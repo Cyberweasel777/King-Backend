@@ -86,6 +86,20 @@ function isValidSolanaAddress(addr: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]+$/.test(s);
 }
 
+// Demo wallets for integration/testing
+router.get('/whales/demo', (req, res) => {
+  res.json({
+    chain: 'solana',
+    wallets: [
+      {
+        label: 'System Program (high activity; good for signatures/debug counters)',
+        address: '11111111111111111111111111111111',
+      },
+    ],
+    note: 'Public addresses for testing whales/debug plumbing. Real wallets required for meaningful token transfer output.',
+  });
+});
+
 router.get('/whales', async (req, res) => {
   const wallet = typeof req.query.wallet === 'string' ? req.query.wallet.trim() : '';
   if (!wallet) {

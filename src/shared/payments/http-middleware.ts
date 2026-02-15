@@ -45,7 +45,11 @@ export function withSubscriptionHttp(appId: AppId, minimumTier: SubscriptionTier
 
     const ok = await isSubscribed(appId, externalUserId, minimumTier);
     if (!ok) {
-      const checkoutUrl = `/api/payments/checkout?app=${encodeURIComponent(appId)}&tier=${encodeURIComponent(minimumTier)}&user=${encodeURIComponent(externalUserId)}`;
+      const checkoutPath = `/api/payments/checkout?app=${encodeURIComponent(appId)}&tier=${encodeURIComponent(minimumTier)}&user=${encodeURIComponent(externalUserId)}`;
+
+      const proto = (req.header('x-forwarded-proto') || req.protocol || 'https').split(',')[0].trim();
+      const host = (req.header('x-forwarded-host') || req.header('host') || '').split(',')[0].trim();
+      const checkoutUrl = host ? `${proto}://${host}${checkoutPath}` : checkoutPath;
 
       res.status(402).json({
         error: 'subscription_required',
