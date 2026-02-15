@@ -12,6 +12,7 @@
 
 export * from './types';
 export * from './access-control';
+export * from './http-middleware';
 export * from './stripe-client';
 export * from './webhook-handler';
 export * from './database';

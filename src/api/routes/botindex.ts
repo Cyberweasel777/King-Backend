@@ -10,6 +10,7 @@ import { Router } from 'express';
 
 // Real correlation engine (migrated from Projects/botindex)
 import correlationRoutes from '../../services/botindex/api/correlation.routes';
+import { withSubscriptionHttp, withFreeLimit, getFreeLimitKey } from '../../shared/payments';
 
 const router = Router();
 
@@ -72,13 +73,26 @@ router.post('/signals', async (req, res) => {
 
 // ============================================================================
 // CORRELATION ENGINE (MIGRATED)
-// Provides:
-//   GET  /api/botindex/correlation/:tokenA/:tokenB
-//   GET  /api/botindex/matrix
-//   GET  /api/botindex/leaders
-//   ...and other analysis endpoints
+// Free tier: limited pair correlations (N/day)
+// Pro tier: everything (matrix, leaders, jobs, unlimited)
+// Caller identity: pass Telegram user id via header `x-external-user-id` or `?user=`
 // ============================================================================
-router.use('/', correlationRoutes);
+
+// Pro-only endpoints (anything that's not a pair correlation)
+router.use(
+  (req, res, next) => {
+    // Pair correlation endpoints look like /correlation/:tokenA/:tokenB
+    if (req.path.startsWith('/correlation/')) return next();
+    return withSubscriptionHttp('botindex', 'pro')(req, res, next);
+  },
+  correlationRoutes
+);
+
+// Free-tier limiter for pair correlations
+router.use(
+  '/correlation',
+  withFreeLimit({ perDay: 5, key: getFreeLimitKey })
+);
 
 // ============================================================================
 // SIGNAL BY ID
