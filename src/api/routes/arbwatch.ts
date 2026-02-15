@@ -6,6 +6,7 @@
  */
 
 import { Router } from 'express';
+import { getMarkets, getOpportunities } from '../../services/arbwatch';
 
 const router = Router();
 
@@ -22,69 +23,33 @@ router.get('/health', (req, res) => {
 
 // ============================================================================
 // LIST MARKETS
-// GET /api/arbwatch/markets — List tracked markets/exchanges
+// GET /api/arbwatch/markets — List tracked prediction markets
 // ============================================================================
 router.get('/markets', async (req, res) => {
-  // TODO: Paste your working market listing code here
-  // Your code should:
-  // 1. Return list of exchanges/DEXs being monitored
-  // 2. Include trading pairs available on each
-  // 3. Show last update timestamp
-  
-  // STUB:
   res.json({
-    markets: [
-      { 
-        id: 'uniswap', 
-        name: 'Uniswap', 
-        type: 'dex',
-        pairs: ['ETH/USDC', 'PEPE/ETH'],
-        lastUpdate: new Date().toISOString()
-      },
-      { 
-        id: 'binance', 
-        name: 'Binance', 
-        type: 'cex',
-        pairs: ['BTC/USDT', 'ETH/USDT'],
-        lastUpdate: new Date().toISOString()
-      }
-    ],
-    message: 'TODO: Paste your working market code here'
+    markets: getMarkets(),
+    message: 'OK'
   });
 });
 
 // ============================================================================
 // OPPORTUNITIES
 // GET /api/arbwatch/opportunities — Get arbitrage opportunities
-// TODO: Add withSubscription('arbwatch', 'basic') for limited results
+// Free: limit=3 (default)
+// Basic+: larger limits and Deepseek-enhanced scoring
 // ============================================================================
 router.get('/opportunities', async (req, res) => {
-  // TODO: Paste your working arbitrage detection code here
-  // Your code should:
-  // 1. Compare prices across markets for same pair
-  // 2. Calculate spread, fees, net profit
-  // 3. Filter by minimum profit threshold
-  // 4. Sort by profitability
-  //
-  // AFTER PASTE: Limit free tier to 3 opportunities
-  
-  // STUB:
-  res.json({
-    opportunities: [
-      {
-        id: 'opp-1',
-        pair: 'PEPE/ETH',
-        buyMarket: 'uniswap',
-        sellMarket: 'binance',
-        buyPrice: 0.00000120,
-        sellPrice: 0.00000125,
-        spread: 4.17,
-        netProfit: 3.85,
-        timestamp: Date.now()
-      }
-    ],
-    message: 'TODO: Paste your working arbitrage detection code here'
+  const limit = Math.min(parseInt(String(req.query.limit || '3'), 10) || 3, 50);
+  const minProfitPercent = parseFloat(String(req.query.minProfitPercent || '0.5')) || 0.5;
+  const useDeepseek = String(req.query.deepseek || 'true') !== 'false';
+
+  const { opportunities, meta } = await getOpportunities({
+    limit,
+    minProfitPercent,
+    useDeepseek,
   });
+
+  res.json({ opportunities, meta });
 });
 
 // ============================================================================
