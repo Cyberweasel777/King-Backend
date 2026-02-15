@@ -64,6 +64,10 @@ interface DexScreenerResponse {
   pairs?: DexScreenerPair[];
 }
 
+interface DexPairResponse {
+  pair?: DexScreenerPair;
+}
+
 interface TokenProfile {
   tokenAddress: string;
   chainId: string;
@@ -144,16 +148,13 @@ export class DexScreenerScraper extends BaseScraper {
     try {
       const response = await this.withRetry(async () => {
         await this.rateLimit();
-        const res = await this.fetchWithTimeout(
-          `${this.baseUrl}/dex/tokens/${address}`
-        );
+        const res = await this.fetchWithTimeout(`${this.baseUrl}/dex/tokens/${address}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res;
       });
 
-      const data = await response.json() as DexScreenerResponse;
+      const data = (await response.json()) as DexScreenerResponse;
       const pairs: DexScreenerPair[] = data.pairs || [];
-
       if (pairs.length === 0) return null;
 
       // Choose "best" pair. DexScreener token results can include multiple pools across DEXes,
@@ -176,14 +177,33 @@ export class DexScreenerScraper extends BaseScraper {
           (hasVolume ? 100_000 : 0) +
           Math.log10(volume24h + 1) * 5_000 +
           (hasTxns ? 10_000 : 0) +
-          (buys + sells)
+          buys +
+          sells
         );
       };
 
       const bestPair = pairs.slice().sort((a, b) => scorePair(b) - scorePair(a))[0];
       if (!bestPair) return null;
 
+      // Transform.
       const token = this.transformToTokenData(bestPair, chain);
+
+      // Fallback hydration: if liquidity is missing/zero, try the pair endpoint once.
+      // This helps for very new pools where /dex/tokens response is sparse.
+      if ((token.metadata?.warnings || []).includes('missing_liquidity') && bestPair?.pairAddress) {
+        const hydrated = await this.hydratePairLiquidity(chain, bestPair.pairAddress);
+        if (hydrated?.liquidityUsd && hydrated.liquidityUsd > 0) {
+          token.liquidityUsd = hydrated.liquidityUsd;
+          // remove warning
+          const next = (token.metadata?.warnings || []).filter((w) => w !== 'missing_liquidity');
+          token.metadata = { ...(token.metadata || {}), warnings: next.length ? next : undefined };
+        } else {
+          token.metadata = {
+            ...(token.metadata || {}),
+            warnings: Array.from(new Set([...(token.metadata?.warnings || []), 'pair_liquidity_unavailable'])),
+          };
+        }
+      }
 
       tokenCache.set(cacheKey, token, 300000); // 5 minute cache
       return token;
@@ -315,6 +335,26 @@ export class DexScreenerScraper extends BaseScraper {
         warnings: warnings.length ? warnings : undefined,
       },
     };
+  }
+
+  private async hydratePairLiquidity(chain: string, pairAddress: string): Promise<{ liquidityUsd: number } | null> {
+    try {
+      const response = await this.withRetry(async () => {
+        await this.rateLimit();
+        const res = await this.fetchWithTimeout(`${this.baseUrl}/dex/pairs/${chain}/${pairAddress}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res;
+      });
+
+      const data = (await response.json()) as DexPairResponse;
+      const pair = data.pair;
+      const liquidityUsd = pair?.liquidity?.usd;
+      if (typeof liquidityUsd !== 'number') return null;
+      return { liquidityUsd };
+    } catch (error) {
+      logger.warn(`Pair liquidity hydration failed for ${chain}/${pairAddress}`, error);
+      return null;
+    }
   }
 
   private calculateTrendingScore(pair: DexScreenerPair): number {
