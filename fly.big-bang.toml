@@ -1,0 +1,113 @@
+app = "king-backend"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+
+# ============================================
+# BIG BANG: All 15 Apps Unified
+# ============================================
+
+[processes]
+  # API Gateway - Horizontal scaling
+  api = "node dist/api/server.js"
+  
+  # Bot Orchestrator - Single instance (stateful connections)
+  bots = "node dist/bots/launcher.js"
+  
+  # Data Pipeline - Continuous scraping
+  pipeline = "node dist/pipeline/scheduler.js"
+  
+  # Background Workers - Queue processing
+  worker = "node dist/worker/queue.js"
+
+# ============================================
+# API SERVICE - Exposed to internet
+# ============================================
+
+[[services]]
+  processes = ["api"]
+  internal_port = 8080
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 2  # High availability for Big Bang
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+    force_https = true
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  [[services.http_checks]]
+    interval = "10s"
+    timeout = "5s"
+    grace_period = "5s"
+    method = "GET"
+    path = "/health"
+    protocol = "http"
+
+# ============================================
+# MACHINE RESOURCES (Big Bang Scale)
+# ============================================
+
+# API: 2 machines, 1GB RAM each (can handle all 15 apps)
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "1gb"
+  processes = ["api"]
+
+# Bots: 1 machine, 1GB RAM (all 15 bots in one process)
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "1gb"
+  processes = ["bots"]
+
+# Pipeline: 1 machine, 512MB (scrapers don't need much RAM)
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  processes = ["pipeline"]
+
+# Worker: 2 machines, 1GB each (queue processing)
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "1gb"
+  processes = ["worker"]
+
+# ============================================
+# METRICS & MONITORING
+# ============================================
+
+[metrics]
+  port = 8080
+  path = "/metrics"
+
+# ============================================
+# AUTOSCALING CONFIG
+# ============================================
+
+# API scales on request volume
+[services.concurrency]
+  type = "requests"
+  soft_limit = 200
+  hard_limit = 500
+
+# Workers scale on queue depth (manual for now)
+# Future: Use flyctl scale count worker=N
+
+# ============================================
+# ROLLBACK STRATEGY
+# ============================================
+
+# Keep last 5 releases for rollback
+[deploy]
+  release_command = "node scripts/health-check.js"
+  strategy = "rolling"

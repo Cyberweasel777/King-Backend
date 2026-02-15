@@ -1,0 +1,136 @@
+/**
+ * Payment Module Type Definitions
+ */
+
+export type AppId = 
+  | 'spreadhunter'
+  | 'deckvault'
+  | 'packpal'
+  | 'dropfarm'
+  | 'dropscout'
+  | 'launchradar'
+  | 'memeradar'
+  | 'memestock'
+  | 'nftpulse'
+  | 'pointtrack'
+  | 'rosterradar'
+  | 'skinsignal'
+  | 'socialindex'
+  | 'botindex'
+  | 'arbwatch';
+
+export type SubscriptionTier = 'free' | 'basic' | 'pro' | 'enterprise';
+export type SubscriptionStatus = 'active' | 'inactive' | 'past_due' | 'canceled' | 'trialing';
+
+export interface TierConfig {
+  id: SubscriptionTier;
+  name: string;
+  price: number;           // in cents
+  currency: string;
+  interval: 'month' | 'year';
+  stripePriceId?: string;  // loaded from env
+  features: string[];
+  limits: TierLimits;
+}
+
+export interface TierLimits {
+  requestsPerDay?: number;
+  alertsPerDay?: number;
+  collections?: number;
+  cards?: number;
+  exportAllowed?: boolean;
+  apiAccess?: boolean;
+  [key: string]: any;      // app-specific limits
+}
+
+export interface Subscription {
+  id: string;
+  userId?: string;
+  appId: AppId;
+  externalUserId: string;      // Telegram ID, Discord ID, etc.
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  tier: SubscriptionTier;
+  status: SubscriptionStatus;
+  currentPeriodStart?: Date;
+  currentPeriodEnd?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PaymentEvent {
+  id: string;
+  appId: AppId;
+  eventType: string;
+  stripeEventId: string;
+  userId?: string;
+  externalUserId?: string;
+  amount?: number;
+  currency?: string;
+  tier?: SubscriptionTier;
+  metadata?: Record<string, any>;
+  createdAt: Date;
+}
+
+export interface CheckoutSessionRequest {
+  externalUserId: string;
+  tier: SubscriptionTier;
+  successUrl: string;
+  cancelUrl: string;
+  email?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface CheckoutSessionResponse {
+  sessionId: string;
+  url: string;
+}
+
+export interface PortalSessionRequest {
+  externalUserId: string;
+  returnUrl: string;
+}
+
+export interface SubscriptionStatusResponse {
+  appId: AppId;
+  externalUserId: string;
+  tier: SubscriptionTier;
+  status: SubscriptionStatus;
+  currentPeriodEnd?: Date;
+  features: string[];
+  limits: TierLimits;
+}
+
+export interface AppPaymentStats {
+  appId: AppId;
+  totalUsers: number;
+  activeSubscriptions: number;
+  mrr: number;                 // in cents
+  currency: string;
+  byTier: Record<SubscriptionTier, {
+    count: number;
+    mrr?: number;
+    percentage?: number;
+  }>;
+  recentEvents: PaymentEvent[];
+}
+
+export interface MissionControlDashboard {
+  timestamp: string;
+  apps: AppStatus[];
+  portfolioTotal: {
+    mrr: number;
+    totalSubs: number;
+    appsWithRevenue: number;
+  };
+}
+
+export interface AppStatus {
+  id: AppId;
+  status: 'healthy' | 'degraded' | 'down';
+  stripeConnected: boolean;
+  mrr: number;
+  activeSubs: number;
+  churn30d: number;
+  lastEvent?: string;
+}

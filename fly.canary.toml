@@ -1,0 +1,70 @@
+app = "king-backend-canary"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+  CANARY_MODE = "true"
+
+# ============================================
+# CANARY: 2 Apps Only (SpreadHunter + MemeRadar)
+# ============================================
+
+[processes]
+  api = "node dist/api/server.js"
+  bots = "node dist/bots/launcher.js"
+  pipeline = "node dist/pipeline/scheduler.js"
+
+# API Service
+[[services]]
+  processes = ["api"]
+  internal_port = 8080
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+    force_https = true
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  [[services.http_checks]]
+    interval = "10s"
+    timeout = "5s"
+    grace_period = "5s"
+    method = "GET"
+    path = "/health"
+    protocol = "http"
+
+# ============================================
+# CANARY SIZING (Minimal Cost)
+# ============================================
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+[metrics]
+  port = 8080
+  path = "/metrics"
+
+# ============================================
+# CANARY FLAGS
+# ============================================
+
+[env.api]
+  ENABLED_APPS = "spreadhunter,memeradar"
+
+[env.bots]
+  ENABLED_APPS = "spreadhunter,memeradar"
+
+[env.pipeline]
+  ENABLED_APPS = "spreadhunter,memeradar"
