@@ -42,14 +42,33 @@ router.get('/opportunities', async (req, res) => {
   const limit = Math.min(parseInt(String(req.query.limit || '3'), 10) || 3, 50);
   const minProfitPercent = parseFloat(String(req.query.minProfitPercent || '0.5')) || 0.5;
   const useDeepseek = String(req.query.deepseek || 'true') !== 'false';
+  const debug = String(req.query.debug || 'false') === 'true';
 
-  const { opportunities, meta } = await getOpportunities({
-    limit,
-    minProfitPercent,
-    useDeepseek,
-  });
+  try {
+    const { opportunities, meta } = await getOpportunities({
+      limit,
+      minProfitPercent,
+      useDeepseek,
+      debug,
+    });
 
-  res.json({ opportunities, meta });
+    res.json({ opportunities, meta });
+  } catch (error) {
+    // Best-effort: never throw from this endpoint.
+    res.json({
+      opportunities: [],
+      meta: {
+        markets: getMarkets(),
+        matches: 0,
+        matchedOutcomes: 0,
+        scrapedAt: new Date().toISOString(),
+        useDeepseek,
+        minProfitPercent,
+        limit,
+        ...(debug ? { errors: [(error as Error)?.message || String(error)] } : {}),
+      },
+    });
+  }
 });
 
 // ============================================================================

@@ -17,32 +17,80 @@ const activeScrapers: { name: PredictionMarket; scraper: any }[] = [
 ];
 
 /**
- * Run all scrapers and return combined results
+ * Per-scraper run metadata (used for debug/observability)
+ */
+export interface ScraperRunMeta {
+  ok: boolean;
+  count: {
+    events: number;
+    markets: number;
+    oddsSnapshots: number;
+  };
+  durationMs: number;
+  errors: string[];
+}
+
+/**
+ * Run all scrapers and return combined results.
+ *
+ * NOTE: This function is intentionally best-effort: one scraper failing should
+ * never prevent others from returning results.
  */
 export async function scrapeAll(): Promise<Record<PredictionMarket, ScrapeResult>> {
+  const { results } = await scrapeAllWithMeta();
+  return results;
+}
+
+/**
+ * Run all scrapers and also return per-scraper metadata for debugging.
+ */
+export async function scrapeAllWithMeta(): Promise<{
+  results: Record<PredictionMarket, ScrapeResult>;
+  meta: Record<PredictionMarket, ScraperRunMeta>;
+}> {
   const results: any = {};
+  const meta: any = {};
 
   console.log('\n🔍 Starting market scrape...\n');
 
   for (const { name, scraper } of activeScrapers) {
+    const startedAt = Date.now();
     try {
-      const result = await scraper.scrape();
-      results[scraper.getMarketplace()] = result;
+      const result: ScrapeResult = await scraper.scrape();
+      const market = scraper.getMarketplace() as PredictionMarket;
+      results[market] = result;
+      meta[market] = {
+        ok: true,
+        count: {
+          events: result.events?.length ?? 0,
+          markets: result.markets?.length ?? 0,
+          oddsSnapshots: result.oddsSnapshots?.length ?? 0,
+        },
+        durationMs: Date.now() - startedAt,
+        errors: result.errors ?? [],
+      } satisfies ScraperRunMeta;
     } catch (error) {
+      const msg = (error as Error)?.message || String(error);
       console.error(`Scraper ${name} failed:`, error);
       results[name] = {
         market: name,
         events: [],
         markets: [],
         oddsSnapshots: [],
-        errors: [(error as Error).message],
+        errors: [msg],
         scrapedAt: new Date().toISOString(),
-      };
+      } satisfies ScrapeResult;
+      meta[name] = {
+        ok: false,
+        count: { events: 0, markets: 0, oddsSnapshots: 0 },
+        durationMs: Date.now() - startedAt,
+        errors: [msg],
+      } satisfies ScraperRunMeta;
     }
   }
 
   console.log('\n✅ Scraping complete\n');
-  return results as Record<PredictionMarket, ScrapeResult>;
+  return { results: results as Record<PredictionMarket, ScrapeResult>, meta };
 }
 
 /**
