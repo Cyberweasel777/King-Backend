@@ -69,6 +69,11 @@ interface TokenProfile {
   chainId: string;
 }
 
+type TokenProfileLite = {
+  address: string;
+  chain: string;
+};
+
 export class DexScreenerScraper extends BaseScraper {
   private baseUrl = 'https://api.dexscreener.com/latest';
 
@@ -193,12 +198,13 @@ export class DexScreenerScraper extends BaseScraper {
   /**
    * Get latest token profiles (boosted/promoted)
    */
-  async getTokenProfiles(): Promise<TokenData[]> {
+  async getTokenProfiles(): Promise<TokenProfileLite[]> {
     try {
       const response = await this.withRetry(async () => {
         await this.rateLimit();
+        // NOTE: token-profiles is NOT under /latest.
         const res = await this.fetchWithTimeout(
-          `${this.baseUrl}/token-profiles/latest/v1`
+          `https://api.dexscreener.com/token-profiles/latest/v1`
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res;
@@ -206,15 +212,10 @@ export class DexScreenerScraper extends BaseScraper {
 
       const profiles = await response.json() as TokenProfile[];
       logger.info(`Fetched ${profiles.length} token profiles`);
-      
-      // Fetch full data for each profile
-      const tokens: TokenData[] = [];
-      for (const profile of profiles.slice(0, 10)) {
-        const token = await this.getTokenByAddress(profile.tokenAddress, profile.chainId);
-        if (token) tokens.push(token);
-      }
 
-      return tokens;
+      return profiles
+        .filter((p) => p && p.tokenAddress && p.chainId)
+        .map((p) => ({ address: p.tokenAddress, chain: p.chainId }));
     } catch (error) {
       logger.error('Failed to fetch token profiles', error);
       return [];
@@ -224,7 +225,7 @@ export class DexScreenerScraper extends BaseScraper {
   /**
    * Main scrape method (for scheduled runs)
    */
-  async scrape(): Promise<{ trending: TrendingToken[]; profiles: TokenData[] }> {
+  async scrape(): Promise<{ trending: TrendingToken[]; profiles: TokenProfileLite[] }> {
     const [trending, profiles] = await Promise.all([
       this.getTrendingSolana(20),
       this.getTokenProfiles(),
