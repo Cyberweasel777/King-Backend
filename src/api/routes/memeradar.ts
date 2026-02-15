@@ -6,6 +6,7 @@
  */
 
 import { Router } from 'express';
+import { getTokens, getTrending, getWhales } from '../../services/memeradar';
 
 const router = Router();
 
@@ -25,35 +26,12 @@ router.get('/health', (req, res) => {
 // GET /api/memeradar/tokens — List all tracked tokens
 // ============================================================================
 router.get('/tokens', async (req, res) => {
-  // TODO: Paste your working token listing code here
-  // Your code should:
-  // 1. Query database for tracked tokens
-  // 2. Support filters: ?sort=volume&limit=50&minMarketCap=1000000
-  // 3. Return paginated results
-  
-  // STUB:
-  res.json({
-    tokens: [
-      { 
-        id: 'pepe', 
-        name: 'Pepe', 
-        symbol: 'PEPE', 
-        price: 0.00000123, 
-        volume24h: 5000000,
-        marketCap: 500000000
-      },
-      { 
-        id: 'doge', 
-        name: 'Dogecoin', 
-        symbol: 'DOGE', 
-        price: 0.08, 
-        volume24h: 1000000000,
-        marketCap: 10000000000
-      }
-    ],
-    total: 2,
-    message: 'TODO: Paste your working token listing code here'
-  });
+  const limit = Math.min(parseInt(String(req.query.limit || '20'), 10) || 20, 50);
+  const q = typeof req.query.q === 'string' ? req.query.q : undefined;
+  const chain = typeof req.query.chain === 'string' ? req.query.chain : undefined;
+
+  const tokens = await getTokens({ q, limit, chain });
+  res.json({ tokens, count: tokens.length });
 });
 
 // ============================================================================
@@ -87,20 +65,10 @@ router.get('/tokens/:id', async (req, res) => {
 // TODO: Add withSubscription('memeradar', 'basic') for free tier limit
 // ============================================================================
 router.get('/trending', async (req, res) => {
-  // TODO: Paste your working trending detection code here
-  // Your code should:
-  // 1. Calculate trending score based on volume, social mentions, price action
-  // 2. Return ranked list
-  // 3. Limit results for free tier (use checkLimit)
-  
-  // STUB:
-  res.json({
-    trending: [
-      { token: 'PEPE', score: 95, change24h: 45.2, volume: 10000000 },
-      { token: 'WOJAK', score: 87, change24h: 32.1, volume: 5000000 }
-    ],
-    message: 'TODO: Paste your working trending code here'
-  });
+  const limit = Math.min(parseInt(String(req.query.limit || '20'), 10) || 20, 50);
+  const chain = (typeof req.query.chain === 'string' ? req.query.chain : 'solana') as any;
+  const trending = await getTrending({ limit, chain });
+  res.json({ trending, count: trending.length });
 });
 
 // ============================================================================
@@ -109,22 +77,14 @@ router.get('/trending', async (req, res) => {
 // TODO: Add withSubscription('memeradar', 'pro') for premium access
 // ============================================================================
 router.get('/whales', async (req, res) => {
-  // TODO: Paste your working whale tracking code here
-  // Your code should:
-  // 1. Query for large transactions (> $10k)
-  // 2. Group by token and action (buy/sell)
-  // 3. Return with timestamps
-  //
-  // AFTER PASTE: Gate with: withSubscription('memeradar', 'pro')
-  
-  // STUB:
-  res.json({
-    whales: [
-      { token: 'PEPE', action: 'buy', amount: 50000, wallet: '0x1234...', time: Date.now() },
-      { token: 'DOGE', action: 'sell', amount: 100000, wallet: '0x5678...', time: Date.now() }
-    ],
-    message: 'TODO: Paste your working whale code here (Premium feature)'
-  });
+  const wallet = typeof req.query.wallet === 'string' ? req.query.wallet : '';
+  if (!wallet) {
+    res.status(400).json({ error: 'wallet_required', message: 'Provide ?wallet=<solana_address>' });
+    return;
+  }
+  const limit = Math.min(parseInt(String(req.query.limit || '50'), 10) || 50, 100);
+  const whales = await getWhales({ wallet, limit });
+  res.json({ whales, count: whales.length });
 });
 
 // ============================================================================
