@@ -7,6 +7,15 @@ import { DexScreenerScraper } from './scrapers/dexscreener';
 import { HeliusScraper } from './scrapers/helius';
 import type { TokenData, TrendingToken, WhaleTransaction } from './types';
 
+type WhalesDebugInfo = {
+  signaturesFetched: number;
+  txDetailsAttempted: number;
+  txDetailsSucceeded: number;
+  parsedTransfers: number;
+  firstError?: string;
+  heliusStatusCodes?: { getSignaturesForAddress?: number; getTransaction: number[] };
+};
+
 const dex = new DexScreenerScraper();
 
 function getHelius(): HeliusScraper | null {
@@ -43,4 +52,29 @@ export async function getWhales(params: { wallet: string; limit?: number }): Pro
   if (!helius) return [];
   const limit = Math.min(params.limit ?? 50, 100);
   return helius.getWalletTransactions(params.wallet, limit);
+}
+
+export async function getWhalesWithDebug(params: {
+  wallet: string;
+  limit?: number;
+}): Promise<{ whales: WhaleTransaction[]; debug: WhalesDebugInfo }> {
+  const helius = getHelius();
+  const limit = Math.min(params.limit ?? 50, 100);
+
+  if (!helius) {
+    return {
+      whales: [],
+      debug: {
+        signaturesFetched: 0,
+        txDetailsAttempted: 0,
+        txDetailsSucceeded: 0,
+        parsedTransfers: 0,
+        firstError: 'helius_not_configured',
+        heliusStatusCodes: { getTransaction: [] },
+      },
+    };
+  }
+
+  const { transactions, debug } = await helius.getWalletTransactionsWithDebug(params.wallet, limit);
+  return { whales: transactions, debug };
 }

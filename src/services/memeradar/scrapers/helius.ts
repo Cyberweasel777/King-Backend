@@ -72,6 +72,18 @@ interface HeliusHoldersResponse {
   };
 }
 
+type WhalesDebugInfo = {
+  signaturesFetched: number;
+  txDetailsAttempted: number;
+  txDetailsSucceeded: number;
+  parsedTransfers: number;
+  firstError?: string;
+  heliusStatusCodes?: {
+    getSignaturesForAddress?: number;
+    getTransaction: number[];
+  };
+};
+
 export class HeliusScraper extends BaseScraper {
   private baseUrl: string;
   private trackedWallets: Map<string, TrackedWallet> = new Map();
@@ -122,7 +134,9 @@ export class HeliusScraper extends BaseScraper {
     wallet: string, 
     limit: number = 100
   ): Promise<WhaleTransaction[]> {
-    const cacheKey = `helius:txs:${wallet}:${limit}`;
+    const effectiveLimit = Math.min(limit, 10);
+
+    const cacheKey = `helius:txs:${wallet}:${effectiveLimit}`;
     const cached = tokenCache.get<WhaleTransaction[]>(cacheKey);
     if (cached) return cached;
 
@@ -136,7 +150,7 @@ export class HeliusScraper extends BaseScraper {
             jsonrpc: '2.0',
             id: 'helius-test',
             method: 'getSignaturesForAddress',
-            params: [wallet, { limit }],
+            params: [wallet, { limit: effectiveLimit }],
           }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -148,7 +162,7 @@ export class HeliusScraper extends BaseScraper {
 
       // Fetch transaction details for each signature
       const transactions: WhaleTransaction[] = [];
-      for (const sig of signatures.slice(0, 20)) { // Limit to 20 for performance
+      for (const sig of signatures.slice(0, effectiveLimit)) {
         const tx = await this.getTransactionDetails(sig.signature);
         if (tx) transactions.push(tx);
       }
@@ -162,9 +176,71 @@ export class HeliusScraper extends BaseScraper {
   }
 
   /**
+   * Get wallet transactions with debug instrumentation.
+   * NOTE: bypasses cache so counters represent actual work performed.
+   */
+  async getWalletTransactionsWithDebug(
+    wallet: string,
+    limit: number = 100
+  ): Promise<{ transactions: WhaleTransaction[]; debug: WhalesDebugInfo }> {
+    const effectiveLimit = Math.min(limit, 10);
+
+    const debug: WhalesDebugInfo = {
+      signaturesFetched: 0,
+      txDetailsAttempted: 0,
+      txDetailsSucceeded: 0,
+      parsedTransfers: 0,
+      heliusStatusCodes: { getTransaction: [] },
+    };
+
+    try {
+      const response = await this.withRetry(async () => {
+        await this.rateLimit();
+        const res = await this.fetchWithTimeout(this.baseUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 'helius-test',
+            method: 'getSignaturesForAddress',
+            params: [wallet, { limit: effectiveLimit }],
+          }),
+        });
+        debug.heliusStatusCodes!.getSignaturesForAddress = res.status;
+        if (!res.ok) {
+          if (!debug.firstError) debug.firstError = `getSignaturesForAddress HTTP ${res.status}`;
+          throw new Error(`HTTP ${res.status}`);
+        }
+        return res;
+      });
+
+      const data = (await response.json()) as HeliusSignaturesResponse;
+      const signatures = data.result || [];
+      debug.signaturesFetched = signatures.length;
+
+      const transactions: WhaleTransaction[] = [];
+      for (const sig of signatures.slice(0, effectiveLimit)) {
+        debug.txDetailsAttempted += 1;
+        const tx = await this.getTransactionDetails(sig.signature, debug);
+        if (tx) transactions.push(tx);
+      }
+
+      logger.debug(
+        `whales(debug) wallet=${wallet} limit=${effectiveLimit} signaturesFetched=${debug.signaturesFetched} txDetailsAttempted=${debug.txDetailsAttempted} txDetailsSucceeded=${debug.txDetailsSucceeded} parsedTransfers=${debug.parsedTransfers}`
+      );
+
+      return { transactions, debug };
+    } catch (error) {
+      if (!debug.firstError) debug.firstError = error instanceof Error ? error.message : String(error);
+      logger.error(`Failed to fetch wallet transactions for ${wallet} (debug)`, error);
+      return { transactions: [], debug };
+    }
+  }
+
+  /**
    * Get transaction details by signature
    */
-  async getTransactionDetails(signature: string): Promise<WhaleTransaction | null> {
+  async getTransactionDetails(signature: string, debug?: WhalesDebugInfo): Promise<WhaleTransaction | null> {
     try {
       const response = await this.withRetry(async () => {
         await this.rateLimit();
@@ -178,20 +254,26 @@ export class HeliusScraper extends BaseScraper {
             params: [signature, { maxSupportedTransactionVersion: 0 }],
           }),
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (debug?.heliusStatusCodes) debug.heliusStatusCodes.getTransaction.push(res.status);
+        if (!res.ok) {
+          if (debug && !debug.firstError) debug.firstError = `getTransaction HTTP ${res.status}`;
+          throw new Error(`HTTP ${res.status}`);
+        }
         return res;
       });
 
-      const data = await response.json() as HeliusTxResponse;
+      const data = (await response.json()) as HeliusTxResponse;
       const tx = data.result;
 
       if (!tx || !tx.meta) return null;
 
       // Parse token transfers from transaction
       const tokenTransfers = this.parseTokenTransfers(tx);
+      if (debug) debug.parsedTransfers += tokenTransfers.length;
       if (tokenTransfers.length === 0) return null;
 
       const transfer = tokenTransfers[0];
+      if (debug) debug.txDetailsSucceeded += 1;
       
       return {
         signature,
@@ -206,6 +288,7 @@ export class HeliusScraper extends BaseScraper {
         chain: 'solana',
       };
     } catch (error) {
+      if (debug && !debug.firstError) debug.firstError = error instanceof Error ? error.message : String(error);
       logger.error(`Failed to fetch transaction ${signature}`, error);
       return null;
     }

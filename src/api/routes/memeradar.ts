@@ -6,7 +6,7 @@
  */
 
 import { Router } from 'express';
-import { getTokens, getTrending, getWhales } from '../../services/memeradar';
+import { getTokens, getTrending, getWhales, getWhalesWithDebug } from '../../services/memeradar';
 
 const router = Router();
 
@@ -82,7 +82,25 @@ router.get('/whales', async (req, res) => {
     res.status(400).json({ error: 'wallet_required', message: 'Provide ?wallet=<solana_address>' });
     return;
   }
+
   const limit = Math.min(parseInt(String(req.query.limit || '50'), 10) || 50, 100);
+  const debug = String(req.query.debug || '').toLowerCase() === 'true';
+
+  if (debug) {
+    const { whales, debug: d } = await getWhalesWithDebug({ wallet, limit });
+    res.json({
+      whales,
+      count: whales.length,
+      signaturesFetched: d.signaturesFetched,
+      txDetailsAttempted: d.txDetailsAttempted,
+      txDetailsSucceeded: d.txDetailsSucceeded,
+      parsedTransfers: d.parsedTransfers,
+      firstError: d.firstError,
+      heliusStatusCodes: d.heliusStatusCodes,
+    });
+    return;
+  }
+
   const whales = await getWhales({ wallet, limit });
   res.json({ whales, count: whales.length });
 });
