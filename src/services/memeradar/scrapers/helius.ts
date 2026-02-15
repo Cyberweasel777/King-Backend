@@ -135,9 +135,8 @@ export class HeliusScraper extends BaseScraper {
     limit: number = 100
   ): Promise<WhaleTransaction[]> {
     const txDetailsLimit = 10;
-    const effectiveLimit = Math.min(limit, txDetailsLimit);
 
-    const cacheKey = `helius:txs:${wallet}:${effectiveLimit}`;
+    const cacheKey = `helius:txs:${wallet}:${limit}`;
     const cached = tokenCache.get<WhaleTransaction[]>(cacheKey);
     if (cached) return cached;
 
@@ -151,7 +150,7 @@ export class HeliusScraper extends BaseScraper {
             jsonrpc: '2.0',
             id: 'helius-test',
             method: 'getSignaturesForAddress',
-            params: [wallet, { limit: effectiveLimit }],
+            params: [wallet, { limit }],
           }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -184,7 +183,7 @@ export class HeliusScraper extends BaseScraper {
     wallet: string,
     limit: number = 100
   ): Promise<{ transactions: WhaleTransaction[]; debug: WhalesDebugInfo }> {
-    const effectiveLimit = Math.min(limit, 10);
+    const txDetailsLimit = 10;
 
     const debug: WhalesDebugInfo = {
       signaturesFetched: 0,
