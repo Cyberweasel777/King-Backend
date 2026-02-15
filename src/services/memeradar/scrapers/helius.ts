@@ -84,6 +84,16 @@ type WhalesDebugInfo = {
   };
 };
 
+function formatAmount(n: number): string {
+  if (!Number.isFinite(n)) return '0';
+  const abs = Math.abs(n);
+  if (abs === 0) return '0';
+  // Keep small numbers readable without sci-notation.
+  if (abs < 1e-6) return n.toFixed(12).replace(/0+$/, '').replace(/\.$/, '');
+  if (abs < 1) return n.toFixed(8).replace(/0+$/, '').replace(/\.$/, '');
+  return n.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+}
+
 export class HeliusScraper extends BaseScraper {
   private baseUrl: string;
   private trackedWallets: Map<string, TrackedWallet> = new Map();
@@ -135,8 +145,9 @@ export class HeliusScraper extends BaseScraper {
     limit: number = 100
   ): Promise<WhaleTransaction[]> {
     const txDetailsLimit = 10;
+    const effectiveLimit = Math.min(limit, txDetailsLimit);
 
-    const cacheKey = `helius:txs:${wallet}:${limit}`;
+    const cacheKey = `helius:txs:${wallet}:${effectiveLimit}`;
     const cached = tokenCache.get<WhaleTransaction[]>(cacheKey);
     if (cached) return cached;
 
@@ -150,7 +161,7 @@ export class HeliusScraper extends BaseScraper {
             jsonrpc: '2.0',
             id: 'helius-test',
             method: 'getSignaturesForAddress',
-            params: [wallet, { limit }],
+            params: [wallet, { limit: effectiveLimit }],
           }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -162,7 +173,7 @@ export class HeliusScraper extends BaseScraper {
 
       // Fetch transaction details for each signature
       const transactions: WhaleTransaction[] = [];
-      for (const sig of signatures.slice(0, txDetailsLimit)) {
+      for (const sig of signatures.slice(0, effectiveLimit)) {
         const tx = await this.getTransactionDetails(sig.signature);
         if (tx) transactions.push(tx);
       }
@@ -184,6 +195,7 @@ export class HeliusScraper extends BaseScraper {
     limit: number = 100
   ): Promise<{ transactions: WhaleTransaction[]; debug: WhalesDebugInfo }> {
     const txDetailsLimit = 10;
+    const effectiveLimit = Math.min(limit, txDetailsLimit);
 
     const debug: WhalesDebugInfo = {
       signaturesFetched: 0,
@@ -203,7 +215,7 @@ export class HeliusScraper extends BaseScraper {
             jsonrpc: '2.0',
             id: 'helius-test',
             method: 'getSignaturesForAddress',
-            params: [wallet, { limit }],
+            params: [wallet, { limit: effectiveLimit }],
           }),
         });
         debug.heliusStatusCodes!.getSignaturesForAddress = res.status;
@@ -219,7 +231,7 @@ export class HeliusScraper extends BaseScraper {
       debug.signaturesFetched = signatures.length;
 
       const transactions: WhaleTransaction[] = [];
-      for (const sig of signatures.slice(0, txDetailsLimit)) {
+      for (const sig of signatures.slice(0, effectiveLimit)) {
         debug.txDetailsAttempted += 1;
         const tx = await this.getTransactionDetails(sig.signature, debug);
         if (tx) transactions.push(tx);
@@ -277,11 +289,14 @@ export class HeliusScraper extends BaseScraper {
       
       return {
         signature,
+        solscanUrl: `https://solscan.io/tx/${signature}`,
         wallet: tx.transaction?.message?.accountKeys?.[0] || '',
         tokenIn: transfer.tokenIn,
         tokenOut: transfer.tokenOut,
         amountIn: transfer.amountIn,
         amountOut: transfer.amountOut,
+        amountInDisplay: formatAmount(transfer.amountIn),
+        amountOutDisplay: formatAmount(transfer.amountOut),
         valueUsd: 0, // Would need price data
         timestamp: new Date((tx.blockTime || 0) * 1000).toISOString(),
         type: transfer.type,

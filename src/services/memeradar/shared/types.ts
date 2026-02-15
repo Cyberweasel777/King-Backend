@@ -40,11 +40,16 @@ export interface TrendingToken {
 // Whale wallet transaction
 export interface WhaleTransaction {
   signature: string;
+  /** Convenience link for UI */
+  solscanUrl?: string;
   wallet: string;
   tokenIn: string;
   tokenOut: string;
   amountIn: number;
   amountOut: number;
+  /** Pre-formatted amounts for UI (avoids scientific notation) */
+  amountInDisplay?: string;
+  amountOutDisplay?: string;
   valueUsd: number;
   timestamp: string;
   type: 'buy' | 'sell' | 'swap';
