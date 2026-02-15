@@ -156,8 +156,15 @@ export class DexScreenerScraper extends BaseScraper {
 
       if (pairs.length === 0) return null;
 
-      // Get the pair with highest liquidity
-      const bestPair = pairs.sort((a, b) => b.liquidity.usd - a.liquidity.usd)[0];
+      // Get the pair with highest liquidity (some pairs omit liquidity/volume fields)
+      const candidates = pairs.filter(
+        (p) => typeof p?.liquidity?.usd === 'number' && Number.isFinite(p.liquidity.usd)
+      );
+      const bestPair = (candidates.length ? candidates : pairs)
+        .slice()
+        .sort((a, b) => (b?.liquidity?.usd || 0) - (a?.liquidity?.usd || 0))[0];
+
+      if (!bestPair) return null;
       const token = this.transformToTokenData(bestPair, chain);
 
       tokenCache.set(cacheKey, token, 300000); // 5 minute cache
@@ -271,10 +278,10 @@ export class DexScreenerScraper extends BaseScraper {
       chain: chain as any,
       priceUsd: parseFloat(pair.priceUsd) || 0,
       marketCap: pair.marketCap || pair.fdv || 0,
-      liquidityUsd: pair.liquidity.usd,
-      volume24h: pair.volume.h24,
-      priceChange24h: pair.priceChange.h24,
-      priceChange1h: pair.priceChange.h1,
+      liquidityUsd: pair?.liquidity?.usd || 0,
+      volume24h: pair?.volume?.h24 || 0,
+      priceChange24h: pair?.priceChange?.h24 || 0,
+      priceChange1h: pair?.priceChange?.h1 || 0,
       holders: 0, // DexScreener doesn't provide this
       timestamp: new Date().toISOString(),
       dexUrl: `https://dexscreener.com/${pair.chainId}/${pair.pairAddress}`,
@@ -286,10 +293,16 @@ export class DexScreenerScraper extends BaseScraper {
 
   private calculateTrendingScore(pair: DexScreenerPair): number {
     // Simple trending score based on volume, price change, and liquidity
-    const volumeScore = Math.log10(pair.volume.h24 + 1) * 10;
-    const priceChangeScore = Math.abs(pair.priceChange.h24) * 2;
-    const liquidityScore = Math.log10(pair.liquidity.usd + 1) * 5;
-    const activityScore = (pair.txns.h24.buys + pair.txns.h24.sells) / 100;
+    const volume24h = pair?.volume?.h24 || 0;
+    const priceChange24h = pair?.priceChange?.h24 || 0;
+    const liquidityUsd = pair?.liquidity?.usd || 0;
+    const buys = pair?.txns?.h24?.buys || 0;
+    const sells = pair?.txns?.h24?.sells || 0;
+
+    const volumeScore = Math.log10(volume24h + 1) * 10;
+    const priceChangeScore = Math.abs(priceChange24h) * 2;
+    const liquidityScore = Math.log10(liquidityUsd + 1) * 5;
+    const activityScore = (buys + sells) / 100;
     
     return Math.round(volumeScore + priceChangeScore + liquidityScore + activityScore);
   }
