@@ -78,20 +78,22 @@ router.post('/signals', async (req, res) => {
 // Caller identity: pass Telegram user id via header `x-external-user-id` or `?user=`
 // ============================================================================
 
-// Pro-only endpoints (anything that's not a pair correlation)
+// Mixed access model:
+// - Free: ONLY pair correlation routes: /correlation/:tokenA/:tokenB (limited per day)
+// - Pro: everything else (matrix/leaders/jobs/etc.)
 router.use(
-  (req, res, next) => {
-    // Pair correlation endpoints look like /correlation/:tokenA/:tokenB
-    if (req.path.startsWith('/correlation/')) return next();
+  async (req, res, next) => {
+    const isPairCorrelation = /^\/correlation\/[^/]+\/[^/]+/.test(req.path);
+
+    if (isPairCorrelation) {
+      // Apply free-tier rate limit
+      return withFreeLimit({ perDay: 5, key: getFreeLimitKey })(req, res, next);
+    }
+
+    // Anything else in the correlation router requires Pro
     return withSubscriptionHttp('botindex', 'pro')(req, res, next);
   },
   correlationRoutes
-);
-
-// Free-tier limiter for pair correlations
-router.use(
-  '/correlation',
-  withFreeLimit({ perDay: 5, key: getFreeLimitKey })
 );
 
 // ============================================================================
