@@ -23,6 +23,38 @@ interface CacheEntry {
 const priceCache = new Map<string, CacheEntry>();
 
 /**
+ * Resolve the most liquid pool/pair for a token mint using DEXScreener.
+ * Returns a pool/pair address suitable for GeckoTerminal /pools/{id} calls.
+ */
+async function resolveTopPoolFromDexscreener(chain: string, tokenAddress: string): Promise<string | null> {
+  try {
+    const url = `${DEXSCREENER_API}/dex/tokens/${tokenAddress}`;
+    await rateLimit();
+    const res = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'BotIndex/1.0'
+      }
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { pairs?: any[] };
+    if (!data.pairs || data.pairs.length === 0) return null;
+
+    // Prefer matching chain, then highest liquidity
+    const pairs = data.pairs
+      .filter((p: any) => !p.chainId || String(p.chainId).toLowerCase() === String(chain).toLowerCase());
+
+    const best = (pairs.length ? pairs : data.pairs)
+      .sort((a: any, b: any) => parseFloat(b.liquidity?.usd || 0) - parseFloat(a.liquidity?.usd || 0))[0];
+
+    // DEXScreener uses pairAddress for pools
+    return best?.pairAddress || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Fetch price series for a token
  * @param token - Token identifier (chain:address or symbol)
  * @param window - Time window (1h, 24h, 7d, 30d)
@@ -81,7 +113,9 @@ async function fetchFromDEXScreener(
       : ['solana', token]; // Default to solana if no chain specified
 
     // Build API URL
-    const url = `${DEXSCREENER_API}/dex/pairs/${chain}/${address}`;
+    // NOTE: DEXScreener /dex/pairs expects a *pair address*, not a token mint.
+    // We use /dex/tokens to resolve pairs for a token mint.
+    const url = `${DEXSCREENER_API}/dex/tokens/${address}`;
     
     await rateLimit();
     
@@ -184,7 +218,12 @@ async function fetchFromGeckoTerminal(
     const limit = Math.min(limitMap[window] || 24, 1000);
 
     // Build API URL
-    const url = `${GECKOTERMINAL_API}/networks/${chain}/pools/${address}/ohlcv/${timeframe}?limit=${limit}`;
+    // GeckoTerminal OHLCV endpoint expects a *pool address*, not a token mint.
+    // Resolve a likely pool via DEXScreener, then request OHLCV for that pool.
+    const resolvedPool = await resolveTopPoolFromDexscreener(chain, address);
+    if (!resolvedPool) return null;
+
+    const url = `${GECKOTERMINAL_API}/networks/${chain}/pools/${resolvedPool}/ohlcv/${timeframe}?limit=${limit}`;
     
     await rateLimit();
     
@@ -289,7 +328,7 @@ export async function getAggregatedPrice(
     await rateLimit();
     
     const dexResponse = await fetch(
-      `${DEXSCREENER_API}/dex/pairs/${chain}/${address}`,
+      `${DEXSCREENER_API}/dex/tokens/${address}`,
       {
         headers: {
           'Accept': 'application/json',
