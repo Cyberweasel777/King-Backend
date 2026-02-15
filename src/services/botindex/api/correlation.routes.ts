@@ -74,10 +74,10 @@ router.get('/correlation/:tokenA/:tokenB', async (req: Request, res: Response) =
       return;
     }
 
-    // Fetch price series
+    // Fetch price series (prefer GeckoTerminal OHLCV, fallback to DEXScreener)
     const [seriesA, seriesB] = await Promise.all([
-      fetchPriceSeries(tokenA, window),
-      fetchPriceSeries(tokenB, window)
+      fetchPriceSeries(tokenA, window, 'fallback'),
+      fetchPriceSeries(tokenB, window, 'fallback')
     ]);
 
     if (!seriesA || !seriesB) {
@@ -123,10 +123,10 @@ router.get('/correlation/deep/:tokenA/:tokenB', async (req: Request, res: Respon
       return;
     }
 
-    // Fetch price series
+    // Fetch price series (prefer GeckoTerminal OHLCV, fallback to DEXScreener)
     const [seriesA, seriesB] = await Promise.all([
-      fetchPriceSeries(tokenA, window),
-      fetchPriceSeries(tokenB, window)
+      fetchPriceSeries(tokenA, window, 'fallback'),
+      fetchPriceSeries(tokenB, window, 'fallback')
     ]);
 
     if (!seriesA || !seriesB) {

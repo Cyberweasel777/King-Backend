@@ -64,7 +64,7 @@ async function resolveTopPoolFromDexscreener(chain: string, tokenAddress: string
 export async function fetchPriceSeries(
   token: string,
   window: '1h' | '24h' | '7d' | '30d' = '24h',
-  source: PriceDataSource['name'] = 'dexscreener'
+  source: PriceDataSource['name'] = 'fallback'
 ): Promise<PriceSeries | null> {
   const cacheKey = `${token}:${window}:${source}`;
   
@@ -77,12 +77,13 @@ export async function fetchPriceSeries(
   try {
     let result: PriceSeries | null = null;
 
-    if (source === 'dexscreener' || source === 'fallback') {
-      result = await fetchFromDEXScreener(token, window);
+    // Prefer GeckoTerminal for real OHLCV candles; fallback to Dexscreener.
+    if (source === 'geckoterminal' || source === 'fallback') {
+      result = await fetchFromGeckoTerminal(token, window);
     }
 
-    if (!result && (source === 'geckoterminal' || source === 'fallback')) {
-      result = await fetchFromGeckoTerminal(token, window);
+    if (!result && (source === 'dexscreener' || source === 'fallback')) {
+      result = await fetchFromDEXScreener(token, window);
     }
 
     if (result) {
