@@ -11,6 +11,7 @@ import {
 } from '../types';
 
 export class KalshiScraper extends BaseScraper {
+  // Kalshi migrated their prod Trading API to api.elections.kalshi.com
   private apiUrl = 'https://api.elections.kalshi.com/trade-api/v2';
 
   constructor() {
@@ -36,30 +37,51 @@ export class KalshiScraper extends BaseScraper {
 
     try {
       console.log('🔍 Fetching Kalshi events...');
-      
-      // Fetch active events
-      const activeEvents = await this.fetchActiveEvents();
-      
-      for (const eventData of activeEvents.slice(0, 50)) {
+
+      // Fetch open events (single request)
+      const openEvents = await this.fetchActiveEvents();
+      const eventByTicker = new Map<string, KalshiEvent>();
+      for (const e of openEvents) {
+        const t = (e as any).event_ticker || (e as any).ticker;
+        if (t) eventByTicker.set(String(t), e);
+      }
+
+      // Fetch open markets (single request)
+      console.log('🔍 Fetching Kalshi markets...');
+      const openMarkets = await this.fetchOpenMarkets();
+
+      const emittedEvents = new Set<string>();
+
+      for (const marketData of openMarkets) {
         try {
-          const event = this.parseEvent(eventData);
-          events.push(event);
+          const eventTicker = String((marketData as any).event_ticker || '');
+          const eventId = `ks_${eventTicker}`;
 
-          // Fetch markets for this event
-          const eventMarkets = await this.fetchMarketsForEvent(eventData.ticker);
-
-          for (const marketData of eventMarkets) {
-            if (marketData.status !== 'active') continue;
-
-            const market = this.parseMarket(marketData, event.id);
-            markets.push(market);
-
-            // Get odds snapshot
-            const snapshot = this.createOddsSnapshot(market);
-            oddsSnapshots.push(snapshot);
+          if (eventTicker && !emittedEvents.has(eventTicker)) {
+            const eventData = eventByTicker.get(eventTicker);
+            const event = eventData ? this.parseEvent(eventData) : {
+              id: eventId,
+              title: (marketData as any).title || eventTicker,
+              description: undefined,
+              category: 'General',
+              resolutionSource: 'Kalshi Resolution',
+              resolutionTime: (marketData as any).close_time,
+              status: 'active' as const,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            events.push(event);
+            emittedEvents.add(eventTicker);
           }
+
+          // Some endpoints return status="active" even when filtered with status=open
+          const market = this.parseMarket(marketData as any, eventId);
+          markets.push(market);
+
+          const snapshot = this.createOddsSnapshot(market);
+          oddsSnapshots.push(snapshot);
         } catch (err) {
-          errors.push(`Event ${eventData.ticker}: ${(err as Error).message}`);
+          errors.push(`Market ${(marketData as any).ticker || ''}: ${(err as Error).message}`);
         }
       }
 
@@ -81,11 +103,12 @@ export class KalshiScraper extends BaseScraper {
   }
 
   private async fetchActiveEvents(): Promise<KalshiEvent[]> {
+    // Kalshi uses `status=open` for events (not `active`).
     const response = await this.request<{ events: KalshiEvent[] }>({
       method: 'GET',
       url: `${this.apiUrl}/events`,
       params: {
-        status: 'active',
+        status: 'open',
         limit: 100,
       },
     });
@@ -93,27 +116,31 @@ export class KalshiScraper extends BaseScraper {
     return response.events || [];
   }
 
-  private async fetchMarketsForEvent(eventTicker: string): Promise<KalshiMarket[]> {
-    try {
-      const response = await this.request<{ markets: KalshiMarket[] }>({
-        method: 'GET',
-        url: `${this.apiUrl}/events/${eventTicker}/markets`,
-      });
-      return response.markets || [];
-    } catch (error) {
-      console.warn(`Failed to fetch markets for event ${eventTicker}:`, error);
-      return [];
-    }
+  private async fetchOpenMarkets(): Promise<KalshiMarket[]> {
+    // Pull a page of open markets (no auth required for public market data).
+    // Keeping this as a single request avoids N+1 fetches per event.
+    const response = await this.request<{ markets: KalshiMarket[] }>({
+      method: 'GET',
+      url: `${this.apiUrl}/markets`,
+      params: {
+        status: 'open',
+        limit: 200,
+      },
+    });
+
+    return response.markets || [];
   }
 
   private parseEvent(eventData: KalshiEvent): PredictionEvent {
+    const ticker = (eventData as any).event_ticker || (eventData as any).ticker;
+
     return {
-      id: `ks_${eventData.ticker}`,
-      title: eventData.title,
-      description: eventData.description,
-      category: eventData.category || 'General',
+      id: `ks_${ticker}`,
+      title: (eventData as any).title,
+      description: (eventData as any).description,
+      category: (eventData as any).category || 'General',
       resolutionSource: 'Kalshi Resolution',
-      resolutionTime: eventData.close_time,
+      resolutionTime: (eventData as any).close_time,
       status: 'active',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

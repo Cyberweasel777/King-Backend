@@ -24,48 +24,48 @@ export function matchMarketsAcrossPlatforms(
   const matches: CrossMarketMatch[] = [];
   const marketList = Object.values(markets).flat();
 
-  // Group by normalized question text
+  // Group by normalized question text (cross-platform)
   const byQuestion: Record<string, Market[]> = {};
-  
   for (const market of marketList) {
     const normalized = normalizeQuestion(market.question);
-    if (!byQuestion[normalized]) {
-      byQuestion[normalized] = [];
-    }
+    if (!byQuestion[normalized]) byQuestion[normalized] = [];
     byQuestion[normalized].push(market);
   }
 
-  // Find matches with multiple markets
+  // Any question that appears on >=2 platforms is a candidate cross-market match.
+  // NOTE: eventId is platform-specific (pm_* vs ks_*), so we cannot group by it.
   for (const [question, marketGroup] of Object.entries(byQuestion)) {
     if (marketGroup.length < 2) continue;
 
-    // Group by event
-    const byEvent: Record<string, Market[]> = {};
-    for (const m of marketGroup) {
-      if (!byEvent[m.eventId]) byEvent[m.eventId] = [];
-      byEvent[m.eventId].push(m);
-    }
+    const uniquePlatforms = new Set(marketGroup.map(m => m.market));
+    if (uniquePlatforms.size < 2) continue;
 
-    for (const [eventId, eventMarkets] of Object.entries(byEvent)) {
-      if (eventMarkets.length < 2) continue;
+    const matchedOutcomes = findCommonOutcomes(marketGroup);
+    if (matchedOutcomes.length === 0) continue;
 
-      const event = findEvent(events, eventId);
-      if (!event) continue;
+    // Derive a stable cross-platform id from the normalized question.
+    const eventId = `q_${question}`;
 
-      const matchedOutcomes = findCommonOutcomes(eventMarkets);
-      
-      matches.push({
-        eventId,
-        eventTitle: event.title,
-        question,
-        markets: eventMarkets.map(m => ({
-          market: m.market,
-          marketId: m.id,
-          outcomes: m.outcomePrices,
-        })),
-        matchedOutcomes,
-      });
-    }
+    // Prefer an event title if we can find one; otherwise fall back to question text.
+    const eventTitle = (() => {
+      for (const m of marketGroup) {
+        const e = findEvent(events, m.eventId);
+        if (e?.title) return e.title;
+      }
+      return marketGroup[0]?.question || 'Unknown Event';
+    })();
+
+    matches.push({
+      eventId,
+      eventTitle,
+      question,
+      markets: marketGroup.map(m => ({
+        market: m.market,
+        marketId: m.id,
+        outcomes: m.outcomePrices,
+      })),
+      matchedOutcomes,
+    });
   }
 
   return matches;
@@ -301,8 +301,9 @@ function findEvent(
 
 function findCommonOutcomes(markets: Market[]): string[] {
   if (markets.length === 0) return [];
-  
-  const firstOutcomes = Object.keys(markets[0].outcomes);
+
+  // Outcomes are represented in Market.outcomePrices (map outcomeName -> price)
+  const firstOutcomes = Object.keys(markets[0].outcomePrices);
   const common: string[] = [];
 
   for (const outcome of firstOutcomes) {

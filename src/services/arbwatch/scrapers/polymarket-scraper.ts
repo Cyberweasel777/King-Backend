@@ -88,8 +88,8 @@ export class PolymarketScraper extends BaseScraper {
         active: true,
         closed: false,
         limit: 100,
-        sort: 'volume',
-        order: 'desc',
+        // NOTE: Gamma API sorting params have changed over time; keep this call minimal
+        // to avoid 422 validation errors (e.g. "order fields are not valid").
       },
     });
 
