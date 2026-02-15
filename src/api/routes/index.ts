@@ -9,6 +9,7 @@ import { Router } from 'express';
 import botindexRouter from './botindex';
 import memeradarRouter from './memeradar';
 import arbwatchRouter from './arbwatch';
+import paymentsGlobalRouter from './payments-global';
 
 const router = Router();
 
@@ -16,6 +17,9 @@ const router = Router();
 router.use('/botindex', botindexRouter);
 router.use('/memeradar', memeradarRouter);
 router.use('/arbwatch', arbwatchRouter);
+
+// Global payments helper routes
+router.use('/payments', paymentsGlobalRouter);
 
 // TODO: Add remaining 12 apps here
 // router.use('/spreadhunter', spreadhunterRouter);

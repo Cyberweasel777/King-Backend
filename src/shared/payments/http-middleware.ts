@@ -45,10 +45,13 @@ export function withSubscriptionHttp(appId: AppId, minimumTier: SubscriptionTier
 
     const ok = await isSubscribed(appId, externalUserId, minimumTier);
     if (!ok) {
+      const checkoutUrl = `/api/payments/checkout?app=${encodeURIComponent(appId)}&tier=${encodeURIComponent(minimumTier)}&user=${encodeURIComponent(externalUserId)}`;
+
       res.status(402).json({
         error: 'subscription_required',
         appId,
         requiredTier: minimumTier,
+        checkoutUrl,
         message: 'Upgrade required for this endpoint.'
       });
       return;
