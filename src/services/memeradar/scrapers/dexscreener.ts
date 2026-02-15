@@ -100,7 +100,7 @@ export class DexScreenerScraper extends BaseScraper {
       const response = await this.withRetry(async () => {
         await this.rateLimit();
         const res = await this.fetchWithTimeout(
-          `${this.baseUrl}/dex/search?q=solana&order=volume24h&limit=${limit * 2}`
+          `${this.baseUrl}/dex/search?q=solana`
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res;
@@ -109,8 +109,13 @@ export class DexScreenerScraper extends BaseScraper {
       const data = await response.json() as DexScreenerResponse;
       const pairs: DexScreenerPair[] = data.pairs || [];
 
+      // Sort by 24h volume (DexScreener search results are not ordered)
+      const sorted = pairs
+        .filter((p) => p && (p as any).volume && typeof (p as any).volume.h24 === 'number')
+        .sort((a, b) => (b.volume.h24 || 0) - (a.volume.h24 || 0));
+
       // Filter for Solana memecoins (exclude major tokens)
-      const memecoins = this.filterMemecoins(pairs, 'solana')
+      const memecoins = this.filterMemecoins(sorted, 'solana')
         .slice(0, limit)
         .map((pair, index) => this.transformToTrending(pair, index + 1));
 
