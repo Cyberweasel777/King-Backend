@@ -95,33 +95,32 @@ export class DexScreenerScraper extends BaseScraper {
     logger.info('Fetching trending Solana tokens');
 
     try {
-      // DexScreener doesn't have a direct "trending" endpoint, 
-      // so we fetch top pairs by volume
-      const response = await this.withRetry(async () => {
-        await this.rateLimit();
-        const res = await this.fetchWithTimeout(
-          `${this.baseUrl}/dex/search?q=solana`
-        );
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res;
-      });
+      // DexScreener doesn't expose a clean "trending Solana memecoins" endpoint.
+      // Best-effort approach:
+      //  1) Pull latest token profiles (boosted/promoted)
+      //  2) Filter to Solana
+      //  3) Fetch token details via /dex/tokens/{address}
+      const profiles = await this.getTokenProfiles();
 
-      const data = await response.json() as DexScreenerResponse;
-      const pairs: DexScreenerPair[] = data.pairs || [];
+      const solana = profiles.filter((t) => t.chain === 'solana').slice(0, limit * 2);
 
-      // Sort by 24h volume (DexScreener search results are not ordered)
-      const sorted = pairs
-        .filter((p) => p && (p as any).volume && typeof (p as any).volume.h24 === 'number')
-        .sort((a, b) => (b.volume.h24 || 0) - (a.volume.h24 || 0));
+      const enriched: TokenData[] = [];
+      for (const t of solana) {
+        const full = await this.getTokenByAddress(t.address, 'solana');
+        if (full) enriched.push(full);
+        if (enriched.length >= limit) break;
+      }
 
-      // Filter for Solana memecoins (exclude major tokens)
-      const memecoins = this.filterMemecoins(sorted, 'solana')
-        .slice(0, limit)
-        .map((pair, index) => this.transformToTrending(pair, index + 1));
+      // Convert to TrendingToken
+      const memecoins: TrendingToken[] = enriched.map((token, i) => ({
+        rank: i + 1,
+        token,
+        trendingScore: (token.volume24h || 0) + (token.liquidityUsd || 0) + Math.abs(token.priceChange24h || 0) * 1000,
+      }));
 
       priceCache.set(cacheKey, memecoins, 60000); // 1 minute cache
-      logger.info(`Found ${memecoins.length} trending Solana memecoins`);
-      
+      logger.info(`Found ${memecoins.length} trending Solana memecoins (profiles-based)`);
+
       return memecoins;
     } catch (error) {
       logger.error('Failed to fetch trending tokens', error);
