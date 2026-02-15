@@ -76,10 +76,27 @@ router.get('/trending', async (req, res) => {
 // GET /api/memeradar/whales — Get whale transactions
 // TODO: Add withSubscription('memeradar', 'pro') for premium access
 // ============================================================================
+function isValidSolanaAddress(addr: string): boolean {
+  // Lightweight base58 + length validation (avoids pulling web3.js into the API bundle)
+  // Solana pubkeys are typically 32 bytes -> base58 strings often 32-44 chars.
+  if (!addr) return false;
+  const s = addr.trim();
+  if (s.length < 32 || s.length > 44) return false;
+  // Base58 alphabet (no 0,O,I,l)
+  return /^[1-9A-HJ-NP-Za-km-z]+$/.test(s);
+}
+
 router.get('/whales', async (req, res) => {
-  const wallet = typeof req.query.wallet === 'string' ? req.query.wallet : '';
+  const wallet = typeof req.query.wallet === 'string' ? req.query.wallet.trim() : '';
   if (!wallet) {
     res.status(400).json({ error: 'wallet_required', message: 'Provide ?wallet=<solana_address>' });
+    return;
+  }
+  if (!isValidSolanaAddress(wallet)) {
+    res.status(400).json({
+      error: 'invalid_wallet',
+      message: 'Invalid Solana wallet address format. Provide a base58 public key (typically 32-44 chars).',
+    });
     return;
   }
 
