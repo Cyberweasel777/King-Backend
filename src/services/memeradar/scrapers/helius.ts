@@ -134,7 +134,8 @@ export class HeliusScraper extends BaseScraper {
     wallet: string, 
     limit: number = 100
   ): Promise<WhaleTransaction[]> {
-    const effectiveLimit = Math.min(limit, 10);
+    const txDetailsLimit = 10;
+    const effectiveLimit = Math.min(limit, txDetailsLimit);
 
     const cacheKey = `helius:txs:${wallet}:${effectiveLimit}`;
     const cached = tokenCache.get<WhaleTransaction[]>(cacheKey);
@@ -162,7 +163,7 @@ export class HeliusScraper extends BaseScraper {
 
       // Fetch transaction details for each signature
       const transactions: WhaleTransaction[] = [];
-      for (const sig of signatures.slice(0, effectiveLimit)) {
+      for (const sig of signatures.slice(0, txDetailsLimit)) {
         const tx = await this.getTransactionDetails(sig.signature);
         if (tx) transactions.push(tx);
       }
@@ -203,7 +204,7 @@ export class HeliusScraper extends BaseScraper {
             jsonrpc: '2.0',
             id: 'helius-test',
             method: 'getSignaturesForAddress',
-            params: [wallet, { limit: effectiveLimit }],
+            params: [wallet, { limit }],
           }),
         });
         debug.heliusStatusCodes!.getSignaturesForAddress = res.status;
@@ -219,14 +220,14 @@ export class HeliusScraper extends BaseScraper {
       debug.signaturesFetched = signatures.length;
 
       const transactions: WhaleTransaction[] = [];
-      for (const sig of signatures.slice(0, effectiveLimit)) {
+      for (const sig of signatures.slice(0, txDetailsLimit)) {
         debug.txDetailsAttempted += 1;
         const tx = await this.getTransactionDetails(sig.signature, debug);
         if (tx) transactions.push(tx);
       }
 
       logger.debug(
-        `whales(debug) wallet=${wallet} limit=${effectiveLimit} signaturesFetched=${debug.signaturesFetched} txDetailsAttempted=${debug.txDetailsAttempted} txDetailsSucceeded=${debug.txDetailsSucceeded} parsedTransfers=${debug.parsedTransfers}`
+        `whales(debug) wallet=${wallet} txDetailsLimit=${txDetailsLimit} signaturesFetched=${debug.signaturesFetched} txDetailsAttempted=${debug.txDetailsAttempted} txDetailsSucceeded=${debug.txDetailsSucceeded} parsedTransfers=${debug.parsedTransfers}`
       );
 
       return { transactions, debug };
