@@ -25,6 +25,7 @@ export interface TokenData {
     lpLockDuration?: number;
     mintAuthority?: string;
     freezeAuthority?: string;
+    warnings?: string[];
   };
 }
 

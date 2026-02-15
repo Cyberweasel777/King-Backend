@@ -156,15 +156,33 @@ export class DexScreenerScraper extends BaseScraper {
 
       if (pairs.length === 0) return null;
 
-      // Get the pair with highest liquidity (some pairs omit liquidity/volume fields)
-      const candidates = pairs.filter(
-        (p) => typeof p?.liquidity?.usd === 'number' && Number.isFinite(p.liquidity.usd)
-      );
-      const bestPair = (candidates.length ? candidates : pairs)
-        .slice()
-        .sort((a, b) => (b?.liquidity?.usd || 0) - (a?.liquidity?.usd || 0))[0];
+      // Choose "best" pair. DexScreener token results can include multiple pools across DEXes,
+      // and some entries are missing liquidity/volume/txns fields.
+      const scorePair = (p: DexScreenerPair): number => {
+        const liquidityUsd = p?.liquidity?.usd || 0;
+        const volume24h = p?.volume?.h24 || 0;
+        const buys = p?.txns?.h24?.buys || 0;
+        const sells = p?.txns?.h24?.sells || 0;
 
+        const hasLiquidity = typeof p?.liquidity?.usd === 'number';
+        const hasVolume = typeof p?.volume?.h24 === 'number';
+        const hasTxns = typeof p?.txns?.h24?.buys === 'number' && typeof p?.txns?.h24?.sells === 'number';
+
+        // We care primarily about: real liquidity, then real volume, then activity.
+        // Field-presence bonuses prevent selecting sparse rows.
+        return (
+          (hasLiquidity ? 1_000_000 : 0) +
+          Math.log10(liquidityUsd + 1) * 10_000 +
+          (hasVolume ? 100_000 : 0) +
+          Math.log10(volume24h + 1) * 5_000 +
+          (hasTxns ? 10_000 : 0) +
+          (buys + sells)
+        );
+      };
+
+      const bestPair = pairs.slice().sort((a, b) => scorePair(b) - scorePair(a))[0];
       if (!bestPair) return null;
+
       const token = this.transformToTokenData(bestPair, chain);
 
       tokenCache.set(cacheKey, token, 300000); // 5 minute cache
@@ -271,6 +289,13 @@ export class DexScreenerScraper extends BaseScraper {
   }
 
   private transformToTokenData(pair: DexScreenerPair, chain: string): TokenData {
+    const warnings: string[] = [];
+    if (pair?.liquidity?.usd == null) warnings.push('missing_liquidity');
+    if (pair?.volume?.h24 == null) warnings.push('missing_volume24h');
+    if (pair?.priceChange?.h24 == null) warnings.push('missing_priceChange24h');
+    if (pair?.priceChange?.h1 == null) warnings.push('missing_priceChange1h');
+    if (pair?.txns?.h24 == null) warnings.push('missing_txns24h');
+
     return {
       address: pair.baseToken.address,
       symbol: pair.baseToken.symbol,
@@ -287,6 +312,7 @@ export class DexScreenerScraper extends BaseScraper {
       dexUrl: `https://dexscreener.com/${pair.chainId}/${pair.pairAddress}`,
       metadata: {
         createdAt: pair.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : undefined,
+        warnings: warnings.length ? warnings : undefined,
       },
     };
   }
