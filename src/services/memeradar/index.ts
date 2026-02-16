@@ -6,6 +6,8 @@
 import { DexScreenerScraper } from './scrapers/dexscreener';
 import { HeliusScraper } from './scrapers/helius';
 import type { TokenData, TrendingToken, WhaleTransaction } from './types';
+import { buildProvenanceReport, type ProvenanceReport } from './provenance';
+import { evaluateAlerts, type AlertTelemetry, type TriggeredAlert } from './alerts';
 
 type WhalesDebugInfo = {
   signaturesFetched: number;
@@ -77,4 +79,40 @@ export async function getWhalesWithDebug(params: {
 
   const { transactions, debug } = await helius.getWalletTransactionsWithDebug(params.wallet, limit);
   return { whales: transactions, debug };
+}
+
+export async function resolveToken(identifier: string, chain: 'solana' | 'base' = 'solana'): Promise<TokenData | null> {
+  const q = identifier.trim();
+  if (!q) return null;
+
+  // Address-ish input goes straight to token endpoint first.
+  const maybeAddress = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(q) || /^0x[a-fA-F0-9]{40}$/.test(q);
+  if (maybeAddress) {
+    const byAddress = await dex.getTokenByAddress(q, chain);
+    if (byAddress) return byAddress;
+  }
+
+  const found = await dex.searchTokens(q);
+  return found.find((t) => t.chain === chain) || found[0] || null;
+}
+
+export async function getTokenReport(identifier: string, chain: 'solana' | 'base' = 'solana'): Promise<{ token: TokenData; provenance: ProvenanceReport } | null> {
+  const token = await resolveToken(identifier, chain);
+  if (!token) return null;
+
+  if (token.chain === 'solana') {
+    const helius = getHelius();
+    if (helius) {
+      token.holders = await helius.getTokenHolders(token.address);
+    }
+  }
+
+  return {
+    token,
+    provenance: buildProvenanceReport(token),
+  };
+}
+
+export function evaluateTokenAlerts(telemetry: AlertTelemetry): TriggeredAlert[] {
+  return evaluateAlerts(telemetry);
 }

@@ -6,7 +6,8 @@
  */
 
 import { Router } from 'express';
-import { getTokens, getTrending, getWhales, getWhalesWithDebug } from '../../services/memeradar';
+import { getTokens, getTrending, getWhales, getWhalesWithDebug, getTokenReport } from '../../services/memeradar';
+import { buildProvenanceReport } from '../../services/memeradar/provenance';
 
 const router = Router();
 
@@ -39,23 +40,17 @@ router.get('/tokens', async (req, res) => {
 // GET /api/memeradar/tokens/:id — Get token details
 // ============================================================================
 router.get('/tokens/:id', async (req, res) => {
-  // TODO: Paste your working token detail code here
-  // Your code should:
-  // 1. Fetch token by ID from database
-  // 2. Include price history, social metrics, holder stats
-  // 3. Return 404 if not found
-  
-  // STUB:
+  const chain = (typeof req.query.chain === 'string' ? req.query.chain : 'solana') as 'solana' | 'base';
+  const report = await getTokenReport(req.params.id, chain);
+
+  if (!report) {
+    res.status(404).json({ error: 'not_found', message: 'Token not found for identifier.' });
+    return;
+  }
+
   res.json({
-    id: req.params.id,
-    name: 'Example Token',
-    symbol: 'EXAMPLE',
-    price: 0.001,
-    priceChange24h: 15.5,
-    volume24h: 1000000,
-    marketCap: 10000000,
-    holders: 5000,
-    message: 'TODO: Paste your working token detail code here'
+    token: report.token,
+    provenance: report.provenance,
   });
 });
 
@@ -68,7 +63,11 @@ router.get('/trending', async (req, res) => {
   const limit = Math.min(parseInt(String(req.query.limit || '20'), 10) || 20, 50);
   const chain = (typeof req.query.chain === 'string' ? req.query.chain : 'solana') as any;
   const trending = await getTrending({ limit, chain });
-  res.json({ trending, count: trending.length });
+  const withRisk = trending.map((t) => ({
+    ...t,
+    provenance: buildProvenanceReport(t.token),
+  }));
+  res.json({ trending: withRisk, count: withRisk.length });
 });
 
 // ============================================================================
