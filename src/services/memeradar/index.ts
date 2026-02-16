@@ -29,11 +29,18 @@ function getHelius(): HeliusScraper | null {
 export async function getTokens(params?: { q?: string; limit?: number; chain?: string }): Promise<TokenData[]> {
   const limit = Math.min(params?.limit ?? 20, 50);
   const q = params?.q?.trim();
-  if (q) return dex.searchTokens(q);
+  const chain = params?.chain?.trim().toLowerCase();
+
+  if (q) {
+    const found = await dex.searchTokens(q);
+    const filtered = chain ? found.filter((t) => t.chain === chain) : found;
+    return filtered.slice(0, limit);
+  }
 
   // Default: trending Solana memecoins
   const trending = await dex.getTrendingSolana(limit);
-  return trending.map((t) => t.token);
+  const tokens = trending.map((t) => t.token);
+  return chain ? tokens.filter((t) => t.chain === chain).slice(0, limit) : tokens;
 }
 
 export async function getTrending(params?: { limit?: number; chain?: 'solana' | 'base' }): Promise<TrendingToken[]> {

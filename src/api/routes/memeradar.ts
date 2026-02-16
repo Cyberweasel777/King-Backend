@@ -27,12 +27,21 @@ router.get('/health', (req, res) => {
 // GET /api/memeradar/tokens — List all tracked tokens
 // ============================================================================
 router.get('/tokens', async (req, res) => {
-  const limit = Math.min(parseInt(String(req.query.limit || '20'), 10) || 20, 50);
-  const q = typeof req.query.q === 'string' ? req.query.q : undefined;
-  const chain = typeof req.query.chain === 'string' ? req.query.chain : undefined;
+  try {
+    const limit = Math.min(parseInt(String(req.query.limit || '20'), 10) || 20, 50);
+    const q = typeof req.query.q === 'string' ? req.query.q : undefined;
+    const chain = typeof req.query.chain === 'string' ? req.query.chain : undefined;
 
-  const tokens = await getTokens({ q, limit, chain });
-  res.json({ tokens, count: tokens.length });
+    const tokens = await getTokens({ q, limit, chain });
+    res.json({ tokens, count: tokens.length });
+  } catch (error) {
+    res.json({
+      tokens: [],
+      count: 0,
+      error: 'tokens_unavailable',
+      message: (error as Error)?.message || 'Failed to fetch tokens',
+    });
+  }
 });
 
 // ============================================================================
@@ -40,18 +49,25 @@ router.get('/tokens', async (req, res) => {
 // GET /api/memeradar/tokens/:id — Get token details
 // ============================================================================
 router.get('/tokens/:id', async (req, res) => {
-  const chain = (typeof req.query.chain === 'string' ? req.query.chain : 'solana') as 'solana' | 'base';
-  const report = await getTokenReport(req.params.id, chain);
+  try {
+    const chain = (typeof req.query.chain === 'string' ? req.query.chain : 'solana') as 'solana' | 'base';
+    const report = await getTokenReport(req.params.id, chain);
 
-  if (!report) {
-    res.status(404).json({ error: 'not_found', message: 'Token not found for identifier.' });
-    return;
+    if (!report) {
+      res.status(404).json({ error: 'not_found', message: 'Token not found for identifier.' });
+      return;
+    }
+
+    res.json({
+      token: report.token,
+      provenance: report.provenance,
+    });
+  } catch (error) {
+    res.status(502).json({
+      error: 'token_report_unavailable',
+      message: (error as Error)?.message || 'Failed to fetch token report',
+    });
   }
-
-  res.json({
-    token: report.token,
-    provenance: report.provenance,
-  });
 });
 
 // ============================================================================
@@ -60,14 +76,23 @@ router.get('/tokens/:id', async (req, res) => {
 // TODO: Add withSubscription('memeradar', 'basic') for free tier limit
 // ============================================================================
 router.get('/trending', async (req, res) => {
-  const limit = Math.min(parseInt(String(req.query.limit || '20'), 10) || 20, 50);
-  const chain = (typeof req.query.chain === 'string' ? req.query.chain : 'solana') as any;
-  const trending = await getTrending({ limit, chain });
-  const withRisk = trending.map((t) => ({
-    ...t,
-    provenance: buildProvenanceReport(t.token),
-  }));
-  res.json({ trending: withRisk, count: withRisk.length });
+  try {
+    const limit = Math.min(parseInt(String(req.query.limit || '20'), 10) || 20, 50);
+    const chain = (typeof req.query.chain === 'string' ? req.query.chain : 'solana') as any;
+    const trending = await getTrending({ limit, chain });
+    const withRisk = trending.map((t) => ({
+      ...t,
+      provenance: buildProvenanceReport(t.token),
+    }));
+    res.json({ trending: withRisk, count: withRisk.length });
+  } catch (error) {
+    res.json({
+      trending: [],
+      count: 0,
+      error: 'trending_unavailable',
+      message: (error as Error)?.message || 'Failed to fetch trending',
+    });
+  }
 });
 
 // ============================================================================
@@ -100,39 +125,48 @@ router.get('/whales/demo', (req, res) => {
 });
 
 router.get('/whales', async (req, res) => {
-  const wallet = typeof req.query.wallet === 'string' ? req.query.wallet.trim() : '';
-  if (!wallet) {
-    res.status(400).json({ error: 'wallet_required', message: 'Provide ?wallet=<solana_address>' });
-    return;
-  }
-  if (!isValidSolanaAddress(wallet)) {
-    res.status(400).json({
-      error: 'invalid_wallet',
-      message: 'Invalid Solana wallet address format. Provide a base58 public key (typically 32-44 chars).',
-    });
-    return;
-  }
+  try {
+    const wallet = typeof req.query.wallet === 'string' ? req.query.wallet.trim() : '';
+    if (!wallet) {
+      res.status(400).json({ error: 'wallet_required', message: 'Provide ?wallet=<solana_address>' });
+      return;
+    }
+    if (!isValidSolanaAddress(wallet)) {
+      res.status(400).json({
+        error: 'invalid_wallet',
+        message: 'Invalid Solana wallet address format. Provide a base58 public key (typically 32-44 chars).',
+      });
+      return;
+    }
 
-  const limit = Math.min(parseInt(String(req.query.limit || '50'), 10) || 50, 100);
-  const debug = String(req.query.debug || '').toLowerCase() === 'true';
+    const limit = Math.min(parseInt(String(req.query.limit || '50'), 10) || 50, 100);
+    const debug = String(req.query.debug || '').toLowerCase() === 'true';
 
-  if (debug) {
-    const { whales, debug: d } = await getWhalesWithDebug({ wallet, limit });
+    if (debug) {
+      const { whales, debug: d } = await getWhalesWithDebug({ wallet, limit });
+      res.json({
+        whales,
+        count: whales.length,
+        signaturesFetched: d.signaturesFetched,
+        txDetailsAttempted: d.txDetailsAttempted,
+        txDetailsSucceeded: d.txDetailsSucceeded,
+        parsedTransfers: d.parsedTransfers,
+        firstError: d.firstError,
+        heliusStatusCodes: d.heliusStatusCodes,
+      });
+      return;
+    }
+
+    const whales = await getWhales({ wallet, limit });
+    res.json({ whales, count: whales.length });
+  } catch (error) {
     res.json({
-      whales,
-      count: whales.length,
-      signaturesFetched: d.signaturesFetched,
-      txDetailsAttempted: d.txDetailsAttempted,
-      txDetailsSucceeded: d.txDetailsSucceeded,
-      parsedTransfers: d.parsedTransfers,
-      firstError: d.firstError,
-      heliusStatusCodes: d.heliusStatusCodes,
+      whales: [],
+      count: 0,
+      error: 'whales_unavailable',
+      message: (error as Error)?.message || 'Failed to fetch whale activity',
     });
-    return;
   }
-
-  const whales = await getWhales({ wallet, limit });
-  res.json({ whales, count: whales.length });
 });
 
 // ============================================================================

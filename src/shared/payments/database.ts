@@ -20,7 +20,14 @@ if (!supabaseUrl || !supabaseServiceKey) {
   console.warn('Supabase credentials not configured. Payment module will not function.');
 }
 
-const supabase: SupabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+const supabase: SupabaseClient =
+  supabaseUrl && supabaseServiceKey
+    ? createClient(supabaseUrl, supabaseServiceKey)
+    : ({
+        from() {
+          throw new Error('Supabase is not configured (missing SUPABASE_URL/SUPABASE_SERVICE_KEY)');
+        },
+      } as unknown as SupabaseClient);
 
 /**
  * Get or create a subscription record
