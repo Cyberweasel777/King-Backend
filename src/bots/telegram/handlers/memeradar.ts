@@ -21,6 +21,14 @@ const alertSubscribers = new Set<ChatId>();
 const scoreHistory = new Map<string, number>();
 let alertsLoopStarted = false;
 
+const commandRateWindowMs = 60_000;
+const commandRateLimit = 12;
+const commandUsage = new Map<string, { count: number; resetAt: number }>();
+
+const alertCooldownMs = 60 * 60 * 1000;
+const alertLastSentAt = new Map<string, number>();
+const maxAlertMessagesPerPoll = 5;
+
 function extractArg(text: string | undefined): string {
   if (!text) return '';
   const [, ...rest] = text.trim().split(/\s+/);
@@ -31,10 +39,33 @@ function shortAddress(address: string): string {
   return address.length > 12 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address;
 }
 
+function escapeMd(input: string): string {
+  return input.replace(/([_\*\[\]\(\)~`>#+\-=|{}.!])/g, '\\$1');
+}
+
+function allowCommand(ctx: Context): boolean {
+  const userId = ctx.from?.id?.toString();
+  if (!userId) return true;
+
+  const now = Date.now();
+  const row = commandUsage.get(userId);
+  if (!row || now > row.resetAt) {
+    commandUsage.set(userId, { count: 1, resetAt: now + commandRateWindowMs });
+    return true;
+  }
+
+  if (row.count >= commandRateLimit) return false;
+  row.count += 1;
+  return true;
+}
+
 async function pollAndPushAlerts(bot: Telegraf): Promise<void> {
   const trending = await getTrending({ limit: 20, chain: 'solana' });
+  let sent = 0;
 
   for (const row of trending) {
+    if (sent >= maxAlertMessagesPerPoll) break;
+
     const telemetry = {
       token: row.token,
       // limited data coverage in v1; keep only reliable signal active by default
@@ -44,14 +75,24 @@ async function pollAndPushAlerts(bot: Telegraf): Promise<void> {
     const alerts = evaluateTokenAlerts(telemetry);
     if (!alerts.length) continue;
 
-    const reportLines = alerts
+    const freshAlerts = alerts.filter((a) => {
+      const key = `${row.token.address}:${a.type}`;
+      const last = alertLastSentAt.get(key) || 0;
+      if (Date.now() - last < alertCooldownMs) return false;
+      alertLastSentAt.set(key, Date.now());
+      return true;
+    });
+
+    if (!freshAlerts.length) continue;
+
+    const reportLines = freshAlerts
       .slice(0, 2)
-      .map((a) => `• *${a.type}*: ${a.reason}`)
+      .map((a) => `• *${a.type}*: ${escapeMd(a.reason)}`)
       .join('\n');
 
     const msg =
       `🚨 *MemeRadar Alert*\n` +
-      `Token: *${row.token.symbol}* (${shortAddress(row.token.address)})\n` +
+      `Token: *${escapeMd(row.token.symbol)}* (${shortAddress(row.token.address)})\n` +
       `${reportLines}`;
 
     for (const chatId of alertSubscribers) {
@@ -61,6 +102,8 @@ async function pollAndPushAlerts(bot: Telegraf): Promise<void> {
         console.error('[MemeRadar] Failed to push alert', err);
       }
     }
+
+    sent += 1;
   }
 }
 
@@ -148,6 +191,11 @@ export function createMemeRadarBot(token: string) {
   });
 
   bot.command('trending', async (ctx) => {
+    if (!allowCommand(ctx)) {
+      await ctx.reply('⏱️ Rate limit hit. Wait a minute and try again.');
+      return;
+    }
+
     const trending = await getTrending({ limit: 8, chain: 'solana' });
 
     if (!trending.length) {
@@ -173,7 +221,12 @@ export function createMemeRadarBot(token: string) {
   });
 
   bot.command('token', async (ctx) => {
-    const identifier = extractArg((ctx.message as any)?.text);
+    if (!allowCommand(ctx)) {
+      await ctx.reply('⏱️ Rate limit hit. Wait a minute and try again.');
+      return;
+    }
+
+    const identifier = extractArg((ctx.message as any)?.text).slice(0, 120);
     if (!identifier) {
       await ctx.reply('Usage: /token <address|ticker>');
       return;
@@ -193,7 +246,7 @@ export function createMemeRadarBot(token: string) {
     const why = provenance.whyFlagged.length ? provenance.whyFlagged.map((w) => `• ${w}`).join('\n') : '• No critical flags from current data.';
 
     await ctx.reply(
-      `📊 *${token.symbol}* (${shortAddress(token.address)})\n` +
+      `📊 *${escapeMd(token.symbol)}* (${shortAddress(token.address)})\n` +
       `Provenance: *${provenance.score}/100*\n` +
       `Confidence: *${provenance.confidence}%*\n` +
       `Risk: *${risk}*\n\n` +
@@ -208,6 +261,11 @@ export function createMemeRadarBot(token: string) {
   bot.command('whales',
     withSubscription(APP_ID, 'pro'),
     async (ctx) => {
+      if (!allowCommand(ctx)) {
+        await ctx.reply('⏱️ Rate limit hit. Wait a minute and try again.');
+        return;
+      }
+
       const wallet = extractArg((ctx.message as any)?.text);
       if (!wallet) {
         await ctx.reply('Usage: /whales <solana_wallet>');

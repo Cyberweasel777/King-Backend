@@ -1,23 +1,36 @@
-/**
- * BotIndex API Routes
- * Bot signal correlation and analysis
- * 
- * TODO: Paste your working BotIndex code into the handlers below
- * The stubs return mock data — replace with your real implementation
- */
-
 import { Router } from 'express';
 
-// Real correlation engine (migrated from Projects/botindex)
 import correlationRoutes from '../../services/botindex/api/correlation.routes';
 import { withSubscriptionHttp, withFreeLimit, getFreeLimitKey } from '../../shared/payments';
+import {
+  generateCorrelationMatrix,
+  identifyMarketLeaders,
+  getTopCorrelatedPairs,
+} from '../../services/botindex/engine/matrix';
+import { fetchMultiplePriceSeries } from '../../services/botindex/engine/fetcher';
 
 const router = Router();
 
-// ============================================================================
-// HEALTH CHECK
-// ============================================================================
-router.get('/health', (req, res) => {
+const DEFAULT_TOKEN_UNIVERSE = [
+  'solana:So11111111111111111111111111111111111111112',
+  'solana:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+  'solana:DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
+  'solana:EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm',
+  'solana:7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+];
+
+type BotSignal = {
+  id: string;
+  bot: string;
+  signal: 'buy' | 'sell' | 'hold';
+  token: string;
+  confidence: number;
+  createdAt: string;
+};
+
+const manualSignals = new Map<string, BotSignal>();
+
+router.get('/health', (_req, res) => {
   res.json({
     app: 'botindex',
     status: 'ok',
@@ -25,93 +38,114 @@ router.get('/health', (req, res) => {
   });
 });
 
-// ============================================================================
-// SIGNALS
-// GET /api/botindex/signals — List all signals
-// ============================================================================
 router.get('/signals', async (req, res) => {
-  // TODO: Paste your working signal fetching code here
-  // Your code should:
-  // 1. Query your database or external API for bot signals
-  // 2. Apply any filtering from req.query (limit, offset, type, etc.)
-  // 3. Return the signals array
-  
-  // STUB — Remove after paste:
-  res.json({
-    signals: [
-      { id: '1', bot: 'whale_alert', signal: 'buy', token: 'PEPE', confidence: 0.85 },
-      { id: '2', bot: 'trend_bot', signal: 'sell', token: 'DOGE', confidence: 0.72 }
-    ],
-    count: 2,
-    message: 'TODO: Paste your working signal code here'
-  });
+  const limit = Math.min(parseInt(String(req.query.limit || '10'), 10) || 10, 50);
+
+  try {
+    const priceSeriesMap = await fetchMultiplePriceSeries(DEFAULT_TOKEN_UNIVERSE, '24h');
+    const priceSeries = Array.from(priceSeriesMap.values());
+
+    if (priceSeries.length < 2) {
+      const fallback = Array.from(manualSignals.values()).slice(0, limit);
+      res.json({ signals: fallback, count: fallback.length, source: 'manual' });
+      return;
+    }
+
+    const matrix = generateCorrelationMatrix(priceSeries, '24h');
+    const top = getTopCorrelatedPairs(matrix, limit, true);
+
+    const generated: BotSignal[] = top.map((p, i) => ({
+      id: `corr-${Date.now()}-${i}`,
+      bot: 'correlation_engine',
+      signal: p.correlation >= 0.6 ? 'buy' : p.correlation <= -0.6 ? 'sell' : 'hold',
+      token: `${p.tokenA}↔${p.tokenB}`,
+      confidence: Math.min(0.99, Math.abs(p.correlation)),
+      createdAt: new Date().toISOString(),
+    }));
+
+    const merged = [...generated, ...Array.from(manualSignals.values())].slice(0, limit);
+    res.json({ signals: merged, count: merged.length, source: 'generated' });
+  } catch (err) {
+    console.error('[BotIndex] /signals error', err);
+    const fallback = Array.from(manualSignals.values()).slice(0, limit);
+    res.json({ signals: fallback, count: fallback.length, source: 'manual_fallback' });
+  }
 });
 
-// ============================================================================
-// CREATE SIGNAL
-// POST /api/botindex/signals — Create new signal
-// ============================================================================
 router.post('/signals', async (req, res) => {
-  // TODO: Paste your working signal creation code here
-  // Your code should:
-  // 1. Validate req.body (bot, signal, token, confidence)
-  // 2. Save to database
-  // 3. Return created signal
-  
-  // STUB — Remove after paste:
-  const { bot, signal, token, confidence } = req.body;
-  res.status(201).json({
-    id: 'new-id',
-    bot,
+  const { bot, signal, token, confidence } = req.body || {};
+
+  if (!bot || !signal || !token || typeof confidence !== 'number') {
+    res.status(400).json({ error: 'invalid_payload', message: 'Require bot, signal, token, confidence(number)' });
+    return;
+  }
+
+  if (!['buy', 'sell', 'hold'].includes(signal)) {
+    res.status(400).json({ error: 'invalid_signal', message: 'signal must be buy|sell|hold' });
+    return;
+  }
+
+  const row: BotSignal = {
+    id: `manual-${Date.now()}`,
+    bot: String(bot),
     signal,
-    token,
-    confidence,
+    token: String(token),
+    confidence: Math.max(0, Math.min(1, Number(confidence))),
     createdAt: new Date().toISOString(),
-    message: 'TODO: Paste your working signal creation code here'
-  });
+  };
+
+  manualSignals.set(row.id, row);
+  res.status(201).json(row);
 });
 
-// ============================================================================
-// CORRELATION ENGINE (MIGRATED)
-// Free tier: limited pair correlations (N/day)
-// Pro tier: everything (matrix, leaders, jobs, unlimited)
-// Caller identity: pass Telegram user id via header `x-external-user-id` or `?user=`
-// ============================================================================
-
-// Mixed access model:
-// - Free: ONLY pair correlation routes: /correlation/:tokenA/:tokenB (limited per day)
-// - Pro: everything else (matrix/leaders/jobs/etc.)
 router.use(
   async (req, res, next) => {
     const isPairCorrelation = /^\/correlation\/[^/]+\/[^/]+/.test(req.path);
 
     if (isPairCorrelation) {
-      // Apply free-tier rate limit
       return withFreeLimit({ perDay: 5, key: getFreeLimitKey })(req, res, next);
     }
 
-    // Anything else in the correlation router requires Pro
     return withSubscriptionHttp('botindex', 'pro')(req, res, next);
   },
   correlationRoutes
 );
 
-// ============================================================================
-// SIGNAL BY ID
-// GET /api/botindex/signals/:id — Get single signal
-// ============================================================================
 router.get('/signals/:id', async (req, res) => {
-  // TODO: Paste your working signal retrieval code here
-  
-  // STUB:
-  res.json({
-    id: req.params.id,
-    bot: 'example_bot',
-    signal: 'buy',
-    token: 'EXAMPLE',
-    confidence: 0.8,
-    message: 'TODO: Paste your working signal retrieval code here'
-  });
+  const row = manualSignals.get(req.params.id);
+  if (row) {
+    res.json(row);
+    return;
+  }
+
+  // Build a deterministic “live” id lookup from current leaders if id is unknown.
+  try {
+    const priceSeriesMap = await fetchMultiplePriceSeries(DEFAULT_TOKEN_UNIVERSE, '24h');
+    const priceSeries = Array.from(priceSeriesMap.values());
+    if (priceSeries.length < 2) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+
+    const leaders = identifyMarketLeaders(priceSeries);
+    const first = leaders[0];
+    if (!first) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+
+    res.json({
+      id: req.params.id,
+      bot: 'leader_engine',
+      signal: first.leadScore > 60 ? 'buy' : 'hold',
+      token: first.token,
+      confidence: Math.max(0, Math.min(1, Number(first.causalityStrength || 0))),
+      leadScore: first.leadScore,
+      createdAt: new Date().toISOString(),
+    });
+  } catch {
+    res.status(404).json({ error: 'not_found' });
+  }
 });
 
 export default router;
