@@ -63,6 +63,16 @@ This is a distilled checklist of what we learned shipping the **King Backend** c
 
 ---
 
+## 11) MemeRadar v1 ship-readiness lessons (Telegram + risk engine)
+- **Kill stubs early.** A command that returns fake data (`/token`, `/trending`, `/whales`) creates false confidence and delays real QA.
+- **Score output must include explainability.** A numeric provenance score is not enough; always attach confidence + top risk factors + “why flagged”.
+- **Alert logic needs anti-spam guardrails from day one.** Add per-cycle caps, dedupe windows, and subscriber opt-in (`/alerts_on`, `/alerts_off`) before public rollout.
+- **Use “real-time-ish” language unless you have streaming infra.** Polling every few minutes is fine for MVP, but label it honestly and timestamp messages.
+- **Handle Telegram Markdown safely.** Escape/sanitize command input before echoing user-supplied token strings.
+- **Rate limits are product logic, not just infra logic.** Put per-user command limits in the bot layer to protect API costs and prevent abuse.
+- **Quality fallback beats empty output.** If upstream data is partial, return a useful response with warnings instead of silent empty lists.
+- **Daily digest should track deltas, not just snapshots.** Users care more about score/risk *changes* than absolute values.
+
 ## Fast-shipping template to apply to future apps
 For each new app, ship in this order:
 1) `/health`
@@ -71,3 +81,4 @@ For each new app, ship in this order:
 4) Add gating (401/402 with checkoutUrl)
 5) Deploy + smoke-test via curl scripts
 6) Only then add bots/alerts/pipelines
+7) Add anti-spam controls (rate limits + alert dedupe/caps) before public launch
