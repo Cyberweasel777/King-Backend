@@ -30,6 +30,20 @@ type BotSignal = {
 
 const manualSignals = new Map<string, BotSignal>();
 
+function dedupeCorrelationPairs<T extends { tokenA: string; tokenB: string }>(pairs: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+
+  for (const pair of pairs) {
+    const key = [pair.tokenA, pair.tokenB].sort().join('::');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(pair);
+  }
+
+  return out;
+}
+
 router.get('/health', (_req, res) => {
   res.json({
     app: 'botindex',
@@ -52,7 +66,7 @@ router.get('/signals', async (req, res) => {
     }
 
     const matrix = generateCorrelationMatrix(priceSeries, '24h');
-    const top = getTopCorrelatedPairs(matrix, limit, true);
+    const top = dedupeCorrelationPairs(getTopCorrelatedPairs(matrix, Math.max(limit * 3, 10), true)).slice(0, limit);
 
     const generated: BotSignal[] = top.map((p, i) => ({
       id: `corr-${Date.now()}-${i}`,

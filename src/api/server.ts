@@ -3,6 +3,7 @@
  * Canary Deployment: BotIndex, MemeRadar, ArbWatch
  */
 
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';

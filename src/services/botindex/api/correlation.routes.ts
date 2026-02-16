@@ -93,10 +93,25 @@ router.get('/correlation/:tokenA/:tokenB', async (req: Request, res: Response) =
       window: TIME_WINDOWS[window].hours 
     });
 
-    // Cache result
-    pairCache.set(cacheKey, { result, expiresAt: Date.now() + CACHE_TTL });
+    if (!result || typeof result.sampleSize !== 'number' || result.sampleSize < 3) {
+      res.status(422).json({
+        error: 'insufficient_overlap',
+        message: 'Insufficient overlapping price samples to calculate a reliable correlation'
+      });
+      return;
+    }
 
-    res.json(formatPairResponse(result));
+    // Preserve caller token ids (including chain prefix) in response.
+    const normalizedResult = {
+      ...result,
+      tokenA,
+      tokenB,
+    };
+
+    // Cache result
+    pairCache.set(cacheKey, { result: normalizedResult, expiresAt: Date.now() + CACHE_TTL });
+
+    res.json(formatPairResponse(normalizedResult));
   } catch (error) {
     console.error('Correlation pair error:', error);
     res.status(500).json({
