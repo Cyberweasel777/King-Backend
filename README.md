@@ -88,6 +88,18 @@ Remove the `// STUB:` sections and test.
 
 ## API Endpoints (Ready)
 
+### Shell API (additive, staged rollout)
+
+- `GET /api/:app/shell/feature-flags`
+- `GET /api/:app/shell/signal-summary`
+- `GET /api/:app/shell/opportunity-timeline`
+- `GET /api/:app/shell/entitlement-status`
+- `GET /api/:app/shell/pricing-metadata`
+- `GET /api/:app/shell/status-block`
+
+Rollout is controlled by `SHELL_ROLLOUT_PHASE` (`P1`→`P5`) and optional `SHELL_FEATURE_OVERRIDES`.
+See `docs/SHELL_ROLLOUT_FLY.md` for production deployment + smoke tests.
+
 | App | Endpoint | Status |
 |-----|----------|--------|
 | BotIndex | `GET /api/botindex/health` | ✅ Ready |

@@ -10,6 +10,9 @@ import botindexRouter from './botindex';
 import memeradarRouter from './memeradar';
 import arbwatchRouter from './arbwatch';
 import paymentsGlobalRouter from './payments-global';
+import paymentsRouter from './payments';
+import contractsRouter from './contracts';
+import shellRouter from './shell';
 
 const router = Router();
 
@@ -18,8 +21,17 @@ router.use('/botindex', botindexRouter);
 router.use('/memeradar', memeradarRouter);
 router.use('/arbwatch', arbwatchRouter);
 
+// App-scoped payment routes (config/status/checkout/portal/webhook/admin)
+router.use('/', paymentsRouter);
+
 // Global payments helper routes
 router.use('/payments', paymentsGlobalRouter);
+
+// Cross-repo route contracts for UI shells
+router.use('/contracts', contractsRouter);
+
+// Shell endpoints for landing/dashboard rollouts
+router.use('/', shellRouter);
 
 // TODO: Add remaining 12 apps here
 // router.use('/spreadhunter', spreadhunterRouter);
