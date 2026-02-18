@@ -29,6 +29,25 @@ const supabase: SupabaseClient =
         },
       } as unknown as SupabaseClient);
 
+function isMissingSubscriptionsTableError(message?: string): boolean {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return m.includes("public.subscriptions") || m.includes("relation \"subscriptions\" does not exist");
+}
+
+function makeFallbackFreeSubscription(appId: AppId, externalUserId: string): Subscription {
+  const now = new Date();
+  return {
+    id: `fallback:${appId}:${externalUserId}`,
+    appId,
+    externalUserId,
+    tier: 'free',
+    status: 'inactive',
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 /**
  * Get or create a subscription record
  */
@@ -36,35 +55,49 @@ export async function getOrCreateSubscription(
   appId: AppId,
   externalUserId: string
 ): Promise<Subscription> {
-  // Try to get existing
-  const { data: existing } = await supabase
-    .from('subscriptions')
-    .select('*')
-    .eq('app_id', appId)
-    .eq('external_user_id', externalUserId)
-    .single();
+  try {
+    // Try to get existing
+    const { data: existing, error: readError } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('app_id', appId)
+      .eq('external_user_id', externalUserId)
+      .single();
 
-  if (existing) {
-    return mapDbToSubscription(existing);
+    if (readError && isMissingSubscriptionsTableError(readError.message)) {
+      return makeFallbackFreeSubscription(appId, externalUserId);
+    }
+
+    if (existing) {
+      return mapDbToSubscription(existing);
+    }
+
+    // Create new free subscription
+    const { data: created, error } = await supabase
+      .from('subscriptions')
+      .insert({
+        app_id: appId,
+        external_user_id: externalUserId,
+        tier: 'free',
+        status: 'inactive',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      if (isMissingSubscriptionsTableError(error.message)) {
+        return makeFallbackFreeSubscription(appId, externalUserId);
+      }
+      throw new Error(`Failed to create subscription: ${error.message}`);
+    }
+
+    return mapDbToSubscription(created);
+  } catch (error: any) {
+    if (isMissingSubscriptionsTableError(error?.message)) {
+      return makeFallbackFreeSubscription(appId, externalUserId);
+    }
+    throw error;
   }
-
-  // Create new free subscription
-  const { data: created, error } = await supabase
-    .from('subscriptions')
-    .insert({
-      app_id: appId,
-      external_user_id: externalUserId,
-      tier: 'free',
-      status: 'inactive',
-    })
-    .select()
-    .single();
-
-  if (error) {
-    throw new Error(`Failed to create subscription: ${error.message}`);
-  }
-
-  return mapDbToSubscription(created);
 }
 
 /**
@@ -81,7 +114,14 @@ export async function getSubscription(
     .eq('external_user_id', externalUserId)
     .single();
 
-  if (error || !data) return null;
+  if (error) {
+    if (isMissingSubscriptionsTableError(error.message)) {
+      return makeFallbackFreeSubscription(appId, externalUserId);
+    }
+    return null;
+  }
+
+  if (!data) return null;
   return mapDbToSubscription(data);
 }
 
