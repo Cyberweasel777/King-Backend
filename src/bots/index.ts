@@ -10,6 +10,7 @@ export { createNicheHunterBot } from './telegram/handlers/nichehunter';
 export { createChainPulseBot } from './telegram/handlers/chainpulse';
 export { createYieldHunterBot } from './telegram/handlers/yieldhunter';
 export { createValidatorXBot } from './telegram/handlers/validatorx';
+export { createRosterRadarBot } from './telegram/handlers/rosterradar';
 
 // Discord Bot Exports
 export { createAlphaCallerBot } from './discord/handlers/alphacaller';

@@ -7,6 +7,8 @@ import { Telegraf } from 'telegraf';
 import { createBotIndexBot } from './telegram/handlers/botindex';
 import { createMemeRadarBot } from './telegram/handlers/memeradar';
 import { createArbWatchBot } from './telegram/handlers/arbwatch';
+import { createSpreadHunterBot } from './telegram/handlers/spreadhunter';
+import { createRosterRadarBot } from './telegram/handlers/rosterradar';
 
 interface BotConfig {
   name: string;
@@ -29,6 +31,16 @@ const bots: BotConfig[] = [
     name: 'ArbWatch',
     tokenEnv: 'ARBWATCH_BOT_TOKEN',
     createBot: createArbWatchBot
+  },
+  {
+    name: 'SpreadHunter',
+    tokenEnv: 'SPREADHUNTER_BOT_TOKEN',
+    createBot: createSpreadHunterBot
+  },
+  {
+    name: 'RosterRadar',
+    tokenEnv: 'ROSTERRADAR_BOT_TOKEN',
+    createBot: createRosterRadarBot
   }
 ];
 

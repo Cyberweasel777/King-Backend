@@ -60,8 +60,8 @@ const paymentRailsContract = {
     {
       id: 'P5',
       featureId: 'F8',
-      appId: 'signalvault',
-      name: 'Cross-App Signal Vault (Bundle)',
+      appId: 'botindex',
+      name: 'Cross-App Signal Vault Bundle (BotIndex Anchor)',
       priorityRank: 5,
       checkoutPath: '/api/payments/checkout?app=botindex&tier=pro',
       statusPath: '/api/botindex/payments/status',
