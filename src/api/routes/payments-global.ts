@@ -4,7 +4,7 @@
  * Minimal checkout URL creator for canary.
  * Mounted at /api/payments
  *
- * GET /api/payments/checkout?app=<botindex|memeradar|arbwatch>&tier=<basic|pro>&user=<externalUserId>
+ * GET /api/payments/checkout?app=<botindex|memeradar|arbwatch|spreadhunter|rosterradar>&tier=<basic|pro>&user=<externalUserId>
  * Returns: { url }
  */
 
@@ -15,7 +15,7 @@ import { isStripeConfigured } from '../../shared/payments/config';
 
 const router = Router();
 
-const CANARY_APPS: AppId[] = ['botindex', 'memeradar', 'arbwatch'];
+const CANARY_APPS: AppId[] = ['botindex', 'memeradar', 'arbwatch', 'spreadhunter', 'rosterradar'];
 
 function getExternalUserId(req: Request): string | null {
   const h = req.header('x-external-user-id');

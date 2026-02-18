@@ -139,9 +139,30 @@ export const ArbitrageContract = {
 // CONTRACT REGISTRY
 // ============================================================================
 
+export const PaymentRailRouteContract = z.object({
+  id: z.enum(['P1', 'P2', 'P3', 'P4', 'P5']),
+  appId: z.string(),
+  checkoutPath: z.string(),
+  statusPath: z.string(),
+  configPath: z.string(),
+  defaultTier: SubscriptionTier.optional(),
+  note: z.string().optional(),
+});
+
+export const PaymentRailsExecutionContract = z.object({
+  generatedAt: z.string(),
+  p1ToP5: z.array(PaymentRailRouteContract),
+  defaults: z.object({
+    additiveOnly: z.boolean(),
+    defaultEnabled: z.boolean(),
+    safeRollout: z.boolean(),
+  }),
+});
+
 export const FeatureContracts = {
   whaleTracking: WhaleTrackingContract,
   arbitrage: ArbitrageContract,
+  paymentRailsExecution: PaymentRailsExecutionContract,
   // Add more features here
 };
 
@@ -153,6 +174,8 @@ export type WhaleTransaction = z.infer<typeof WhaleTrackingContract.responses.wh
 export type WhaleAlert = z.infer<typeof WhaleTrackingContract.responses.whaleAlert>;
 export type ArbitrageOpportunity = z.infer<typeof ArbitrageContract.responses.opportunity>;
 export type ArbitrageResult = z.infer<typeof ArbitrageContract.responses.executionResult>;
+export type PaymentRailRoute = z.infer<typeof PaymentRailRouteContract>;
+export type PaymentRailsExecution = z.infer<typeof PaymentRailsExecutionContract>;
 
 // ============================================================================
 // VALIDATION HELPERS

@@ -114,6 +114,11 @@ router.post('/signals', async (req, res) => {
 
 router.use(
   async (req, res, next) => {
+    // Let central payments router handle /api/:app/payments/* without bot-level gating.
+    if (req.path === '/payments' || req.path.startsWith('/payments/')) {
+      return next();
+    }
+
     const isPairCorrelation = /^\/correlation\/[^/]+\/[^/]+/.test(req.path);
 
     if (isPairCorrelation) {

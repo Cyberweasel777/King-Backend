@@ -48,18 +48,25 @@ export async function launchBots() {
     try {
       const bot = config.createBot(token);
 
-      // Launch with long polling (webhook mode for production)
-      await bot.launch();
+      // Start each bot independently so one failure/slow-start doesn't block others
       runningBots.set(config.name, bot);
+      console.log(`${config.name} bot launch initiated`);
 
-      console.log(`${config.name} bot launched`);
+      void bot.launch({ dropPendingUpdates: true })
+        .then(() => {
+          console.log(`${config.name} bot launched`);
+        })
+        .catch((err) => {
+          runningBots.delete(config.name);
+          console.error(`${config.name} failed to launch:`, err);
+        });
 
       // Enable graceful stop
       process.once('SIGINT', () => bot.stop('SIGINT'));
       process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
     } catch (err) {
-      console.error(`${config.name} failed to launch:`, err);
+      console.error(`${config.name} failed to initialize:`, err);
     }
   }
 }

@@ -10,7 +10,8 @@
     "bots": "ts-node src/bots/launcher.ts",
     "pipeline": "ts-node src/pipeline/scheduler.ts",
     "worker": "ts-node src/worker/queue.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke:payment-rails": "node scripts/e2e-smoke-payment-rails.mjs"
   },
   "dependencies": {
     "express": "^4.18.2",
