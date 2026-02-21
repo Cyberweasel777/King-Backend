@@ -8,6 +8,7 @@ import {
   getTopCorrelatedPairs,
 } from '../../services/botindex/engine/matrix';
 import { fetchMultiplePriceSeries } from '../../services/botindex/engine/fetcher';
+import { buildHeatMap, getPredictionArbFeed } from '../../services/signals/predictionArb';
 
 const router = Router();
 
@@ -50,6 +51,41 @@ router.get('/health', (_req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString()
   });
+});
+
+router.get('/signals/prediction-arb', (_req, res) => {
+  const { feed, sourcePath } = getPredictionArbFeed();
+  if (!feed) {
+    res.status(404).json({ error: 'prediction_arb_unavailable', sourcePath });
+    return;
+  }
+
+  const cards = feed.opportunities.slice(0, 10).map((op, i) => ({
+    id: `prediction-arb-${i + 1}`,
+    bot: 'prediction_arb_router',
+    signal: op.estimatedNetEdgePct > 0 ? 'buy' : 'hold',
+    token: `${op.eventSlug}:${op.outcome}`,
+    confidence: Math.max(0, Math.min(0.99, op.estimatedNetEdgePct / 25)),
+    createdAt: op.timestamp,
+    metadata: {
+      marketTitle: op.marketTitle,
+      bestBuyVenue: op.bestBuyVenue,
+      bestSellVenue: op.bestSellVenue,
+      grossEdgePct: op.grossEdgePct,
+      netEdgePct: op.estimatedNetEdgePct,
+    },
+  }));
+
+  res.json({ sourcePath, count: cards.length, signals: cards });
+});
+
+router.get('/signals/prediction-heatmap', (_req, res) => {
+  const { feed, sourcePath } = getPredictionArbFeed();
+  if (!feed) {
+    res.status(404).json({ error: 'prediction_heatmap_unavailable', sourcePath });
+    return;
+  }
+  res.json({ sourcePath, generatedAt: feed.timestamp, mode: feed.mode, heatmap: buildHeatMap(feed) });
 });
 
 router.get('/signals', async (req, res) => {

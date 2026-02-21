@@ -78,7 +78,43 @@ export interface CheckoutSessionRequest {
   successUrl: string;
   cancelUrl: string;
   email?: string;
+  referralCode?: string;
   metadata?: Record<string, any>;
+}
+
+export interface ReferralCode {
+  id: string;
+  appId: AppId;
+  externalUserId: string;
+  code: string;
+  createdAt: Date;
+}
+
+export interface ReferralConversion {
+  id: string;
+  appId: AppId;
+  referrerExternalUserId: string;
+  referredExternalUserId: string;
+  checkoutSessionId?: string;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  status: 'pending' | 'converted' | 'rejected';
+  rewardMonths: number;
+  payoutCents: number;
+  convertedAt?: Date;
+  createdAt: Date;
+  metadata?: Record<string, any>;
+}
+
+export interface ReferralStats {
+  appId: AppId;
+  externalUserId: string;
+  code: string;
+  totalReferrals: number;
+  convertedReferrals: number;
+  pendingReferrals: number;
+  totalPayoutCents: number;
+  totalRewardMonths: number;
 }
 
 export interface CheckoutSessionResponse {

@@ -14,6 +14,7 @@ import {
   updateSubscriptionFromStripe,
   recordPaymentEvent,
   getSubscriptionByStripeCustomer,
+  recordReferralConversion,
 } from './database';
 import { sendMetaCapiEvent } from './meta-capi';
 
@@ -120,6 +121,22 @@ async function handleCheckoutCompleted(
     tier,
     status: 'active',
   });
+
+  // Capture referral conversion when present
+  const referralCode = session.metadata?.referral_code;
+  if (referralCode) {
+    await recordReferralConversion({
+      appId,
+      referralCode,
+      referredExternalUserId: externalUserId,
+      checkoutSessionId: session.id,
+      stripeCustomerId,
+      stripeSubscriptionId: stripeSubId,
+      rewardMonths: 1,
+      payoutCents: 0,
+      metadata: { tier },
+    });
+  }
 
   // Send Meta CAPI event (optional)
   if (session.customer_details?.email) {

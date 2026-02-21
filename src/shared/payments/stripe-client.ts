@@ -10,7 +10,7 @@ import {
   getTierConfig, 
   getStripePriceId,
 } from './config';
-import { upsertSubscription } from './database';
+import { resolveReferralCode } from './database';
 
 /**
  * Get Stripe client for an app
@@ -35,11 +35,19 @@ export async function createCheckoutSession(
     throw new Error(`Stripe not configured for ${appId}`);
   }
 
-  const tierConfig = getTierConfig(appId, request.tier);
+  getTierConfig(appId, request.tier);
   const priceId = getStripePriceId(appId, request.tier);
-  
+
   if (!priceId) {
     throw new Error(`No price configured for ${appId} tier ${request.tier}`);
+  }
+
+  let referralCode: string | undefined;
+  if (request.referralCode) {
+    const referral = await resolveReferralCode(appId, request.referralCode);
+    if (referral && referral.externalUserId !== request.externalUserId) {
+      referralCode = referral.code;
+    }
   }
 
   // Create or retrieve customer
@@ -82,6 +90,7 @@ export async function createCheckoutSession(
         external_user_id: request.externalUserId,
         app_id: appId,
         tier: request.tier,
+        ...(referralCode ? { referral_code: referralCode } : {}),
         ...request.metadata,
       },
     },
@@ -89,6 +98,7 @@ export async function createCheckoutSession(
       external_user_id: request.externalUserId,
       app_id: appId,
       tier: request.tier,
+      ...(referralCode ? { referral_code: referralCode } : {}),
     },
   });
 

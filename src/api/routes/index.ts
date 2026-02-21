@@ -13,6 +13,7 @@ import paymentsGlobalRouter from './payments-global';
 import paymentsRouter from './payments';
 import contractsRouter from './contracts';
 import shellRouter from './shell';
+import signalsRouter from './signals';
 
 const router = Router();
 
@@ -32,6 +33,9 @@ router.use('/contracts', contractsRouter);
 
 // Shell endpoints for landing/dashboard rollouts
 router.use('/', shellRouter);
+
+// Shared signal bus routes (fan-out across apps)
+router.use('/signals', signalsRouter);
 
 // TODO: Add remaining 12 apps here
 // router.use('/spreadhunter', spreadhunterRouter);

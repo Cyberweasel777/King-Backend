@@ -7,6 +7,7 @@
 
 import { Router } from 'express';
 import { getMarkets, getOpportunities } from '../../services/arbwatch';
+import { getPredictionArbFeed } from '../../services/signals/predictionArb';
 
 const router = Router();
 
@@ -43,6 +44,7 @@ router.get('/opportunities', async (req, res) => {
   const minProfitPercent = parseFloat(String(req.query.minProfitPercent || '0.5')) || 0.5;
   const useDeepseek = String(req.query.deepseek || 'true') !== 'false';
   const debug = String(req.query.debug || 'false') === 'true';
+  const includePredictionExpansion = String(req.query.includePredictionExpansion || 'true') !== 'false';
 
   try {
     const { opportunities, meta } = await getOpportunities({
@@ -52,7 +54,30 @@ router.get('/opportunities', async (req, res) => {
       debug,
     });
 
-    res.json({ opportunities, meta });
+    const { feed, sourcePath } = includePredictionExpansion ? getPredictionArbFeed() : { feed: null, sourcePath: null };
+    const predictionExpansion = feed
+      ? feed.opportunities.slice(0, limit).map((op) => ({
+          eventSlug: op.eventSlug,
+          marketTitle: op.marketTitle,
+          outcome: op.outcome,
+          buyVenue: op.bestBuyVenue,
+          sellVenue: op.bestSellVenue,
+          grossEdgePct: op.grossEdgePct,
+          netEdgePct: op.estimatedNetEdgePct,
+          detectedAt: op.timestamp,
+        }))
+      : [];
+
+    res.json({
+      opportunities,
+      meta,
+      predictionExpansion: {
+        enabled: includePredictionExpansion,
+        sourcePath,
+        count: predictionExpansion.length,
+        items: predictionExpansion,
+      },
+    });
   } catch (error) {
     // Best-effort: never throw from this endpoint.
     res.json({

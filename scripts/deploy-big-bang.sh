@@ -22,13 +22,33 @@ npm run validate:apis || {
     exit 1
 }
 
-# Run database migration
+# Load env vars for migration/deploy
+set -a
+source .env
+set +a
+
+# Run database migrations
+# Requires SUPABASE_DB_URL (preferred) or DATABASE_URL (postgres connection string)
 echo ""
-echo "🗄️ Running database migration..."
-psql $SUPABASE_URL -f database/migrations/big-bang-migration.sql || {
-    echo "❌ Database migration failed"
+echo "🗄️ Running database migrations..."
+DB_URL="${SUPABASE_DB_URL:-$DATABASE_URL}"
+if [ -z "$DB_URL" ]; then
+    echo "❌ Missing SUPABASE_DB_URL / DATABASE_URL for SQL migrations"
+    echo "   Add a Postgres connection string to .env before deploy."
+    exit 1
+fi
+
+psql "$DB_URL" -f database/migrations/big-bang-migration.sql || {
+    echo "❌ Big bang migration failed"
     exit 1
 }
+
+psql "$DB_URL" -f database/migrations/2026-02-18-referral-program.sql || {
+    echo "❌ Referral migration failed"
+    exit 1
+}
+
+echo "✅ Database migrations complete"
 
 # Build application
 echo ""

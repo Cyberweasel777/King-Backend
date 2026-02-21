@@ -86,6 +86,10 @@ const paymentRailsContract = {
       routesMountedUnder: '/api',
     },
   },
+  signalBus: {
+    predictionArb: '/api/signals/prediction-arb',
+    predictionHeatmap: '/api/signals/prediction-arb/heatmap',
+  },
   defaults: {
     additiveOnly: true,
     defaultEnabled: false,
@@ -108,6 +112,7 @@ router.get('/payment-rails/ui-shells', (_req, res) => {
       statusPath: item.statusPath,
       configPath: item.configPath,
     })),
+    signalBus: paymentRailsContract.signalBus,
   });
 });
 

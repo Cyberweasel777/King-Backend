@@ -1,9 +1,6 @@
 #!/bin/bash
-/**
- * Pre-Deploy Validation Script
- * 
- * Run before deploying to catch issues early
- */
+# Pre-Deploy Validation Script
+# Run before deploying to catch issues early
 
 echo "☦️  King Backend Pre-Deploy Checks"
 echo "=================================="
@@ -32,6 +29,9 @@ for env in "${REQUIRED_ENVS[@]}"; do
         FAILED=1
     fi
 done
+if [ -z "$SUPABASE_DB_URL" ] && [ -z "$DATABASE_URL" ]; then
+    echo "  ⚠️  Missing SUPABASE_DB_URL/DATABASE_URL (required for SQL migrations in deploy script)"
+fi
 if [ $FAILED -eq 0 ]; then
     echo "  ✅ Required env vars set"
 fi
@@ -70,6 +70,19 @@ if [[ "$SUPABASE_URL" =~ ^https://.*supabase\.co$ ]]; then
     echo "  ✅ Supabase URL format valid"
 else
     echo "  ⚠️  Supabase URL format unusual: $SUPABASE_URL"
+fi
+echo ""
+
+# Check 6: Required migration files
+echo "🔍 Checking migration files..."
+for file in "database/migrations/big-bang-migration.sql" "database/migrations/2026-02-18-referral-program.sql"; do
+    if [ ! -f "$file" ]; then
+        echo "  ❌ Missing migration: $file"
+        FAILED=1
+    fi
+done
+if [ $FAILED -eq 0 ]; then
+    echo "  ✅ Migration files present"
 fi
 echo ""
 

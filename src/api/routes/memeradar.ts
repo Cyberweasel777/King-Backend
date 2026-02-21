@@ -8,6 +8,7 @@
 import { Router } from 'express';
 import { getTokens, getTrending, getWhales, getWhalesWithDebug, getTokenReport } from '../../services/memeradar';
 import { buildProvenanceReport } from '../../services/memeradar/provenance';
+import { buildHeatMap, getPredictionArbFeed } from '../../services/signals/predictionArb';
 
 const router = Router();
 
@@ -20,6 +21,41 @@ router.get('/health', (req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString()
   });
+});
+
+// ============================================================================
+// PREDICTION SIGNAL FAN-OUT
+// GET /api/memeradar/signals/prediction-arb
+// ============================================================================
+router.get('/signals/prediction-arb', (_req, res) => {
+  const { feed, sourcePath } = getPredictionArbFeed();
+  if (!feed) {
+    res.status(404).json({ error: 'prediction_arb_unavailable', sourcePath });
+    return;
+  }
+
+  const opportunities = feed.opportunities.slice(0, 10).map((op) => ({
+    slug: op.eventSlug,
+    title: op.marketTitle,
+    outcome: op.outcome,
+    buyVenue: op.bestBuyVenue,
+    sellVenue: op.bestSellVenue,
+    netEdgePct: op.estimatedNetEdgePct,
+    grossEdgePct: op.grossEdgePct,
+    detectedAt: op.timestamp,
+  }));
+
+  res.json({ sourcePath, mode: feed.mode, opportunities, count: opportunities.length });
+});
+
+router.get('/signals/prediction-heatmap', (_req, res) => {
+  const { feed, sourcePath } = getPredictionArbFeed();
+  if (!feed) {
+    res.status(404).json({ error: 'prediction_heatmap_unavailable', sourcePath });
+    return;
+  }
+
+  res.json({ sourcePath, generatedAt: feed.timestamp, mode: feed.mode, heatmap: buildHeatMap(feed) });
 });
 
 // ============================================================================

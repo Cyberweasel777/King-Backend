@@ -10,6 +10,8 @@ import {
   SubscriptionTier,
   SubscriptionStatus,
   PaymentEvent,
+  ReferralCode,
+  ReferralStats,
 } from './types';
 
 // Initialize Supabase client from environment
@@ -353,6 +355,133 @@ export async function revokeSubscription(
   });
 }
 
+function makeReferralCode(appId: AppId, externalUserId: string): string {
+  const appPrefix = appId.slice(0, 3).toUpperCase();
+  const userSuffix = externalUserId.replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase() || 'USER';
+  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `${appPrefix}${userSuffix}${random}`;
+}
+
+export async function getOrCreateReferralCode(
+  appId: AppId,
+  externalUserId: string
+): Promise<ReferralCode> {
+  const { data: existing } = await supabase
+    .from('referral_codes')
+    .select('*')
+    .eq('app_id', appId)
+    .eq('external_user_id', externalUserId)
+    .single();
+
+  if (existing) return mapDbToReferralCode(existing);
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = makeReferralCode(appId, externalUserId);
+    const { data, error } = await supabase
+      .from('referral_codes')
+      .insert({
+        app_id: appId,
+        external_user_id: externalUserId,
+        code,
+      })
+      .select()
+      .single();
+
+    if (!error && data) return mapDbToReferralCode(data);
+  }
+
+  throw new Error('Failed to create referral code');
+}
+
+export async function resolveReferralCode(
+  appId: AppId,
+  code: string
+): Promise<ReferralCode | null> {
+  const normalized = code.trim().toUpperCase();
+  const { data, error } = await supabase
+    .from('referral_codes')
+    .select('*')
+    .eq('app_id', appId)
+    .eq('code', normalized)
+    .single();
+
+  if (error || !data) return null;
+  return mapDbToReferralCode(data);
+}
+
+export async function recordReferralConversion(args: {
+  appId: AppId;
+  referralCode: string;
+  referredExternalUserId: string;
+  checkoutSessionId?: string;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  rewardMonths?: number;
+  payoutCents?: number;
+  metadata?: Record<string, any>;
+}): Promise<void> {
+  const referral = await resolveReferralCode(args.appId, args.referralCode);
+  if (!referral) return;
+  if (referral.externalUserId === args.referredExternalUserId) return;
+
+  const rewardMonths = args.rewardMonths ?? 1;
+  const payoutCents = args.payoutCents ?? 0;
+
+  await supabase
+    .from('referral_conversions')
+    .upsert(
+      {
+        app_id: args.appId,
+        referrer_external_user_id: referral.externalUserId,
+        referred_external_user_id: args.referredExternalUserId,
+        checkout_session_id: args.checkoutSessionId,
+        stripe_customer_id: args.stripeCustomerId,
+        stripe_subscription_id: args.stripeSubscriptionId,
+        status: 'converted',
+        reward_months: rewardMonths,
+        payout_cents: payoutCents,
+        converted_at: new Date().toISOString(),
+        metadata: {
+          referral_code: args.referralCode,
+          ...(args.metadata || {}),
+        },
+      },
+      { onConflict: 'app_id,referred_external_user_id' }
+    );
+}
+
+export async function getReferralStats(
+  appId: AppId,
+  externalUserId: string
+): Promise<ReferralStats> {
+  const referralCode = await getOrCreateReferralCode(appId, externalUserId);
+
+  const { data: rows, error } = await supabase
+    .from('referral_conversions')
+    .select('*')
+    .eq('app_id', appId)
+    .eq('referrer_external_user_id', externalUserId);
+
+  if (error) {
+    throw new Error(`Failed to load referral stats: ${error.message}`);
+  }
+
+  const entries = rows || [];
+  const converted = entries.filter((r: any) => r.status === 'converted');
+  const pending = entries.filter((r: any) => r.status === 'pending');
+
+  return {
+    appId,
+    externalUserId,
+    code: referralCode.code,
+    totalReferrals: entries.length,
+    convertedReferrals: converted.length,
+    pendingReferrals: pending.length,
+    totalPayoutCents: converted.reduce((sum: number, r: any) => sum + (r.payout_cents || 0), 0),
+    totalRewardMonths: converted.reduce((sum: number, r: any) => sum + (r.reward_months || 0), 0),
+  };
+}
+
 // Database mappers
 function mapDbToSubscription(db: any): Subscription {
   return {
@@ -397,6 +526,16 @@ function mapDbToPaymentEvent(db: any): PaymentEvent {
     currency: db.currency,
     tier: db.tier,
     metadata: db.metadata,
+    createdAt: new Date(db.created_at),
+  };
+}
+
+function mapDbToReferralCode(db: any): ReferralCode {
+  return {
+    id: db.id,
+    appId: db.app_id,
+    externalUserId: db.external_user_id,
+    code: db.code,
     createdAt: new Date(db.created_at),
   };
 }

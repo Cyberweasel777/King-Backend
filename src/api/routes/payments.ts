@@ -25,6 +25,9 @@ import {
   getRecentPaymentEvents,
   grantSubscription,
   revokeSubscription,
+  getOrCreateReferralCode,
+  getReferralStats,
+  resolveReferralCode,
 } from '../../shared/payments/database';
 import {
   getAvailableTiers,
@@ -99,12 +102,77 @@ router.get('/:app/payments/status', extractAppId, async (req, res) => {
 });
 
 /**
+ * GET /api/:app/payments/referral/code
+ * Get or create referral code for user
+ */
+router.get('/:app/payments/referral/code', extractAppId, async (req, res) => {
+  const appId = (req as any).appId as AppId;
+  const externalUserId = req.query.userId as string;
+
+  if (!externalUserId) {
+    return res.status(400).json({ error: 'Missing userId parameter' });
+  }
+
+  try {
+    const referral = await getOrCreateReferralCode(appId, externalUserId);
+    res.json({
+      app: appId,
+      externalUserId,
+      code: referral.code,
+      shareText: `Use my code ${referral.code} at checkout`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/:app/payments/referral/stats
+ * Get referral conversion stats for user
+ */
+router.get('/:app/payments/referral/stats', extractAppId, async (req, res) => {
+  const appId = (req as any).appId as AppId;
+  const externalUserId = req.query.userId as string;
+
+  if (!externalUserId) {
+    return res.status(400).json({ error: 'Missing userId parameter' });
+  }
+
+  try {
+    const stats = await getReferralStats(appId, externalUserId);
+    res.json(stats);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/:app/payments/referral/validate
+ * Validate a referral code
+ */
+router.get('/:app/payments/referral/validate', extractAppId, async (req, res) => {
+  const appId = (req as any).appId as AppId;
+  const code = (req.query.code as string || '').trim();
+
+  if (!code) {
+    return res.status(400).json({ error: 'Missing code parameter' });
+  }
+
+  try {
+    const referral = await resolveReferralCode(appId, code);
+    res.json({ valid: !!referral });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/:app/payments/checkout
  * Create checkout session
  */
 router.post('/:app/payments/checkout', extractAppId, async (req, res) => {
   const appId = (req as any).appId as AppId;
-  const { externalUserId, tier, successUrl, cancelUrl, email } = req.body;
+  const { externalUserId, tier, successUrl, cancelUrl, email, referralCode } = req.body;
   
   if (!externalUserId || !tier || !successUrl || !cancelUrl) {
     return res.status(400).json({ 
@@ -119,6 +187,7 @@ router.post('/:app/payments/checkout', extractAppId, async (req, res) => {
       successUrl,
       cancelUrl,
       email,
+      referralCode,
     });
     
     res.json(session);
