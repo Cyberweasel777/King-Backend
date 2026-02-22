@@ -15,6 +15,7 @@ import paymentsRouter from './payments';
 import contractsRouter from './contracts';
 import shellRouter from './shell';
 import signalsRouter from './signals';
+import arbRouter from './arb';
 
 const router = Router();
 
@@ -38,6 +39,9 @@ router.use('/', shellRouter);
 
 // Shared signal bus routes (fan-out across apps)
 router.use('/signals', signalsRouter);
+
+// Cross-platform arb scanner endpoint
+router.use('/arb', arbRouter);
 
 // TODO: Add remaining 12 apps here
 // router.use('/spreadhunter', spreadhunterRouter);

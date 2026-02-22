@@ -11,6 +11,7 @@
     "pipeline": "ts-node src/pipeline/scheduler.ts",
     "worker": "ts-node src/worker/queue.ts",
     "typecheck": "tsc --noEmit",
+    "test:arb-scanner": "ts-node src/services/arbwatch/scanner.test.ts",
     "smoke:payment-rails": "node scripts/e2e-smoke-payment-rails.mjs"
   },
   "dependencies": {
