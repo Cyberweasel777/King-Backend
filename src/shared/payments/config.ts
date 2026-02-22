@@ -76,11 +76,26 @@ export function getDefaultTierConfig(tier: SubscriptionTier): Partial<TierConfig
           apiAccess: false,
         },
       };
+    case 'starter':
+      return {
+        id: 'starter',
+        name: 'Starter',
+        price: 3900,
+        currency: 'usd',
+        interval: 'month',
+        features: ['Expanded access', 'Standard alerts', 'Email support'],
+        limits: {
+          requestsPerDay: 200,
+          alertsPerDay: 50,
+          exportAllowed: false,
+          apiAccess: false,
+        },
+      };
     case 'basic':
       return {
         id: 'basic',
         name: 'Basic',
-        price: 999,  // $9.99
+        price: 999,  // Legacy tier (kept for backward compatibility)
         currency: 'usd',
         interval: 'month',
         features: ['More requests', 'Email alerts', 'Standard support'],
@@ -99,6 +114,21 @@ export function getDefaultTierConfig(tier: SubscriptionTier): Partial<TierConfig
         currency: 'usd',
         interval: 'month',
         features: ['Unlimited requests', 'Priority alerts', 'Data export', 'API access', 'Priority support'],
+        limits: {
+          requestsPerDay: Infinity,
+          alertsPerDay: Infinity,
+          exportAllowed: true,
+          apiAccess: true,
+        },
+      };
+    case 'elite':
+      return {
+        id: 'elite',
+        name: 'Elite',
+        price: 39900,
+        currency: 'usd',
+        interval: 'month',
+        features: ['Unlimited requests', 'Premium alerts', 'Data export', 'API access', 'Priority support'],
         limits: {
           requestsPerDay: Infinity,
           alertsPerDay: Infinity,
@@ -127,13 +157,50 @@ export function getDefaultTierConfig(tier: SubscriptionTier): Partial<TierConfig
 }
 
 // App-specific tier configs can be defined here
-export const APP_TIER_CONFIGS: Partial<Record<AppId, Record<SubscriptionTier, Partial<TierConfig>>>> = {
-  // Example: deckvault has different limits
-  // deckvault: {
-  //   free: { ...getDefaultTierConfig('free'), limits: { collections: 1, cards: 100 } },
-  //   basic: { ...getDefaultTierConfig('basic'), limits: { collections: 5, cards: 1000 } },
-  //   pro: { ...getDefaultTierConfig('pro'), limits: { collections: Infinity, cards: Infinity } },
-  // },
+export const APP_TIER_CONFIGS: Partial<Record<AppId, Partial<Record<SubscriptionTier, Partial<TierConfig>>>>> = {
+  arbwatch: {
+    free: {
+      features: ['Market overview', 'Basic opportunities'],
+      limits: {
+        scanner: false,
+        heatmap: false,
+        premiumAlerts: false,
+      },
+    },
+    starter: {
+      id: 'starter',
+      name: 'Starter',
+      price: 3900,
+      features: ['Expanded market coverage', 'Standard alerts'],
+      limits: {
+        scanner: false,
+        heatmap: false,
+        premiumAlerts: false,
+      },
+    },
+    pro: {
+      id: 'pro',
+      name: 'Pro',
+      price: 12900,
+      features: ['Scanner access', 'Heatmap access', 'Premium alerts'],
+      limits: {
+        scanner: true,
+        heatmap: true,
+        premiumAlerts: true,
+      },
+    },
+    elite: {
+      id: 'elite',
+      name: 'Elite',
+      price: 39900,
+      features: ['Scanner access', 'Heatmap access', 'Premium alerts', 'Priority support'],
+      limits: {
+        scanner: true,
+        heatmap: true,
+        premiumAlerts: true,
+      },
+    },
+  },
 };
 
 export function getTierConfig(appId: AppId, tier: SubscriptionTier): TierConfig {
@@ -150,6 +217,8 @@ export function getTierConfig(appId: AppId, tier: SubscriptionTier): TierConfig 
 }
 
 export function getAvailableTiers(appId: AppId): TierConfig[] {
-  const tiers: SubscriptionTier[] = ['free', 'basic', 'pro'];
+  const tiers: SubscriptionTier[] = appId === 'arbwatch'
+    ? ['free', 'starter', 'pro', 'elite']
+    : ['free', 'basic', 'pro'];
   return tiers.map(tier => getTierConfig(appId, tier));
 }

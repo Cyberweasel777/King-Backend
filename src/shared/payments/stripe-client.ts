@@ -35,11 +35,13 @@ export async function createCheckoutSession(
     throw new Error(`Stripe not configured for ${appId}`);
   }
 
-  getTierConfig(appId, request.tier);
-  const priceId = getStripePriceId(appId, request.tier);
+  const normalizedTier = appId === 'arbwatch' && request.tier === 'basic' ? 'starter' : request.tier;
+
+  getTierConfig(appId, normalizedTier);
+  const priceId = getStripePriceId(appId, normalizedTier);
 
   if (!priceId) {
-    throw new Error(`No price configured for ${appId} tier ${request.tier}`);
+    throw new Error(`No price configured for ${appId} tier ${normalizedTier}`);
   }
 
   let referralCode: string | undefined;
@@ -89,7 +91,7 @@ export async function createCheckoutSession(
       metadata: {
         external_user_id: request.externalUserId,
         app_id: appId,
-        tier: request.tier,
+        tier: normalizedTier,
         ...(referralCode ? { referral_code: referralCode } : {}),
         ...request.metadata,
       },
@@ -97,7 +99,7 @@ export async function createCheckoutSession(
     metadata: {
       external_user_id: request.externalUserId,
       app_id: appId,
-      tier: request.tier,
+      tier: normalizedTier,
       ...(referralCode ? { referral_code: referralCode } : {}),
     },
   });

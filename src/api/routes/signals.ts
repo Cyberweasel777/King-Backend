@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { buildHeatMap, getPredictionArbFeed } from '../../services/signals/predictionArb';
+import { withSubscriptionHttp } from '../../shared/payments';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ router.get('/prediction-arb', (_req, res) => {
   });
 });
 
-router.get('/prediction-arb/heatmap', (_req, res) => {
+router.get('/prediction-arb/heatmap', withSubscriptionHttp('arbwatch', 'pro'), (_req, res) => {
   const { feed, sourcePath } = getPredictionArbFeed();
 
   if (!feed) {

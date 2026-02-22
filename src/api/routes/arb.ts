@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { runArbScanner } from '../../services/arbwatch/scanner';
+import { withSubscriptionHttp } from '../../shared/payments';
 
 const router = Router();
 
-router.get('/scanner', async (req, res) => {
+router.get('/scanner', withSubscriptionHttp('arbwatch', 'pro'), async (req, res) => {
   const limit = Number(req.query.limit ?? 25);
   const minEdgePct = Number(req.query.minEdgePct ?? 0.25);
   const maxPerEvent = Number(req.query.maxPerEvent ?? 50);

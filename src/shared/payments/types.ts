@@ -19,7 +19,7 @@ export type AppId =
   | 'botindex'
   | 'arbwatch';
 
-export type SubscriptionTier = 'free' | 'basic' | 'pro' | 'enterprise';
+export type SubscriptionTier = 'free' | 'starter' | 'basic' | 'pro' | 'elite' | 'enterprise';
 export type SubscriptionStatus = 'active' | 'inactive' | 'past_due' | 'canceled' | 'trialing';
 
 export interface TierConfig {
@@ -54,6 +54,9 @@ export interface Subscription {
   status: SubscriptionStatus;
   currentPeriodStart?: Date;
   currentPeriodEnd?: Date;
+  grandfathered?: boolean;
+  grandfatheredFromTier?: SubscriptionTier;
+  grandfatheredGraceEnd?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -135,6 +138,12 @@ export interface SubscriptionStatusResponse {
   currentPeriodEnd?: Date;
   features: string[];
   limits: TierLimits;
+  grandfather?: {
+    isGrandfathered: boolean;
+    legacyTier?: SubscriptionTier;
+    graceEnd?: Date;
+    accessUntil?: Date;
+  };
 }
 
 export interface AppPaymentStats {

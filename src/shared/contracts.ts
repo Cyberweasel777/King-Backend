@@ -10,7 +10,7 @@ import { z } from 'zod';
 // SHARED CONTRACTS (All apps use these)
 // ============================================================================
 
-export const SubscriptionTier = z.enum(['free', 'basic', 'pro', 'enterprise']);
+export const SubscriptionTier = z.enum(['free', 'starter', 'basic', 'pro', 'elite', 'enterprise']);
 export const AppId = z.enum([
   'botindex', 'memeradar', 'arbwatch', 'spreadhunter', 
   'deckvault', 'packpal', 'dropfarm', 'dropscout',

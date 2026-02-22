@@ -53,7 +53,7 @@ export async function handleWebhookEvent(
   event: Stripe.Event
 ): Promise<{ processed: boolean; message: string }> {
   // Record event first (for audit/metrics)
-  const tier = extractTierFromEvent(event);
+  const tier = normalizeTierForApp(appId, extractTierFromEvent(event));
   const amount = extractAmountFromEvent(event);
   const currency = extractCurrencyFromEvent(event);
   
@@ -104,7 +104,7 @@ async function handleCheckoutCompleted(
   const session = event.data.object as Stripe.Checkout.Session;
   
   const externalUserId = session.metadata?.external_user_id;
-  const tier = session.metadata?.tier as SubscriptionTier;
+  const tier = normalizeTierForApp(appId, session.metadata?.tier as SubscriptionTier);
   
   if (!externalUserId || !tier) {
     return { processed: false, message: 'Missing metadata in checkout session' };
@@ -273,6 +273,13 @@ function extractTierFromEvent(event: Stripe.Event): SubscriptionTier | undefined
   const obj = event.data.object as any;
   return obj.metadata?.tier || 
          obj.subscription_details?.metadata?.tier;
+}
+
+function normalizeTierForApp(appId: AppId, tier?: SubscriptionTier): SubscriptionTier | undefined {
+  if (!tier) return undefined;
+  if (appId === 'arbwatch' && tier === 'basic') return 'starter';
+  if (appId === 'arbwatch' && tier === 'enterprise') return 'elite';
+  return tier;
 }
 
 function extractAmountFromEvent(event: Stripe.Event): number | undefined {

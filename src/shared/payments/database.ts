@@ -13,6 +13,10 @@ import {
   ReferralCode,
   ReferralStats,
 } from './types';
+import {
+  computeInitialGraceEnd,
+  isLegacyArbwatchPaidTier,
+} from './arbwatch-migration';
 
 // Initialize Supabase client from environment
 const supabaseUrl = process.env.SUPABASE_URL || '';
@@ -50,6 +54,38 @@ function makeFallbackFreeSubscription(appId: AppId, externalUserId: string): Sub
   };
 }
 
+async function ensureArbwatchGrandfathering(subscription: Subscription): Promise<Subscription> {
+  if (subscription.appId !== 'arbwatch') return subscription;
+  if (subscription.grandfathered) return subscription;
+  if (!isLegacyArbwatchPaidTier(subscription.tier)) return subscription;
+  if (subscription.status !== 'active' && subscription.status !== 'trialing') return subscription;
+
+  const graceEnd = computeInitialGraceEnd();
+
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .update({
+      grandfathered: true,
+      grandfathered_from_tier: subscription.tier,
+      grandfathered_grace_end: graceEnd.toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', subscription.id)
+    .select()
+    .single();
+
+  if (error || !data) {
+    return {
+      ...subscription,
+      grandfathered: true,
+      grandfatheredFromTier: subscription.tier,
+      grandfatheredGraceEnd: graceEnd,
+    };
+  }
+
+  return mapDbToSubscription(data);
+}
+
 /**
  * Get or create a subscription record
  */
@@ -71,7 +107,7 @@ export async function getOrCreateSubscription(
     }
 
     if (existing) {
-      return mapDbToSubscription(existing);
+      return ensureArbwatchGrandfathering(mapDbToSubscription(existing));
     }
 
     // Create new free subscription
@@ -124,7 +160,7 @@ export async function getSubscription(
   }
 
   if (!data) return null;
-  return mapDbToSubscription(data);
+  return ensureArbwatchGrandfathering(mapDbToSubscription(data));
 }
 
 /**
@@ -140,7 +176,7 @@ export async function getSubscriptionByStripeCustomer(
     .single();
 
   if (error || !data) return null;
-  return mapDbToSubscription(data);
+  return ensureArbwatchGrandfathering(mapDbToSubscription(data));
 }
 
 /**
@@ -283,8 +319,10 @@ export async function getAppPaymentStats(
   // Count by tier
   const byTier: Record<string, number> = {
     free: 0,
+    starter: 0,
     basic: 0,
     pro: 0,
+    elite: 0,
     enterprise: 0,
   };
 
@@ -352,6 +390,9 @@ export async function revokeSubscription(
     status: 'inactive',
     stripeSubscriptionId: undefined,
     currentPeriodEnd: undefined,
+    grandfathered: false,
+    grandfatheredFromTier: undefined,
+    grandfatheredGraceEnd: undefined,
   });
 }
 
@@ -495,6 +536,9 @@ function mapDbToSubscription(db: any): Subscription {
     status: db.status,
     currentPeriodStart: db.current_period_start ? new Date(db.current_period_start) : undefined,
     currentPeriodEnd: db.current_period_end ? new Date(db.current_period_end) : undefined,
+    grandfathered: Boolean(db.grandfathered),
+    grandfatheredFromTier: db.grandfathered_from_tier,
+    grandfatheredGraceEnd: db.grandfathered_grace_end ? new Date(db.grandfathered_grace_end) : undefined,
     createdAt: new Date(db.created_at),
     updatedAt: new Date(db.updated_at),
   };
@@ -502,15 +546,18 @@ function mapDbToSubscription(db: any): Subscription {
 
 function mapSubscriptionToDb(sub: Partial<Subscription>): any {
   return {
-    ...(sub.userId && { user_id: sub.userId }),
-    ...(sub.appId && { app_id: sub.appId }),
-    ...(sub.externalUserId && { external_user_id: sub.externalUserId }),
-    ...(sub.stripeCustomerId && { stripe_customer_id: sub.stripeCustomerId }),
-    ...(sub.stripeSubscriptionId && { stripe_subscription_id: sub.stripeSubscriptionId }),
-    ...(sub.tier && { tier: sub.tier }),
-    ...(sub.status && { status: sub.status }),
-    ...(sub.currentPeriodStart && { current_period_start: sub.currentPeriodStart.toISOString() }),
-    ...(sub.currentPeriodEnd && { current_period_end: sub.currentPeriodEnd.toISOString() }),
+    ...(sub.userId !== undefined && { user_id: sub.userId }),
+    ...(sub.appId !== undefined && { app_id: sub.appId }),
+    ...(sub.externalUserId !== undefined && { external_user_id: sub.externalUserId }),
+    ...(sub.stripeCustomerId !== undefined && { stripe_customer_id: sub.stripeCustomerId }),
+    ...(sub.stripeSubscriptionId !== undefined && { stripe_subscription_id: sub.stripeSubscriptionId }),
+    ...(sub.tier !== undefined && { tier: sub.tier }),
+    ...(sub.status !== undefined && { status: sub.status }),
+    ...(sub.currentPeriodStart !== undefined && { current_period_start: sub.currentPeriodStart?.toISOString() }),
+    ...(sub.currentPeriodEnd !== undefined && { current_period_end: sub.currentPeriodEnd?.toISOString() }),
+    ...(sub.grandfathered !== undefined && { grandfathered: sub.grandfathered }),
+    ...(sub.grandfatheredFromTier !== undefined && { grandfathered_from_tier: sub.grandfatheredFromTier }),
+    ...(sub.grandfatheredGraceEnd !== undefined && { grandfathered_grace_end: sub.grandfatheredGraceEnd?.toISOString() }),
   };
 }
 

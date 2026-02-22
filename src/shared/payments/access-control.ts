@@ -5,10 +5,11 @@
 
 import { Context } from 'telegraf';
 import { AppId, SubscriptionTier, TierConfig, SubscriptionStatusResponse } from './types';
-import { getSubscription, getOrCreateSubscription } from './database';
+import { getSubscription, getOrCreateSubscription, upsertSubscription } from './database';
 import { getTierConfig, getAvailableTiers } from './config';
+import { getEffectiveSubscription } from './arbwatch-migration';
 
-const TIER_HIERARCHY: SubscriptionTier[] = ['free', 'basic', 'pro', 'enterprise'];
+const TIER_HIERARCHY: SubscriptionTier[] = ['free', 'starter', 'basic', 'pro', 'elite', 'enterprise'];
 
 /**
  * Check if user has an active subscription at or above the required tier
@@ -29,10 +30,28 @@ export async function isSubscribed(
     return minimumTier === 'free';
   }
 
+  const effective = appId === 'arbwatch'
+    ? getEffectiveSubscription(subscription)
+    : {
+        effectiveTier: subscription.tier,
+        inGrandfatherGrace: false,
+        shouldAutoMigrate: false,
+        mappedTier: subscription.tier,
+      };
+
+  if (appId === 'arbwatch' && effective.shouldAutoMigrate) {
+    await upsertSubscription(appId, externalUserId, {
+      tier: effective.mappedTier,
+      grandfathered: false,
+      grandfatheredFromTier: undefined,
+      grandfatheredGraceEnd: undefined,
+    });
+  }
+
   // Check tier hierarchy
-  const userTierIndex = TIER_HIERARCHY.indexOf(subscription.tier);
+  const userTierIndex = TIER_HIERARCHY.indexOf(effective.effectiveTier);
   const requiredTierIndex = TIER_HIERARCHY.indexOf(minimumTier);
-  
+
   return userTierIndex >= requiredTierIndex;
 }
 
@@ -44,16 +63,30 @@ export async function getSubscriptionStatus(
   externalUserId: string
 ): Promise<SubscriptionStatusResponse> {
   const subscription = await getOrCreateSubscription(appId, externalUserId);
-  const tierConfig = getTierConfig(appId, subscription.tier);
+  const effective = appId === 'arbwatch'
+    ? getEffectiveSubscription(subscription)
+    : {
+        effectiveTier: subscription.tier,
+        inGrandfatherGrace: false,
+        shouldAutoMigrate: false,
+        mappedTier: subscription.tier,
+      };
+  const tierConfig = getTierConfig(appId, effective.effectiveTier);
 
   return {
     appId,
     externalUserId,
-    tier: subscription.tier,
+    tier: effective.effectiveTier,
     status: subscription.status,
     currentPeriodEnd: subscription.currentPeriodEnd,
     features: tierConfig.features,
     limits: tierConfig.limits,
+    grandfather: {
+      isGrandfathered: Boolean(subscription.grandfathered),
+      legacyTier: subscription.grandfatheredFromTier,
+      graceEnd: subscription.grandfatheredGraceEnd,
+      accessUntil: subscription.grandfatheredGraceEnd,
+    },
   };
 }
 
@@ -65,7 +98,9 @@ export async function getUserTier(
   externalUserId: string
 ): Promise<SubscriptionTier> {
   const subscription = await getSubscription(appId, externalUserId);
-  return subscription?.tier || 'free';
+  if (!subscription) return 'free';
+  if (appId !== 'arbwatch') return subscription.tier;
+  return getEffectiveSubscription(subscription).effectiveTier;
 }
 
 /**
@@ -178,10 +213,12 @@ export function getTierComparison(appId: AppId): string {
  * Format subscription status for display
  */
 export function formatSubscriptionStatus(status: SubscriptionStatusResponse): string {
-  const tierEmoji = {
+  const tierEmoji: Record<SubscriptionTier, string> = {
     free: '🆓',
+    starter: '⭐',
     basic: '⭐',
     pro: '💎',
+    elite: '👑',
     enterprise: '🏢',
   };
 
@@ -192,7 +229,12 @@ export function formatSubscriptionStatus(status: SubscriptionStatusResponse): st
     const daysLeft = Math.ceil((status.currentPeriodEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
     message += `Renews in: ${daysLeft} days\n`;
   }
-  
+
+  if (status.grandfather?.isGrandfathered && status.grandfather.graceEnd) {
+    const graceDaysLeft = Math.max(0, Math.ceil((status.grandfather.graceEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+    message += `Grandfathered grace: ${graceDaysLeft} days left\n`;
+  }
+
   message += `\n*Your Features:*\n`;
   message += status.features.map(f => `  ✓ ${f}`).join('\n');
   

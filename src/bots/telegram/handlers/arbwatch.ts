@@ -31,10 +31,14 @@ export function createArbWatchBot(token: string) {
       `Free:\n` +
       `/opportunities — View arb opportunities\n` +
       `/markets — List markets\n\n` +
-      `Pro:\n` +
+      `Starter ($39):\n` +
+      `/opportunities — Expanded opportunities\n\n` +
+      `Pro/Elite:\n` +
       `/position — Log position\n` +
       `/positions — View positions\n` +
-      `/execute — Execute trade`
+      `/execute — Execute trade\n` +
+      `/scanner — Cross-venue scanner\n` +
+      `/heatmap — Prediction heatmap`
     );
   });
 

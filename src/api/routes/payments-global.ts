@@ -4,7 +4,7 @@
  * Minimal checkout URL creator for canary.
  * Mounted at /api/payments
  *
- * GET /api/payments/checkout?app=<botindex|memeradar|arbwatch|spreadhunter|rosterradar>&tier=<basic|pro>&user=<externalUserId>
+ * GET /api/payments/checkout?app=<botindex|memeradar|arbwatch|spreadhunter|rosterradar>&tier=<starter|pro|elite|basic>&user=<externalUserId>
  * Returns: { url }
  */
 
@@ -50,8 +50,11 @@ router.get('/checkout', async (req: Request, res: Response) => {
   }
 
   const subscriptionTier = tier as SubscriptionTier;
-  if (subscriptionTier !== 'basic' && subscriptionTier !== 'pro') {
-    return res.status(400).json({ error: 'invalid_tier', message: 'tier must be basic or pro' });
+  const isValidTier = appId === 'arbwatch'
+    ? ['starter', 'pro', 'elite', 'basic'].includes(subscriptionTier)
+    : ['basic', 'pro'].includes(subscriptionTier);
+  if (!isValidTier) {
+    return res.status(400).json({ error: 'invalid_tier', message: appId === 'arbwatch' ? 'tier must be starter, pro, or elite' : 'tier must be basic or pro' });
   }
 
   if (!externalUserId) {
