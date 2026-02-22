@@ -80,6 +80,25 @@ export const apps: AppConfig[] = [
       enabled: true,
       schedule: '*/2 * * * *'  // Every 2 minutes (faster for arb)
     }
+  },
+  {
+    id: 'skinsignal',
+    name: 'SkinSignal',
+    enabled: true,
+    api: {
+      prefix: '/api/skinsignal',
+      rateLimit: '60/min'
+    },
+    bot: {
+      telegram: {
+        enabled: true,
+        tokenEnv: 'SKINSIGNAL_BOT_TOKEN'
+      }
+    },
+    pipeline: {
+      enabled: true,
+      schedule: '*/5 * * * *'  // Every 5 minutes (respects Steam rate limits)
+    }
   }
 ];
 

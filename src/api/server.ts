@@ -29,7 +29,7 @@ app.get('/health', async (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    canary: ['botindex', 'memeradar', 'arbwatch']
+    canary: ['botindex', 'memeradar', 'arbwatch', 'skinsignal']
   });
 });
 
@@ -51,7 +51,7 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`☦️  King Backend running on port ${PORT}`);
     console.log(`Health: http://localhost:${PORT}/health`);
-    console.log('Canary apps: botindex, memeradar, arbwatch');
+    console.log('Canary apps: botindex, memeradar, arbwatch, skinsignal');
   });
 }
 

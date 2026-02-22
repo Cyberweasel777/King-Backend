@@ -9,6 +9,7 @@ import { Router } from 'express';
 import botindexRouter from './botindex';
 import memeradarRouter from './memeradar';
 import arbwatchRouter from './arbwatch';
+import skinsignalRouter from './skinsignal';
 import paymentsGlobalRouter from './payments-global';
 import paymentsRouter from './payments';
 import contractsRouter from './contracts';
@@ -21,6 +22,7 @@ const router = Router();
 router.use('/botindex', botindexRouter);
 router.use('/memeradar', memeradarRouter);
 router.use('/arbwatch', arbwatchRouter);
+router.use('/skinsignal', skinsignalRouter);
 
 // App-scoped payment routes (config/status/checkout/portal/webhook/admin)
 router.use('/', paymentsRouter);
