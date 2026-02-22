@@ -10,10 +10,12 @@ import logger from './logger';
 const envSchema = z.object({
   // Required
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  SUPABASE_URL: z.string().url(),
-  SUPABASE_SERVICE_KEY: z.string().min(1),
-  
+  CONVEX_URL: z.string().url(),
+  CONVEX_ADMIN_KEY: z.string().min(1),
+
   // Optional with defaults
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_SERVICE_KEY: z.string().min(1).optional(),
   SUPABASE_ANON_KEY: z.string().optional(),
   REDIS_URL: z.string().url().optional(),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),

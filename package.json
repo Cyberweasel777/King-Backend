@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test:arb-scanner": "ts-node src/services/arbwatch/scanner.test.ts",
     "test:arbwatch-migration": "ts-node src/shared/payments/arbwatch-migration.test.ts",
+    "test:payments-convex-adapter": "ts-node src/shared/payments/convex-payments-adapter.test.ts",
     "smoke:payment-rails": "node scripts/e2e-smoke-payment-rails.mjs"
   },
   "dependencies": {
