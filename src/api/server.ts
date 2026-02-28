@@ -8,11 +8,19 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import routes from './routes/index';
+import { mountBotindexX402TestRoute } from './routes/botindex';
 import { errorHandler } from './middleware/errorHandler';
+import { getX402RuntimeConfig } from './middleware/x402Gate';
 import { initDb } from '../shared/payments/database';
+import logger from '../config/logger';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+const x402Config = getX402RuntimeConfig();
+
+if (x402Config.enabled) {
+  mountBotindexX402TestRoute();
+}
 
 // Security middleware
 app.use(helmet());
@@ -29,7 +37,11 @@ app.get('/health', async (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    canary: ['botindex', 'memeradar', 'arbwatch', 'skinsignal']
+    canary: ['botindex', 'memeradar', 'arbwatch', 'skinsignal'],
+    x402: {
+      enabled: x402Config.enabled,
+      network: x402Config.network,
+    },
   });
 });
 
@@ -49,12 +61,19 @@ async function start() {
   await initDb();
   
   app.listen(PORT, () => {
-    console.log(`☦️  King Backend running on port ${PORT}`);
-    console.log(`Health: http://localhost:${PORT}/health`);
-    console.log('Canary apps: botindex, memeradar, arbwatch, skinsignal');
+    logger.info(
+      {
+        port: PORT,
+        x402Enabled: x402Config.enabled,
+        x402Network: x402Config.network,
+      },
+      'King Backend API started'
+    );
   });
 }
 
-start().catch(console.error);
+start().catch((error) => {
+  logger.error({ err: error }, 'Failed to start API server');
+});
 
 export default app;

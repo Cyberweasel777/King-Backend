@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import correlationRoutes from '../../services/botindex/api/correlation.routes';
 import { withSubscriptionHttp, withFreeLimit, getFreeLimitKey } from '../../shared/payments';
+import x402TestRouter from './x402-test';
 import {
   generateCorrelationMatrix,
   identifyMarketLeaders,
@@ -11,6 +12,13 @@ import { fetchMultiplePriceSeries } from '../../services/botindex/engine/fetcher
 import { buildHeatMap, getPredictionArbFeed } from '../../services/signals/predictionArb';
 
 const router = Router();
+let x402RouteMounted = false;
+
+export function mountBotindexX402TestRoute(): void {
+  if (x402RouteMounted) return;
+  router.use('/x402', x402TestRouter);
+  x402RouteMounted = true;
+}
 
 const DEFAULT_TOKEN_UNIVERSE = [
   'solana:So11111111111111111111111111111111111111112',
@@ -152,6 +160,11 @@ router.use(
   async (req, res, next) => {
     // Let central payments router handle /api/:app/payments/* without bot-level gating.
     if (req.path === '/payments' || req.path.startsWith('/payments/')) {
+      return next();
+    }
+
+    // x402 routes handle their own payment gating — skip subscription check.
+    if (req.path.startsWith('/x402/') || req.path === '/x402') {
       return next();
     }
 
