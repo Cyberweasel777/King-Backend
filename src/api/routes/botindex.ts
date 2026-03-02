@@ -10,6 +10,7 @@ import {
   getTopCorrelatedPairs,
 } from '../../services/botindex/engine/matrix';
 import { fetchMultiplePriceSeries } from '../../services/botindex/engine/fetcher';
+import { getBotindexTokenUniverse } from '../../services/botindex/engine/universe';
 import { buildHeatMap, getPredictionArbFeed } from '../../services/signals/predictionArb';
 
 const router = Router();
@@ -21,14 +22,6 @@ export function mountBotindexX402TestRoute(): void {
   router.use('/v1', x402PremiumRouter);
   x402RouteMounted = true;
 }
-
-const DEFAULT_TOKEN_UNIVERSE = [
-  'solana:So11111111111111111111111111111111111111112',
-  'solana:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-  'solana:DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
-  'solana:EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm',
-  'solana:7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
-];
 
 type BotSignal = {
   id: string;
@@ -102,7 +95,8 @@ router.get('/signals', async (req, res) => {
   const limit = Math.min(parseInt(String(req.query.limit || '10'), 10) || 10, 50);
 
   try {
-    const priceSeriesMap = await fetchMultiplePriceSeries(DEFAULT_TOKEN_UNIVERSE, '24h');
+    const tokenUniverse = await getBotindexTokenUniverse(30);
+    const priceSeriesMap = await fetchMultiplePriceSeries(tokenUniverse, '24h');
     const priceSeries = Array.from(priceSeriesMap.values());
 
     if (priceSeries.length < 2) {
@@ -195,7 +189,8 @@ router.get('/signals/:id', async (req, res) => {
 
   // Build a deterministic “live” id lookup from current leaders if id is unknown.
   try {
-    const priceSeriesMap = await fetchMultiplePriceSeries(DEFAULT_TOKEN_UNIVERSE, '24h');
+    const tokenUniverse = await getBotindexTokenUniverse(30);
+    const priceSeriesMap = await fetchMultiplePriceSeries(tokenUniverse, '24h');
     const priceSeries = Array.from(priceSeriesMap.values());
     if (priceSeries.length < 2) {
       res.status(404).json({ error: 'not_found' });

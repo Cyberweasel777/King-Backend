@@ -1,6 +1,7 @@
 import { Request, Response, Router } from 'express';
 import { createX402Gate } from '../middleware/x402Gate';
 import { fetchMultiplePriceSeries } from '../../services/botindex/engine/fetcher';
+import { getBotindexTokenUniverse } from '../../services/botindex/engine/universe';
 import {
   generateCorrelationMatrix,
   identifyMarketLeaders,
@@ -16,16 +17,6 @@ const METADATA = {
   version: '1.0',
   provider: 'Renaldo Corp / BotIndex',
 } as const;
-
-const DEFAULT_TOKEN_UNIVERSE = [
-  'solana:So11111111111111111111111111111111111111112',
-  'solana:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-  'solana:Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
-  'solana:DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
-  'solana:EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm',
-  'solana:7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
-  'solana:6D7NaBmqsFEK14vgtgBaHwLxBozrMBF3ZgJy5mR8yXrw',
-];
 
 const AGENT_REGISTRY: Record<string, { name: string; type: string }> = {
   spreadhunter: { name: 'SpreadHunter', type: 'sports_betting' },
@@ -110,7 +101,8 @@ function filterPredictionSignalsByAgentType(
 }
 
 async function buildBotindexTrace(limit: number) {
-  const priceSeriesMap = await fetchMultiplePriceSeries(DEFAULT_TOKEN_UNIVERSE, '24h');
+  const tokenUniverse = await getBotindexTokenUniverse(30);
+  const priceSeriesMap = await fetchMultiplePriceSeries(tokenUniverse, '24h');
   const priceSeries = Array.from(priceSeriesMap.values());
 
   if (priceSeries.length < 2) {
@@ -160,7 +152,8 @@ function buildStubTrace(
 }
 
 async function buildWindowSnapshot(window: keyof typeof TIME_WINDOWS, limit: number) {
-  const priceSeriesMap = await fetchMultiplePriceSeries(DEFAULT_TOKEN_UNIVERSE, window);
+  const tokenUniverse = await getBotindexTokenUniverse(30);
+  const priceSeriesMap = await fetchMultiplePriceSeries(tokenUniverse, window);
   const priceSeries = Array.from(priceSeriesMap.values());
 
   if (priceSeries.length < 2) {
@@ -298,7 +291,8 @@ router.get(
   }),
   async (_req: Request, res: Response) => {
     try {
-      const priceSeriesMap = await fetchMultiplePriceSeries(DEFAULT_TOKEN_UNIVERSE, '24h');
+      const tokenUniverse = await getBotindexTokenUniverse(30);
+      const priceSeriesMap = await fetchMultiplePriceSeries(tokenUniverse, '24h');
       const priceSeries = Array.from(priceSeriesMap.values());
 
       const correlationLeaders =
@@ -407,7 +401,8 @@ router.get(
   }),
   async (_req: Request, res: Response) => {
     try {
-      const priceSeriesMap = await fetchMultiplePriceSeries(DEFAULT_TOKEN_UNIVERSE, '24h');
+      const tokenUniverse = await getBotindexTokenUniverse(30);
+      const priceSeriesMap = await fetchMultiplePriceSeries(tokenUniverse, '24h');
       const priceSeries = Array.from(priceSeriesMap.values());
 
       const matrix =
