@@ -18,9 +18,8 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const x402Config = getX402RuntimeConfig();
 
-if (x402Config.enabled) {
-  mountBotindexX402TestRoute();
-}
+// Always mount x402/v1 routes — individual gates pass through when x402 is disabled
+mountBotindexX402TestRoute();
 
 // Security middleware
 app.use(helmet());
