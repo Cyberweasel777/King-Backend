@@ -170,6 +170,11 @@ router.use(
       return next();
     }
 
+    // v1 premium routes use x402 gates — skip subscription check.
+    if (req.path.startsWith('/v1/') || req.path === '/v1') {
+      return next();
+    }
+
     const isPairCorrelation = /^\/correlation\/[^/]+\/[^/]+/.test(req.path);
 
     if (isPairCorrelation) {
