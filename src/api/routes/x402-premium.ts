@@ -290,6 +290,18 @@ router.get('/', (_req: Request, res: Response) => {
         price: '$0.02',
         description: 'Active Metaplex Genesis launches on Solana',
       },
+      {
+        method: 'GET',
+        path: '/commerce/compare?q=<query>',
+        price: '$0.05',
+        description: 'Cross-protocol merchant comparison (ACP vs UCP vs x402). Returns ranked offers, trust scores, fees, and protocol breakdown.',
+      },
+      {
+        method: 'GET',
+        path: '/commerce/protocols',
+        price: '$0.01',
+        description: 'Agentic commerce protocol directory — ACP (OpenAI+Stripe), UCP (Google), x402 (Coinbase) with fees and merchant counts.',
+      },
     ],
   });
 });

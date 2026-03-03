@@ -7,6 +7,7 @@ import x402PremiumRouter from './x402-premium';
 import botindexSportsRouter from './botindex-sports';
 import botindexCryptoRouter from './botindex-crypto';
 import botindexGenesisRouter from './botindex-genesis';
+import botindexCommerceRouter from './botindex-commerce';
 import {
   generateCorrelationMatrix,
   identifyMarketLeaders,
@@ -26,6 +27,7 @@ export function mountBotindexX402TestRoute(): void {
   router.use('/v1', botindexSportsRouter);
   router.use('/v1', botindexCryptoRouter);
   router.use('/v1', botindexGenesisRouter);
+  router.use('/v1', botindexCommerceRouter);
   x402RouteMounted = true;
 }
 
