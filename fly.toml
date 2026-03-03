@@ -31,6 +31,11 @@ primary_region = "iad"
     hard_limit = 25
     soft_limit = 20
 
+[mounts]
+  source = "king_data"
+  destination = "/data"
+  processes = ["api"]
+
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
