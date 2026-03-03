@@ -19,10 +19,17 @@ type CaipNetwork = (typeof LEGACY_TO_CAIP)[LegacyNetwork];
 
 function getFacilitatorClient(): HTTPFacilitatorClient {
   const url = process.env.X402_FACILITATOR_URL;
-  if (url) {
-    return new HTTPFacilitatorClient({ url });
+  const cdpApiKey = process.env.CDP_API_KEY;
+
+  const config: Record<string, unknown> = {};
+  if (url) config.url = url;
+  if (cdpApiKey) {
+    config.createAuthHeaders = () => ({
+      Authorization: `Bearer ${cdpApiKey}`,
+    });
   }
-  return new HTTPFacilitatorClient();
+
+  return new HTTPFacilitatorClient(config);
 }
 
 let facilitatorClient: HTTPFacilitatorClient | null = null;
