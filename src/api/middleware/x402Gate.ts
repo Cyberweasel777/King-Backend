@@ -17,7 +17,15 @@ type SupportedNetwork = z.infer<typeof NETWORK_SCHEMA>;
 type LegacyNetwork = keyof typeof LEGACY_TO_CAIP;
 type CaipNetwork = (typeof LEGACY_TO_CAIP)[LegacyNetwork];
 
-const facilitatorClient = new HTTPFacilitatorClient();
+function getFacilitatorClient(): HTTPFacilitatorClient {
+  const url = process.env.X402_FACILITATOR_URL;
+  if (url) {
+    return new HTTPFacilitatorClient({ url });
+  }
+  return new HTTPFacilitatorClient();
+}
+
+let facilitatorClient: HTTPFacilitatorClient | null = null;
 const resourceServerByNetwork = new Map<CaipNetwork, x402ResourceServer>();
 
 export type X402GateOptions = {
@@ -58,6 +66,10 @@ function toCaipNetwork(network: SupportedNetwork): CaipNetwork {
 function getResourceServer(network: CaipNetwork): x402ResourceServer {
   const cached = resourceServerByNetwork.get(network);
   if (cached) return cached;
+
+  if (!facilitatorClient) {
+    facilitatorClient = getFacilitatorClient();
+  }
 
   const server = new x402ResourceServer(facilitatorClient).register(
     network,
