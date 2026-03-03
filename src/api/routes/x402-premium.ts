@@ -278,6 +278,18 @@ router.get('/', (_req: Request, res: Response) => {
         price: '$0.02',
         description: 'Token graduation signals from Catapult/Hyperliquid via GradSniper',
       },
+      {
+        method: 'GET',
+        path: '/solana/launches',
+        price: '$0.02',
+        description: 'Metaplex Genesis token launches on Solana (all tracked)',
+      },
+      {
+        method: 'GET',
+        path: '/solana/active',
+        price: '$0.02',
+        description: 'Active Metaplex Genesis launches on Solana',
+      },
     ],
   });
 });
