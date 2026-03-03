@@ -8,8 +8,10 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import routes from './routes/index';
+import adminHitsRouter from './routes/admin-hits';
 import { mountBotindexX402TestRoute } from './routes/botindex';
 import { errorHandler } from './middleware/errorHandler';
+import { hitCounter } from './middleware/hitCounter';
 import { getX402RuntimeConfig } from './middleware/x402Gate';
 import { initDb } from '../shared/payments/database';
 import logger from '../config/logger';
@@ -44,8 +46,12 @@ app.get('/health', async (req, res) => {
   });
 });
 
+// Track BotIndex/x402 endpoint hits (in-memory, zero I/O)
+app.use(hitCounter);
+
 // Mount all routes
 app.use('/api', routes);
+app.use('/api', adminHitsRouter);
 
 // Error handling
 app.use(errorHandler);
