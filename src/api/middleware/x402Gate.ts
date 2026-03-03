@@ -77,10 +77,12 @@ function getFacilitatorClient(): HTTPFacilitatorClient {
 
     config.createAuthHeaders = async () => {
       // Map facilitator operations to their HTTP paths
+      // Keys must match the path names used by @x402/core HTTPFacilitatorClient internally:
+      // "verify", "settle", "supported" (not "getSupported")
       const pathMap: Record<string, { method: string; path: string }> = {
         verify: { method: 'POST', path: '/platform/v2/x402/verify' },
         settle: { method: 'POST', path: '/platform/v2/x402/settle' },
-        getSupported: { method: 'GET', path: '/platform/v2/x402/supported' },
+        supported: { method: 'GET', path: '/platform/v2/x402/supported' },
       };
 
       const headers: Record<string, Record<string, string>> = {};
