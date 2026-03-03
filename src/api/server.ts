@@ -9,6 +9,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import routes from './routes/index';
 import adminHitsRouter from './routes/admin-hits';
+import wellKnownRouter from './routes/well-known';
 import { mountBotindexX402TestRoute } from './routes/botindex';
 import { errorHandler } from './middleware/errorHandler';
 import { hitCounter } from './middleware/hitCounter';
@@ -32,6 +33,9 @@ app.use('/api/:app/payments/webhook', express.raw({ type: 'application/json' }))
 
 // JSON parser for other routes
 app.use(express.json());
+
+// Agent discovery endpoints (no auth, no middleware)
+app.use('/.well-known', wellKnownRouter);
 
 // Health check
 app.get('/health', async (req, res) => {
