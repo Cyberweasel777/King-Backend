@@ -49,9 +49,11 @@ app.get('/health', async (req, res) => {
 // Track BotIndex/x402 endpoint hits (in-memory, zero I/O)
 app.use(hitCounter);
 
+// Mount admin telemetry first so it bypasses app-level subscription guards
+app.use('/api', adminHitsRouter);
+
 // Mount all routes
 app.use('/api', routes);
-app.use('/api', adminHitsRouter);
 
 // Error handling
 app.use(errorHandler);
