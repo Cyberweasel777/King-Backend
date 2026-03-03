@@ -230,6 +230,54 @@ router.get('/', (_req: Request, res: Response) => {
         price: '$0.50',
         description: 'Full premium dashboard payload with all agents, traces, and matrices',
       },
+      {
+        method: 'GET',
+        path: '/sports/odds',
+        price: '$0.02',
+        description: 'Live sports odds snapshot (NFL, NBA, UFC, NHL)',
+      },
+      {
+        method: 'GET',
+        path: '/sports/lines',
+        price: '$0.02',
+        description: 'Sports line movements with sharp action flags',
+      },
+      {
+        method: 'GET',
+        path: '/sports/props',
+        price: '$0.02',
+        description: 'Top prop bet movements with confidence scores',
+      },
+      {
+        method: 'GET',
+        path: '/sports/correlations',
+        price: '$0.05',
+        description: 'Player correlation matrix for DFS and betting',
+      },
+      {
+        method: 'GET',
+        path: '/sports/optimizer',
+        price: '$0.10',
+        description: 'Correlation-adjusted DFS lineup optimizer',
+      },
+      {
+        method: 'GET',
+        path: '/sports/arb',
+        price: '$0.05',
+        description: 'Cross-platform prediction/sportsbook arbitrage scanner',
+      },
+      {
+        method: 'GET',
+        path: '/crypto/tokens',
+        price: '$0.02',
+        description: 'Token universe with latest price data from MemeRadar',
+      },
+      {
+        method: 'GET',
+        path: '/crypto/graduating',
+        price: '$0.02',
+        description: 'Token graduation signals from Catapult/Hyperliquid via GradSniper',
+      },
     ],
   });
 });

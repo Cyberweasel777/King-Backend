@@ -4,6 +4,8 @@ import correlationRoutes from '../../services/botindex/api/correlation.routes';
 import { withSubscriptionHttp, withFreeLimit, getFreeLimitKey } from '../../shared/payments';
 import x402TestRouter from './x402-test';
 import x402PremiumRouter from './x402-premium';
+import botindexSportsRouter from './botindex-sports';
+import botindexCryptoRouter from './botindex-crypto';
 import {
   generateCorrelationMatrix,
   identifyMarketLeaders,
@@ -20,6 +22,8 @@ export function mountBotindexX402TestRoute(): void {
   if (x402RouteMounted) return;
   router.use('/x402', x402TestRouter);
   router.use('/v1', x402PremiumRouter);
+  router.use('/v1', botindexSportsRouter);
+  router.use('/v1', botindexCryptoRouter);
   x402RouteMounted = true;
 }
 
