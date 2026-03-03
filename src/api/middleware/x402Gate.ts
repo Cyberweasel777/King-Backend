@@ -131,7 +131,10 @@ export function createX402Gate(options: X402GateOptions = {}): RequestHandler {
         description: options.description || 'x402 protected endpoint',
       },
     },
-    getResourceServer(caipNetwork)
+    getResourceServer(caipNetwork),
+    undefined,
+    undefined,
+    false
   );
 
   return async (req, res, next) => {
