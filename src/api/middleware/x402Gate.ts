@@ -140,6 +140,8 @@ function toCaipNetwork(network: SupportedNetwork): CaipNetwork {
   return network as CaipNetwork;
 }
 
+let resourceServerInitPromise: Promise<void> | null = null;
+
 function getResourceServer(network: CaipNetwork): x402ResourceServer {
   const cached = resourceServerByNetwork.get(network);
   if (cached) return cached;
@@ -153,6 +155,13 @@ function getResourceServer(network: CaipNetwork): x402ResourceServer {
     new ExactEvmScheme()
   );
   resourceServerByNetwork.set(network, server);
+
+  // Kick off async initialize to fetch supported schemes from facilitator
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  resourceServerInitPromise = (server as any).initialize()
+    .then(() => logger.info({ network }, 'x402 resource server initialized'))
+    .catch((err: unknown) => logger.warn({ err, network }, 'x402 resource server init failed (will retry on request)'));
+
   return server;
 }
 
@@ -216,6 +225,10 @@ export function createX402Gate(options: X402GateOptions = {}): RequestHandler {
 
   return async (req, res, next) => {
     try {
+      // Ensure resource server has fetched supported schemes before processing
+      if (resourceServerInitPromise) {
+        await resourceServerInitPromise;
+      }
       await gate(req, res, next);
     } catch (error) {
       logger.error({ err: error }, 'x402 gate failed');
