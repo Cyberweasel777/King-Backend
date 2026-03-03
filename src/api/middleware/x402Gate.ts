@@ -70,9 +70,10 @@ function getFacilitatorClient(): HTTPFacilitatorClient {
   if (url) config.url = url;
 
   if (cdpApiKeyId && cdpApiKeySecret) {
+    // CDP JWT uses host (not origin) in the URI claim — matches @coinbase/cdp-sdk pattern
     const facilitatorHost = url
-      ? new URL(url).origin
-      : 'https://api.cdp.coinbase.com';
+      ? new URL(url).host
+      : 'api.cdp.coinbase.com';
 
     config.createAuthHeaders = async () => {
       // Map facilitator operations to their HTTP paths
@@ -91,7 +92,7 @@ function getFacilitatorClient(): HTTPFacilitatorClient {
           facilitatorHost,
           path
         );
-        headers[op] = { Authorization: `Bearer ${jwt}` };
+        headers[op] = { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' };
       }
       return headers;
     };
