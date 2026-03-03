@@ -2,7 +2,9 @@ import type { RequestHandler } from 'express';
 import { paymentMiddleware, x402ResourceServer } from '@x402/express';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
 import { HTTPFacilitatorClient } from '@x402/core/server';
+import { SignJWT, importJWK } from 'jose';
 import { z } from 'zod';
+import crypto from 'crypto';
 import logger from '../../config/logger';
 
 const SUPPORTED_NETWORKS = ['base-sepolia', 'base', 'eip155:84532', 'eip155:8453'] as const;
@@ -17,16 +19,84 @@ type SupportedNetwork = z.infer<typeof NETWORK_SCHEMA>;
 type LegacyNetwork = keyof typeof LEGACY_TO_CAIP;
 type CaipNetwork = (typeof LEGACY_TO_CAIP)[LegacyNetwork];
 
+/**
+ * Generate a CDP-compatible JWT for authenticating with the Coinbase facilitator.
+ * Uses Ed25519 (EdDSA) signing with the CDP API Key ID + Secret.
+ */
+async function generateCdpJwt(
+  apiKeyId: string,
+  apiKeySecret: string,
+  requestMethod: string,
+  requestHost: string,
+  requestPath: string
+): Promise<string> {
+  const decoded = Buffer.from(apiKeySecret, 'base64');
+  if (decoded.length !== 64) {
+    throw new Error(`Invalid Ed25519 key length: expected 64, got ${decoded.length}`);
+  }
+
+  const seed = decoded.subarray(0, 32);
+  const publicKey = decoded.subarray(32);
+
+  const jwk = {
+    kty: 'OKP' as const,
+    crv: 'Ed25519' as const,
+    d: seed.toString('base64url'),
+    x: publicKey.toString('base64url'),
+  };
+
+  const key = await importJWK(jwk, 'EdDSA');
+  const now = Math.floor(Date.now() / 1000);
+  const nonce = crypto.randomBytes(16).toString('hex');
+
+  return new SignJWT({
+    sub: apiKeyId,
+    iss: 'cdp',
+    uris: [`${requestMethod} ${requestHost}${requestPath}`],
+  })
+    .setProtectedHeader({ alg: 'EdDSA', kid: apiKeyId, typ: 'JWT', nonce })
+    .setIssuedAt(now)
+    .setNotBefore(now)
+    .setExpirationTime(now + 120)
+    .sign(key);
+}
+
 function getFacilitatorClient(): HTTPFacilitatorClient {
   const url = process.env.X402_FACILITATOR_URL;
-  const cdpApiKey = process.env.CDP_API_KEY;
+  const cdpApiKeyId = process.env.CDP_API_KEY;
+  const cdpApiKeySecret = process.env.CDP_API_KEY_SECRET;
 
   const config: Record<string, unknown> = {};
   if (url) config.url = url;
-  if (cdpApiKey) {
-    config.createAuthHeaders = () => ({
-      Authorization: `Bearer ${cdpApiKey}`,
-    });
+
+  if (cdpApiKeyId && cdpApiKeySecret) {
+    const facilitatorHost = url
+      ? new URL(url).origin
+      : 'https://api.cdp.coinbase.com';
+
+    config.createAuthHeaders = async () => {
+      // Map facilitator operations to their HTTP paths
+      const pathMap: Record<string, { method: string; path: string }> = {
+        verify: { method: 'POST', path: '/platform/v2/x402/verify' },
+        settle: { method: 'POST', path: '/platform/v2/x402/settle' },
+        getSupported: { method: 'GET', path: '/platform/v2/x402/supported' },
+      };
+
+      const headers: Record<string, Record<string, string>> = {};
+      for (const [op, { method, path }] of Object.entries(pathMap)) {
+        const jwt = await generateCdpJwt(
+          cdpApiKeyId,
+          cdpApiKeySecret,
+          method,
+          facilitatorHost,
+          path
+        );
+        headers[op] = { Authorization: `Bearer ${jwt}` };
+      }
+      return headers;
+    };
+
+    logger.info('x402: CDP JWT auth configured for facilitator');
   }
 
   return new HTTPFacilitatorClient(config);
