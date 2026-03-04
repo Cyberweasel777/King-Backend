@@ -1,6 +1,6 @@
 # BotIndex — AI-Native Signal Intelligence API
 
-> No API keys. No signup. Pay per request with USDC via [x402](https://github.com/coinbase/x402).
+> No API keys. No signup. **50 free premium requests per wallet.** Then pay per request with USDC via [x402](https://github.com/coinbase/x402).
 
 **Live:** [king-backend.fly.dev](https://king-backend.fly.dev/health)
 
@@ -18,10 +18,21 @@ curl https://king-backend.fly.dev/api/botindex/zora/trending-coins
 # Free — Hyperliquid funding rate arbitrage
 curl https://king-backend.fly.dev/api/botindex/hyperliquid/funding-arb
 
-# Premium (x402, $0.05 USDC) — correlation leaders
+# Premium with free trial — send your wallet, get 50 free requests
+curl -H "X-Wallet: 0xYOUR_WALLET_ADDRESS" \
+  https://king-backend.fly.dev/api/botindex/v1/signals
+# → Returns real data + X-BotIndex-Free-Remaining: 49
+
+# After 50 requests, same endpoint requires x402 payment
 curl https://king-backend.fly.dev/api/botindex/x402/correlation-leaders
-# → Returns 402 with payment instructions. Use @x402/client to pay automatically.
+# → Returns 402 with payment instructions
 ```
+
+### Free Trial
+
+Every wallet gets **50 free premium requests**. No signup, no email, no API key.
+
+Just send an `X-Wallet: 0x...` header with any request. The response includes `X-BotIndex-Free-Remaining` so you always know where you stand.
 
 ---
 
