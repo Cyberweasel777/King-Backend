@@ -43,6 +43,7 @@ app.get('/health', async (req, res) => {
     status: 'ok', 
     timestamp: new Date().toISOString(),
     canary: ['botindex', 'memeradar', 'arbwatch', 'skinsignal'],
+    botindexDomains: ['sports', 'crypto', 'commerce', 'zora', 'hyperliquid', 'genesis', 'signals'],
     x402: {
       enabled: x402Config.enabled,
       network: x402Config.network,

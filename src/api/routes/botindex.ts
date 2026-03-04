@@ -60,6 +60,7 @@ router.get('/health', (_req, res) => {
   res.json({
     app: 'botindex',
     status: 'ok',
+    domains: ['sports', 'crypto', 'commerce', 'zora', 'hyperliquid', 'genesis', 'signals'],
     timestamp: new Date().toISOString()
   });
 });
