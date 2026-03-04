@@ -7,6 +7,8 @@ import { Router } from 'express';
 
 // Import canary app routes
 import botindexRouter from './botindex';
+import botindexZoraRouter from './botindex-zora';
+import botindexHyperliquidRouter from './botindex-hyperliquid';
 import memeradarRouter from './memeradar';
 import arbwatchRouter from './arbwatch';
 import skinsignalRouter from './skinsignal';
@@ -20,6 +22,8 @@ import arbRouter from './arb';
 const router = Router();
 
 // Mount canary routes
+router.use('/botindex', botindexZoraRouter);
+router.use('/botindex', botindexHyperliquidRouter);
 router.use('/botindex', botindexRouter);
 router.use('/memeradar', memeradarRouter);
 router.use('/arbwatch', arbwatchRouter);
