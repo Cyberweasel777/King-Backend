@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { createX402Gate } from '../middleware/x402Gate';
+import { freeTrialGate, skipIfFreeTrial } from '../middleware/freeTrial';
 import { fetchMultiplePriceSeries } from '../../services/botindex/engine/fetcher';
 import { getBotindexTokenUniverse } from '../../services/botindex/engine/universe';
 import { identifyMarketLeaders, TIME_WINDOWS } from '../../services/botindex/engine/matrix';
@@ -16,10 +17,11 @@ const querySchema = z.object({
 
 router.get(
   '/correlation-leaders',
-  createX402Gate({
+  freeTrialGate(),
+  skipIfFreeTrial(createX402Gate({
     price: '$0.01',
     description: 'BotIndex correlation leaders (x402 test route)',
-  }),
+  })),
   async (req: Request, res: Response) => {
     try {
       const parsedQuery = querySchema.safeParse(req.query);

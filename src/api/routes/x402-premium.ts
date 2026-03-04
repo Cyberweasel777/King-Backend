@@ -1,5 +1,6 @@
 import { Request, Response, Router } from 'express';
 import { createX402Gate } from '../middleware/x402Gate';
+import { freeTrialGate, skipIfFreeTrial, getTrialStats } from '../middleware/freeTrial';
 import { fetchMultiplePriceSeries } from '../../services/botindex/engine/fetcher';
 import { getBotindexTokenUniverse } from '../../services/botindex/engine/universe';
 import {
@@ -194,11 +195,26 @@ async function buildWindowSnapshot(window: keyof typeof TIME_WINDOWS, limit: num
   };
 }
 
+// Admin: free trial stats
+router.get('/admin/trials', (req: Request, res: Response) => {
+  const adminId = req.query.adminId as string;
+  if (adminId !== '8063432083') {
+    res.status(403).json({ error: 'unauthorized' });
+    return;
+  }
+  res.json({ ...getTrialStats(), timestamp: new Date().toISOString(), metadata: METADATA });
+});
+
 router.get('/', (_req: Request, res: Response) => {
   res.json({
     service: 'BotIndex x402 Premium API',
     basePath: '/api/botindex/v1',
     metadata: METADATA,
+    freeTrial: {
+      enabled: true,
+      limit: 50,
+      how: 'Send X-Wallet: 0x... header with any request. First 50 premium requests are free per wallet. No signup required.',
+    },
     endpoints: [
       {
         method: 'GET',
@@ -308,10 +324,11 @@ router.get('/', (_req: Request, res: Response) => {
 
 router.get(
   '/trace/:agentId',
-  createX402Gate({
+  freeTrialGate(),
+  skipIfFreeTrial(createX402Gate({
     price: '$0.05',
     description: 'BotIndex premium reasoning trace by agent',
-  }),
+  })),
   async (req: Request, res: Response) => {
     try {
       const agent = resolveAgent(req.params.agentId);
@@ -357,10 +374,11 @@ router.get(
 
 router.get(
   '/signals',
-  createX402Gate({
+  freeTrialGate(),
+  skipIfFreeTrial(createX402Gate({
     price: '$0.10',
     description: 'BotIndex premium aggregated signals feed',
-  }),
+  })),
   async (_req: Request, res: Response) => {
     try {
       const tokenUniverse = await getBotindexTokenUniverse(30);
@@ -425,10 +443,11 @@ router.get(
 
 router.get(
   '/agent/:id/history',
-  createX402Gate({
+  freeTrialGate(),
+  skipIfFreeTrial(createX402Gate({
     price: '$0.25',
     description: 'BotIndex premium historical matrix and leader analysis',
-  }),
+  })),
   async (req: Request, res: Response) => {
     try {
       const agent = resolveAgent(req.params.id);
@@ -467,10 +486,11 @@ router.get(
 
 router.get(
   '/dashboard',
-  createX402Gate({
+  freeTrialGate(),
+  skipIfFreeTrial(createX402Gate({
     price: '$0.50',
     description: 'BotIndex premium all-in-one dashboard payload',
-  }),
+  })),
   async (_req: Request, res: Response) => {
     try {
       const tokenUniverse = await getBotindexTokenUniverse(30);
