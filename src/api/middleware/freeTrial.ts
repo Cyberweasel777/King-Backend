@@ -129,10 +129,29 @@ export function freeTrialGate(options: FreeTrialOptions = {}): RequestHandler {
 
     if (!wallet) {
       // No wallet identified — can't track trial, pass to x402
-      // But set header so agents know trial exists
+      // But intercept 402 responses to inject free trial instructions
       res.setHeader('X-BotIndex-Free-Trial', 'available');
       res.setHeader('X-BotIndex-Free-Trial-Limit', String(limit));
       res.setHeader('X-BotIndex-Free-Trial-How', 'Send X-Wallet: 0x... header to activate');
+
+      // Monkey-patch res.json to inject free trial info into 402 responses
+      const originalJson = res.json.bind(res);
+      res.json = function(body: any) {
+        if (res.statusCode === 402) {
+          const enhanced = {
+            ...body,
+            freeTrial: {
+              available: true,
+              requestsRemaining: limit,
+              howToActivate: `Add header "X-Wallet: 0xYOUR_WALLET_ADDRESS" to get ${limit} free premium requests. No signup, no API keys.`,
+              example: `curl -H "X-Wallet: 0x1234...abcd" ${req.protocol}://${req.get('host')}${req.originalUrl}`,
+            },
+          };
+          return originalJson(enhanced);
+        }
+        return originalJson(body);
+      };
+
       next();
       return;
     }
