@@ -30,7 +30,17 @@ const shell_1 = __importDefault(require("./shell"));
 const signals_1 = __importDefault(require("./signals"));
 const arb_1 = __importDefault(require("./arb"));
 const botindex_keys_1 = __importDefault(require("./botindex-keys"));
+const apiKeyAuth_1 = require("../middleware/apiKeyAuth");
 const router = (0, express_1.Router)();
+// Global optional API key auth so paid subscribers bypass x402 pay-per-call gates.
+router.use(apiKeyAuth_1.optionalApiKey, (req, _res, next) => {
+    if (req.apiKeyAuth) {
+        req.__apiKeyAuthenticated = true;
+        req.__freeTrialAuthenticated = true;
+        req.__billingMode = 'subscription';
+    }
+    next();
+});
 router.use('/botindex/keys', botindex_keys_1.default);
 // Domain-centric BotIndex routes (canonical)
 router.use('/botindex', botindex_zora_1.default);

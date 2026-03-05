@@ -27,8 +27,19 @@ import shellRouter from './shell';
 import signalsRouter from './signals';
 import arbRouter from './arb';
 import botindexKeysRouter from './botindex-keys';
+import { optionalApiKey } from '../middleware/apiKeyAuth';
 
 const router = Router();
+
+// Global optional API key auth so paid subscribers bypass x402 pay-per-call gates.
+router.use(optionalApiKey, (req, _res, next) => {
+  if (req.apiKeyAuth) {
+    (req as any).__apiKeyAuthenticated = true;
+    (req as any).__freeTrialAuthenticated = true;
+    (req as any).__billingMode = 'subscription';
+  }
+  next();
+});
 
 router.use('/botindex/keys', botindexKeysRouter);
 
