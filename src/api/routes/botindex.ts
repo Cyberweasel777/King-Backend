@@ -16,12 +16,71 @@ import {
 import { fetchMultiplePriceSeries } from '../../services/botindex/engine/fetcher';
 import { getBotindexTokenUniverse } from '../../services/botindex/engine/universe';
 import { buildHeatMap, getPredictionArbFeed } from '../../services/signals/predictionArb';
+import { optionalApiKey } from '../middleware/apiKeyAuth';
 
 const router = Router();
 let x402RouteMounted = false;
+const BASIC_API_KEY_HOURLY_LIMIT = 10;
+const BASIC_API_KEY_WINDOW_MS = 60 * 60 * 1000;
+const basicApiKeyQuota = new Map<string, { windowStartMs: number; count: number }>();
+
+function consumeBasicApiKeyQuota(apiKey: string): { allowed: boolean; remaining: number; retryAfterSeconds: number } {
+  const now = Date.now();
+  const current = basicApiKeyQuota.get(apiKey);
+  if (!current || now - current.windowStartMs >= BASIC_API_KEY_WINDOW_MS) {
+    basicApiKeyQuota.set(apiKey, { windowStartMs: now, count: 1 });
+    return { allowed: true, remaining: BASIC_API_KEY_HOURLY_LIMIT - 1, retryAfterSeconds: 0 };
+  }
+
+  if (current.count >= BASIC_API_KEY_HOURLY_LIMIT) {
+    const elapsedMs = now - current.windowStartMs;
+    const retryAfterSeconds = Math.max(1, Math.ceil((BASIC_API_KEY_WINDOW_MS - elapsedMs) / 1000));
+    return { allowed: false, remaining: 0, retryAfterSeconds };
+  }
+
+  current.count += 1;
+  basicApiKeyQuota.set(apiKey, current);
+  return {
+    allowed: true,
+    remaining: Math.max(0, BASIC_API_KEY_HOURLY_LIMIT - current.count),
+    retryAfterSeconds: 0,
+  };
+}
 
 export function mountBotindexX402TestRoute(): void {
   if (x402RouteMounted) return;
+  router.use(
+    ['/x402/correlation-leaders', '/v1/signals'],
+    optionalApiKey,
+    (req, res, next) => {
+      if (!req.apiKeyAuth) {
+        next();
+        return;
+      }
+
+      if (req.apiKeyAuth.plan === 'pro') {
+        (req as any).__freeTrialAuthenticated = true;
+        res.setHeader('X-BotIndex-API-Key-Plan', 'pro');
+        next();
+        return;
+      }
+
+      const quota = consumeBasicApiKeyQuota(req.apiKeyAuth.apiKey);
+      if (!quota.allowed) {
+        res.setHeader('Retry-After', String(quota.retryAfterSeconds));
+        res.status(429).json({
+          error: 'api_key_rate_limited',
+          message: `Basic plan API key limit reached (${BASIC_API_KEY_HOURLY_LIMIT}/hour) for this endpoint.`,
+        });
+        return;
+      }
+
+      (req as any).__freeTrialAuthenticated = true;
+      res.setHeader('X-BotIndex-API-Key-Plan', 'basic');
+      res.setHeader('X-BotIndex-API-Key-Remaining', String(quota.remaining));
+      next();
+    }
+  );
   router.use('/x402', x402TestRouter);
   router.use('/v1', x402PremiumRouter);
   router.use('/v1', botindexSportsRouter);

@@ -1,66 +1,37 @@
-import type { Request, RequestHandler, Response, NextFunction } from 'express';
+import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import logger from '../../config/logger';
 
-const API_KEY_PREFIX = 'bi_live_';
-const API_KEY_HEX_LENGTH = 32;
-const DEFAULT_MONTHLY_LIMIT = 500;
-const API_KEY_DATA_DIR = process.env.API_KEY_DATA_DIR || '/data';
-const API_KEY_DATA_FILE = path.join(API_KEY_DATA_DIR, 'api-keys-ledger.json');
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export type BotIndexApiPlan = 'basic' | 'pro';
 
-type ApiKeyTier = 'free';
-
-interface ApiKeyLedgerEntry {
-  apiKey: string;
+export interface ApiKeyLedgerEntry {
   email: string;
-  tier: ApiKeyTier;
-  monthlyLimit: number;
-  created: string;
-  usageByMonth: Record<string, number>;
-  lastSeen: string;
+  stripeCustomerId: string;
+  plan: BotIndexApiPlan;
+  createdAt: string;
+  lastUsed: string;
+  requestCount: number;
+  status: 'active';
 }
 
-const ledgerByKey = new Map<string, ApiKeyLedgerEntry>();
-const keyByEmail = new Map<string, string>();
+const API_KEY_DATA_DIR = process.env.API_KEY_DATA_DIR || '/data';
+const API_KEY_DATA_FILE = path.join(API_KEY_DATA_DIR, 'api-keys.json');
+const apiKeyLedger = new Map<string, ApiKeyLedgerEntry>();
 
-function currentMonthKey(now: Date = new Date()): string {
-  const year = now.getUTCFullYear();
-  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
-  return `${year}-${month}`;
-}
+let flushScheduled = false;
 
-function nextResetAt(now: Date = new Date()): string {
-  const year = now.getUTCFullYear();
-  const month = now.getUTCMonth();
-  const nextMonth = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0, 0));
-  return nextMonth.toISOString();
-}
-
-function sanitizeEntry(entry: Partial<ApiKeyLedgerEntry>): ApiKeyLedgerEntry | null {
-  if (typeof entry.apiKey !== 'string' || !entry.apiKey.startsWith(API_KEY_PREFIX)) {
-    return null;
+declare global {
+  namespace Express {
+    interface Request {
+      apiKeyAuth?: {
+        email: string;
+        plan: BotIndexApiPlan;
+        apiKey: string;
+      };
+    }
   }
-  if (typeof entry.email !== 'string' || !EMAIL_REGEX.test(entry.email)) {
-    return null;
-  }
-
-  const monthlyLimit =
-    typeof entry.monthlyLimit === 'number' && Number.isFinite(entry.monthlyLimit) && entry.monthlyLimit > 0
-      ? Math.floor(entry.monthlyLimit)
-      : DEFAULT_MONTHLY_LIMIT;
-
-  return {
-    apiKey: entry.apiKey,
-    email: entry.email.toLowerCase(),
-    tier: 'free',
-    monthlyLimit,
-    created: typeof entry.created === 'string' ? entry.created : new Date().toISOString(),
-    usageByMonth: entry.usageByMonth && typeof entry.usageByMonth === 'object' ? entry.usageByMonth : {},
-    lastSeen: typeof entry.lastSeen === 'string' ? entry.lastSeen : new Date().toISOString(),
-  };
 }
 
 function loadLedger(): void {
@@ -68,196 +39,134 @@ function loadLedger(): void {
     if (!fs.existsSync(API_KEY_DATA_FILE)) return;
 
     const raw = fs.readFileSync(API_KEY_DATA_FILE, 'utf-8');
-    const parsed = JSON.parse(raw) as Record<string, Partial<ApiKeyLedgerEntry>>;
-
-    for (const [apiKey, entry] of Object.entries(parsed)) {
-      const sanitized = sanitizeEntry({ ...entry, apiKey });
-      if (!sanitized) continue;
-
-      ledgerByKey.set(apiKey, sanitized);
-      keyByEmail.set(sanitized.email, apiKey);
+    const data = JSON.parse(raw) as Record<string, ApiKeyLedgerEntry>;
+    for (const [apiKey, entry] of Object.entries(data)) {
+      apiKeyLedger.set(apiKey, entry);
     }
-
-    logger.info({ keys: ledgerByKey.size }, 'API key ledger loaded');
+    logger.info({ apiKeys: apiKeyLedger.size }, 'BotIndex API key ledger loaded');
   } catch (err) {
-    logger.warn({ err }, 'Failed to load API key ledger, starting fresh');
+    logger.warn({ err }, 'Failed to load BotIndex API key ledger, starting fresh');
   }
 }
 
-let flushPending = false;
+async function flushLedger(): Promise<void> {
+  try {
+    await fs.promises.mkdir(API_KEY_DATA_DIR, { recursive: true });
+    const data: Record<string, ApiKeyLedgerEntry> = {};
+    for (const [apiKey, entry] of apiKeyLedger.entries()) {
+      data[apiKey] = entry;
+    }
+    await fs.promises.writeFile(API_KEY_DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    logger.warn({ err }, 'Failed to flush BotIndex API key ledger');
+  }
+}
 
 function scheduleLedgerFlush(): void {
-  if (flushPending) return;
-  flushPending = true;
-
+  if (flushScheduled) return;
+  flushScheduled = true;
   setTimeout(() => {
-    flushPending = false;
-
-    try {
-      if (!fs.existsSync(API_KEY_DATA_DIR)) {
-        fs.mkdirSync(API_KEY_DATA_DIR, { recursive: true });
-      }
-
-      const data: Record<string, ApiKeyLedgerEntry> = {};
-      for (const [apiKey, entry] of ledgerByKey.entries()) {
-        data[apiKey] = entry;
-      }
-
-      fs.writeFileSync(API_KEY_DATA_FILE, JSON.stringify(data, null, 2));
-    } catch (err) {
-      logger.warn({ err }, 'Failed to flush API key ledger');
-    }
-  }, 5000);
+    flushScheduled = false;
+    void flushLedger();
+  }, 500);
 }
 
-function generateApiKey(): string {
-  while (true) {
-    const candidate = `${API_KEY_PREFIX}${crypto.randomBytes(API_KEY_HEX_LENGTH / 2).toString('hex')}`;
-    if (!ledgerByKey.has(candidate)) return candidate;
+function extractApiKey(req: Request): string | null {
+  const header = req.header('x-api-key');
+  if (!header) return null;
+  const firstValue = header.split(',')[0]?.trim();
+  return firstValue || null;
+}
+
+function touchValidKey(apiKey: string, entry: ApiKeyLedgerEntry): void {
+  entry.requestCount += 1;
+  entry.lastUsed = new Date().toISOString();
+  apiKeyLedger.set(apiKey, entry);
+  scheduleLedgerFlush();
+}
+
+function resolveActiveEntry(apiKey: string): ApiKeyLedgerEntry | null {
+  const entry = apiKeyLedger.get(apiKey);
+  if (!entry) return null;
+  if (entry.status !== 'active') return null;
+  return entry;
+}
+
+function attachAuth(req: Request, apiKey: string, entry: ApiKeyLedgerEntry): void {
+  req.apiKeyAuth = {
+    apiKey,
+    email: entry.email,
+    plan: entry.plan,
+  };
+}
+
+export function generateApiKey(): string {
+  let apiKey = `botindex_sk_${crypto.randomBytes(16).toString('hex')}`;
+  while (apiKeyLedger.has(apiKey)) {
+    apiKey = `botindex_sk_${crypto.randomBytes(16).toString('hex')}`;
   }
+  return apiKey;
 }
 
-function getMonthlyUsage(entry: ApiKeyLedgerEntry, now: Date = new Date()): number {
-  const key = currentMonthKey(now);
-  const current = entry.usageByMonth[key];
-  return typeof current === 'number' && Number.isFinite(current) && current >= 0
-    ? Math.floor(current)
-    : 0;
-}
-
-function isManagementRoute(req: Request): boolean {
-  return req.path === '/v1/keys/register' || req.path === '/v1/keys/info';
-}
-
-function normalizeApiKey(value: string | string[] | undefined): string | null {
-  if (!value) return null;
-  const key = Array.isArray(value) ? value[0] : value;
-  if (!key) return null;
-  return key.trim();
-}
-
-loadLedger();
-
-export function isValidEmail(email: string): boolean {
-  return EMAIL_REGEX.test(email.trim().toLowerCase());
-}
-
-export function registerApiKey(email: string): {
+export function createApiKeyEntry(params: {
   apiKey: string;
   email: string;
-  tier: ApiKeyTier;
-  monthlyLimit: number;
-  created: string;
-} {
-  const normalizedEmail = email.trim().toLowerCase();
-  const existingKey = keyByEmail.get(normalizedEmail);
+  stripeCustomerId: string;
+  plan: BotIndexApiPlan;
+}): ApiKeyLedgerEntry {
+  const now = new Date().toISOString();
+  const entry: ApiKeyLedgerEntry = {
+    email: params.email,
+    stripeCustomerId: params.stripeCustomerId,
+    plan: params.plan,
+    createdAt: now,
+    lastUsed: now,
+    requestCount: 0,
+    status: 'active',
+  };
+  apiKeyLedger.set(params.apiKey, entry);
+  scheduleLedgerFlush();
+  return entry;
+}
 
-  if (existingKey) {
-    const existing = ledgerByKey.get(existingKey);
-    if (existing) {
-      return {
-        apiKey: existing.apiKey,
-        email: existing.email,
-        tier: existing.tier,
-        monthlyLimit: existing.monthlyLimit,
-        created: existing.created,
-      };
-    }
+export function getApiKeyEntry(apiKey: string): ApiKeyLedgerEntry | null {
+  return apiKeyLedger.get(apiKey) || null;
+}
+
+export const requireApiKey: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
+  const apiKey = extractApiKey(req);
+  if (!apiKey) {
+    res.status(401).json({ error: 'invalid_api_key', message: 'Valid X-API-Key header is required.' });
+    return;
   }
 
-  const created = new Date().toISOString();
-  const apiKey = generateApiKey();
-  const entry: ApiKeyLedgerEntry = {
-    apiKey,
-    email: normalizedEmail,
-    tier: 'free',
-    monthlyLimit: DEFAULT_MONTHLY_LIMIT,
-    created,
-    usageByMonth: {},
-    lastSeen: created,
-  };
+  const entry = resolveActiveEntry(apiKey);
+  if (!entry) {
+    res.status(401).json({ error: 'invalid_api_key', message: 'Valid X-API-Key header is required.' });
+    return;
+  }
 
-  ledgerByKey.set(apiKey, entry);
-  keyByEmail.set(normalizedEmail, apiKey);
-  scheduleLedgerFlush();
+  touchValidKey(apiKey, entry);
+  attachAuth(req, apiKey, entry);
+  next();
+};
 
-  return {
-    apiKey: entry.apiKey,
-    email: entry.email,
-    tier: entry.tier,
-    monthlyLimit: entry.monthlyLimit,
-    created: entry.created,
-  };
-}
-
-export function getApiKeyInfo(apiKey: string): {
-  email: string;
-  tier: ApiKeyTier;
-  monthlyLimit: number;
-  usedThisMonth: number;
-  remaining: number;
-  resetsAt: string;
-} | null {
-  const entry = ledgerByKey.get(apiKey.trim());
-  if (!entry) return null;
-
-  const usedThisMonth = getMonthlyUsage(entry);
-  const remaining = Math.max(0, entry.monthlyLimit - usedThisMonth);
-
-  return {
-    email: entry.email,
-    tier: entry.tier,
-    monthlyLimit: entry.monthlyLimit,
-    usedThisMonth,
-    remaining,
-    resetsAt: nextResetAt(),
-  };
-}
-
-export function apiKeyAuth(): RequestHandler {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const apiKeyHeader = normalizeApiKey(req.headers['x-api-key']);
-    if (!apiKeyHeader) {
-      next();
-      return;
-    }
-
-    const entry = ledgerByKey.get(apiKeyHeader);
-    if (!entry) {
-      next();
-      return;
-    }
-
-    const usage = getMonthlyUsage(entry);
-    const remainingBefore = Math.max(0, entry.monthlyLimit - usage);
-    if (remainingBefore <= 0) {
-      res.setHeader('X-BotIndex-Key-Remaining', '0');
-      next();
-      return;
-    }
-
-    if (!isManagementRoute(req)) {
-      const month = currentMonthKey();
-      entry.usageByMonth[month] = usage + 1;
-      entry.lastSeen = new Date().toISOString();
-      scheduleLedgerFlush();
-    }
-
-    const usedNow = getMonthlyUsage(entry);
-    const remainingNow = Math.max(0, entry.monthlyLimit - usedNow);
-
-    res.setHeader('X-BotIndex-Key-Remaining', String(remainingNow));
-    (req as any).__apiKeyAuthenticated = true;
+export const optionalApiKey: RequestHandler = (req: Request, _res: Response, next: NextFunction) => {
+  const apiKey = extractApiKey(req);
+  if (!apiKey) {
     next();
-  };
-}
+    return;
+  }
 
-export function skipIfApiKey(handler: RequestHandler): RequestHandler {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if ((req as any).__apiKeyAuthenticated) {
-      next();
-      return;
-    }
-    handler(req, res, next);
-  };
-}
+  const entry = resolveActiveEntry(apiKey);
+  if (!entry) {
+    next();
+    return;
+  }
+
+  touchValidKey(apiKey, entry);
+  attachAuth(req, apiKey, entry);
+  next();
+};
+
+loadLedger();

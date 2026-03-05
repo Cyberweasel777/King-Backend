@@ -26,8 +26,11 @@ import contractsRouter from './contracts';
 import shellRouter from './shell';
 import signalsRouter from './signals';
 import arbRouter from './arb';
+import botindexKeysRouter from './botindex-keys';
 
 const router = Router();
+
+router.use('/botindex/keys', botindexKeysRouter);
 
 // Domain-centric BotIndex routes (canonical)
 router.use('/botindex', botindexZoraRouter);
