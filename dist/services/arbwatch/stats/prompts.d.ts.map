@@ -1,0 +1,1 @@
+{"version":3,"file":"prompts.d.ts","sourceRoot":"","sources":["../../../../src/services/arbwatch/stats/prompts.ts"],"names":[],"mappings":"AAAA,wCAAwC;AAExC,eAAO,MAAM,cAAc;IACzB,oDAAoD;;IAsBpD,sCAAsC;;IAuBtC,mCAAmC;;IAuBnC,sCAAsC;;IA0BtC,oCAAoC;;CAsB5B,CAAC;AAEX,MAAM,MAAM,UAAU,GAAG,MAAM,OAAO,cAAc,CAAC;AAErD,mCAAmC;AACnC,wBAAgB,SAAS,CAAC,IAAI,EAAE,UAAU,GAAG,MAAM,CAElD"}

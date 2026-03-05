@@ -1,0 +1,1 @@
+{"version":3,"file":"prompts.d.ts","sourceRoot":"","sources":["../../../../src/services/botindex/stats/prompts.ts"],"names":[],"mappings":"AAAA,wCAAwC;AAExC,eAAO,MAAM,cAAc;IACzB,4CAA4C;;IAwB5C,8BAA8B;;IAuB9B,8BAA8B;;IAwB9B,gCAAgC;;IAwBhC,0CAA0C;;IAuB1C,uCAAuC;;CAsB/B,CAAC;AAEX,MAAM,MAAM,UAAU,GAAG,MAAM,OAAO,cAAc,CAAC;AAErD,wBAAgB,SAAS,CAAC,IAAI,EAAE,UAAU,GAAG,MAAM,CAElD"}
