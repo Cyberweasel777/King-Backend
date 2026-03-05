@@ -235,4 +235,68 @@ router.post(
   }
 );
 
+// POST /social/ingest — accept pre-scraped tweets from local Mac
+router.post(
+  '/social/ingest',
+  async (req: Request, res: Response) => {
+    const adminId = req.query.adminId as string;
+    if (adminId !== '8063432083') {
+      res.status(403).json({ error: 'unauthorized' });
+      return;
+    }
+
+    const startTime = Date.now();
+    const { tweets, accountsScraped, accountsWithTweets } = req.body as {
+      tweets: Array<{ handle: string; text: string; timestamp: string; likes: number; retweets: number; replies: number }>;
+      accountsScraped: number;
+      accountsWithTweets: number;
+    };
+
+    if (!Array.isArray(tweets)) {
+      res.status(400).json({ error: 'tweets must be an array' });
+      return;
+    }
+
+    try {
+      logger.info({ tweets: tweets.length }, 'Social ingest: analyzing sentiment');
+      const sentimentResults = await analyzeSentiment(tweets);
+
+      logger.info({ results: sentimentResults.length }, 'Social ingest: scoring convergence');
+      const convergenceSignals = scoreConvergence(sentimentResults);
+
+      const durationMs = Date.now() - startTime;
+
+      updateCache({
+        convergenceSignals,
+        sentimentResults,
+        tweets,
+        accountsScraped: accountsScraped || 0,
+        accountsWithTweets: accountsWithTweets || 0,
+        durationMs,
+      });
+
+      logger.info(
+        { durationMs, tweets: tweets.length, signals: convergenceSignals.length },
+        'Social ingest complete'
+      );
+
+      res.json({
+        status: 'ok',
+        tweetsIngested: tweets.length,
+        sentimentResults: sentimentResults.length,
+        convergenceSignals: convergenceSignals.length,
+        topSignals: convergenceSignals.slice(0, 5),
+        durationMs,
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Social ingest failed');
+      res.status(500).json({
+        error: 'ingest_failed',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        durationMs: Date.now() - startTime,
+      });
+    }
+  }
+);
+
 export default router;
