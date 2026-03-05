@@ -2,6 +2,8 @@ import type { NextFunction, Request, Response } from 'express';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import logger from '../../config/logger';
+import { getOptionalConvexAnalyticsStore } from '../../shared/analytics/convex-client';
 
 type HitEntry = {
   count: number;
@@ -26,6 +28,8 @@ const globalVisitorHashes = new Set<string>();
 let firstSeen: string;
 const startTime = Date.now();
 let dirty = false;
+const convexAnalyticsStore = getOptionalConvexAnalyticsStore();
+let lastConvexErrorAt = 0;
 
 function normalizeHitEntry(entry: Partial<HitEntry> | undefined): HitEntry {
   const visitorHashes = Array.isArray(entry?.visitorHashes)
@@ -56,6 +60,24 @@ function getClientIp(req: Request): string {
 
 function hashIp(ip: string): string {
   return crypto.createHash('sha256').update(ip).digest('hex').slice(0, 12);
+}
+
+function optionalHeader(req: Request, headerName: string): string | undefined {
+  const raw = req.get(headerName);
+  if (!raw) return undefined;
+  const value = raw.trim();
+  return value.length > 0 ? value : undefined;
+}
+
+function shouldTrack(pathname: string): boolean {
+  return pathname.includes('botindex') || pathname.includes('x402');
+}
+
+function reportConvexLogError(error: unknown): void {
+  const now = Date.now();
+  if (now - lastConvexErrorAt < 60_000) return;
+  lastConvexErrorAt = now;
+  logger.warn({ err: error }, 'Convex analytics logging failed; continuing with file-based hit counter');
 }
 
 // Load persisted hits on startup
@@ -123,10 +145,10 @@ setInterval(flushToDisk, FLUSH_INTERVAL_MS);
 process.on('SIGTERM', flushToDisk);
 process.on('SIGINT', flushToDisk);
 
-export function hitCounter(req: Request, _res: Response, next: NextFunction): void {
+export function hitCounter(req: Request, res: Response, next: NextFunction): void {
   const p = req.path;
 
-  if (p.includes('botindex') || p.includes('x402')) {
+  if (shouldTrack(p)) {
     if (!hits[p]) {
       hits[p] = { count: 0, lastHit: '', uniqueVisitors: 0, visitorHashes: [] };
     }
@@ -136,6 +158,12 @@ export function hitCounter(req: Request, _res: Response, next: NextFunction): vo
     entry.lastHit = new Date().toISOString();
 
     const visitorHash = hashIp(getClientIp(req));
+    const requestStartedAt = Date.now();
+    const walletAddress = optionalHeader(req, 'X-Wallet');
+    const userAgent = optionalHeader(req, 'User-Agent');
+    const referrer = optionalHeader(req, 'Referer') || optionalHeader(req, 'Referrer');
+    const hasXPaymentHeader = Boolean(optionalHeader(req, 'X-Payment'));
+
     if (!entry.visitorHashes.includes(visitorHash)) {
       entry.visitorHashes.push(visitorHash);
       entry.uniqueVisitors = entry.visitorHashes.length;
@@ -143,6 +171,25 @@ export function hitCounter(req: Request, _res: Response, next: NextFunction): vo
 
     globalVisitorHashes.add(visitorHash);
     dirty = true;
+
+    res.once('finish', () => {
+      if (!convexAnalyticsStore) return;
+
+      void convexAnalyticsStore
+        .logRequest({
+          endpoint: p,
+          method: req.method,
+          visitorHash,
+          walletAddress,
+          userAgent,
+          referrer,
+          statusCode: res.statusCode,
+          x402Paid: hasXPaymentHeader && res.statusCode !== 402,
+          responseTimeMs: Date.now() - requestStartedAt,
+          timestamp: Date.now(),
+        })
+        .catch(reportConvexLogError);
+    });
   }
 
   next();

@@ -64,4 +64,32 @@ export default defineSchema({
   })
     .index('by_app_referred', ['appId', 'referredExternalUserId'])
     .index('by_app_referrer', ['appId', 'referrerExternalUserId']),
+
+  apiRequests: defineTable({
+    endpoint: v.string(),
+    method: v.string(),
+    visitorHash: v.string(),
+    walletAddress: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+    referrer: v.optional(v.string()),
+    statusCode: v.number(),
+    x402Paid: v.boolean(),
+    responseTimeMs: v.optional(v.number()),
+    timestamp: v.number(),
+  })
+    .index('by_endpoint_timestamp', ['endpoint', 'timestamp'])
+    .index('by_visitor', ['visitorHash'])
+    .index('by_wallet', ['walletAddress'])
+    .index('by_timestamp', ['timestamp']),
+
+  wallets: defineTable({
+    address: v.string(),
+    firstSeen: v.number(),
+    lastSeen: v.number(),
+    totalRequests: v.number(),
+    totalPaidUsd: v.number(),
+    endpoints: v.array(v.string()),
+  })
+    .index('by_address', ['address'])
+    .index('by_firstSeen', ['firstSeen']),
 });

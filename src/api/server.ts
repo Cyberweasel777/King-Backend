@@ -10,11 +10,10 @@ import helmet from 'helmet';
 import routes from './routes/index';
 import adminHitsRouter from './routes/admin-hits';
 import wellKnownRouter from './routes/well-known';
-import apiKeysRouter from './routes/api-keys';
 import { mountBotindexX402TestRoute } from './routes/botindex';
 import { errorHandler } from './middleware/errorHandler';
 import { hitCounter } from './middleware/hitCounter';
-import { apiKeyAuth } from './middleware/apiKeyAuth';
+import { optionalApiKey } from './middleware/apiKeyAuth';
 import { getX402RuntimeConfig } from './middleware/x402Gate';
 import { initDb } from '../shared/payments/database';
 import logger from '../config/logger';
@@ -60,10 +59,7 @@ app.use(hitCounter);
 app.use('/api', adminHitsRouter);
 
 // BotIndex API key auth (runs before free-trial/x402 route middleware)
-app.use('/api/botindex', apiKeyAuth());
-
-// API key registration + management endpoints
-app.use('/api/botindex/v1/keys', apiKeysRouter);
+app.use('/api/botindex', optionalApiKey);
 
 // Mount all routes
 app.use('/api', routes);
