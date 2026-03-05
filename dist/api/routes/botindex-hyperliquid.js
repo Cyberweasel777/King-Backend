@@ -97,6 +97,34 @@ router.get('/hyperliquid/hip6/status', async (_req, res) => {
         timestamp: new Date().toISOString(),
     });
 });
+router.get('/hyperliquid/hip6/feed-history', (req, res) => {
+    const limitRaw = Number.parseInt(String(req.query.limit ?? '24'), 10);
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, limitRaw)) : 24;
+    const data = (0, hip6_1.getHip6FeedHistory)(limit);
+    res.json({
+        ...data,
+        count: data.history.length,
+        metadata: {
+            ...METADATA,
+            endpoint: '/botindex/hyperliquid/hip6/feed-history',
+            price: 'free',
+        },
+    });
+});
+router.get('/hyperliquid/hip6/alert-scores', (req, res) => {
+    const limitRaw = Number.parseInt(String(req.query.limit ?? '20'), 10);
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, limitRaw)) : 20;
+    const data = (0, hip6_1.getHip6AlertScores)(limit);
+    res.json({
+        ...data,
+        count: data.alerts.length,
+        metadata: {
+            ...METADATA,
+            endpoint: '/botindex/hyperliquid/hip6/alert-scores',
+            price: 'free',
+        },
+    });
+});
 router.get('/hyperliquid/hip6/launch-candidates', (0, x402Gate_1.createX402Gate)({ price: '$0.01', description: 'HIP-6 launch candidate ranking from live HL market data (0.01 USDC)' }), async (req, res) => {
     try {
         const limitRaw = Number.parseInt(String(req.query.limit ?? '20'), 10);

@@ -4,7 +4,7 @@ import logger from '../../config/logger';
 import { getFundingArbOpportunities } from '../../services/botindex/hyperliquid/funding-arb';
 import { getHLCorrelationMatrix } from '../../services/botindex/hyperliquid/correlation';
 import { getLiquidationHeatmap } from '../../services/botindex/hyperliquid/liquidations';
-import { getHip6LaunchCandidates } from '../../services/botindex/hyperliquid/hip6';
+import { getHip6AlertScores, getHip6FeedHistory, getHip6LaunchCandidates } from '../../services/botindex/hyperliquid/hip6';
 
 const router = Router();
 
@@ -105,6 +105,36 @@ router.get('/hyperliquid/hip6/status', async (_req: Request, res: Response) => {
     },
     note: 'Signal layer for HIP-6 opportunity monitoring. Not an official Hyperliquid auction feed.',
     timestamp: new Date().toISOString(),
+  });
+});
+
+router.get('/hyperliquid/hip6/feed-history', (req: Request, res: Response) => {
+  const limitRaw = Number.parseInt(String(req.query.limit ?? '24'), 10);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, limitRaw)) : 24;
+  const data = getHip6FeedHistory(limit);
+  res.json({
+    ...data,
+    count: data.history.length,
+    metadata: {
+      ...METADATA,
+      endpoint: '/botindex/hyperliquid/hip6/feed-history',
+      price: 'free',
+    },
+  });
+});
+
+router.get('/hyperliquid/hip6/alert-scores', (req: Request, res: Response) => {
+  const limitRaw = Number.parseInt(String(req.query.limit ?? '20'), 10);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, limitRaw)) : 20;
+  const data = getHip6AlertScores(limit);
+  res.json({
+    ...data,
+    count: data.alerts.length,
+    metadata: {
+      ...METADATA,
+      endpoint: '/botindex/hyperliquid/hip6/alert-scores',
+      price: 'free',
+    },
   });
 });
 
