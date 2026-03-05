@@ -14,6 +14,7 @@ import { mountBotindexX402TestRoute } from './routes/botindex';
 import { errorHandler } from './middleware/errorHandler';
 import { hitCounter } from './middleware/hitCounter';
 import { optionalApiKey } from './middleware/apiKeyAuth';
+import { anonRateLimit } from './middleware/anonRateLimit';
 import { getX402RuntimeConfig } from './middleware/x402Gate';
 import { initDb } from '../shared/payments/database';
 import logger from '../config/logger';
@@ -60,6 +61,19 @@ app.use('/api', adminHitsRouter);
 
 // BotIndex API key auth (runs before free-trial/x402 route middleware)
 app.use('/api/botindex', optionalApiKey);
+
+// Anonymous rate limiting on high-value free endpoints (5 req/hr without API key)
+app.use('/api/botindex', anonRateLimit([
+  '/signals',
+  '/v1/signals',
+  '/v1/sports',
+  '/v1/crypto',
+  '/v1/solana',
+  '/v1/commerce',
+  '/hyperliquid',
+  '/zora',
+  '/x402',
+]));
 
 // Mount all routes
 app.use('/api', routes);
