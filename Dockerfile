@@ -8,7 +8,7 @@ RUN npm ci
 
 COPY tsconfig.json ./
 COPY src/ ./src/
-RUN npm run build
+RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 # Production stage
 FROM node:20-alpine
