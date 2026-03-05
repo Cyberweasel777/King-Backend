@@ -4,13 +4,13 @@
  * Limits unauthenticated requests by IP to push visitors toward
  * API key registration. Authenticated requests (API key or x402) bypass.
  *
- * Default: 5 requests per hour per IP on gated endpoints.
+ * Default: 3 requests per hour per IP on gated endpoints.
  */
 
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import logger from '../../config/logger';
 
-const ANON_HOURLY_LIMIT = parseInt(process.env.ANON_RATE_LIMIT || '5', 10);
+const ANON_HOURLY_LIMIT = parseInt(process.env.ANON_RATE_LIMIT || '3', 10);
 const WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
 interface WindowEntry {
@@ -89,7 +89,7 @@ export function anonRateLimit(paths: string[]): RequestHandler {
 
       res.status(429).json({
         error: 'rate_limited',
-        message: `Free anonymous access is limited to ${ANON_HOURLY_LIMIT} requests/hour. Register for an API key for higher limits.`,
+        message: `Free anonymous access is limited to ${ANON_HOURLY_LIMIT} requests per hour. Register for an API key for higher limits.`,
         register: {
           url: 'https://king-backend.fly.dev/api/botindex/keys/register',
           method: 'POST',

@@ -5,7 +5,7 @@
  * Limits unauthenticated requests by IP to push visitors toward
  * API key registration. Authenticated requests (API key or x402) bypass.
  *
- * Default: 5 requests per hour per IP on gated endpoints.
+ * Default: 3 requests per hour per IP on gated endpoints.
  */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -14,7 +14,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.anonRateLimit = anonRateLimit;
 exports.getAnonRateLimitStats = getAnonRateLimitStats;
 const logger_1 = __importDefault(require("../../config/logger"));
-const ANON_HOURLY_LIMIT = parseInt(process.env.ANON_RATE_LIMIT || '5', 10);
+const ANON_HOURLY_LIMIT = parseInt(process.env.ANON_RATE_LIMIT || '3', 10);
 const WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const ipWindows = new Map();
 // Cleanup stale entries every 10 minutes
@@ -74,7 +74,7 @@ function anonRateLimit(paths) {
             logger_1.default.info({ ip, count: entry.count, path: req.path }, 'Anon rate limit hit');
             res.status(429).json({
                 error: 'rate_limited',
-                message: `Free anonymous access is limited to ${ANON_HOURLY_LIMIT} requests/hour. Register for an API key for higher limits.`,
+                message: `Free anonymous access is limited to ${ANON_HOURLY_LIMIT} requests per hour. Register for an API key for higher limits.`,
                 register: {
                     url: 'https://king-backend.fly.dev/api/botindex/keys/register',
                     method: 'POST',

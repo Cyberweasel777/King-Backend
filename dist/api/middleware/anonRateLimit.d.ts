@@ -4,7 +4,7 @@
  * Limits unauthenticated requests by IP to push visitors toward
  * API key registration. Authenticated requests (API key or x402) bypass.
  *
- * Default: 5 requests per hour per IP on gated endpoints.
+ * Default: 3 requests per hour per IP on gated endpoints.
  */
 import type { RequestHandler } from 'express';
 /**
