@@ -174,6 +174,13 @@ function createServer() {
     tool('botindex_hl_funding_arb', 'HL funding rate arb. $0.05', {}, () => fetchBotindex('/hyperliquid/funding-arb'));
     tool('botindex_hl_correlation_matrix', 'HL perp correlation matrix. $0.05', {}, () => fetchBotindex('/hyperliquid/correlation-matrix'));
     tool('botindex_hl_liquidation_heatmap', 'HL liquidation heatmap. $0.05', {}, () => fetchBotindex('/hyperliquid/liquidation-heatmap'));
+    tool('botindex_hl_hip6_status', 'HIP-6 monitoring status (free)', {}, () => fetchBotindex('/hyperliquid/hip6/status'));
+    tool('botindex_hl_hip6_launch_candidates', 'HIP-6 launch candidate ranking. $0.05', { limit: zod_1.z.number().optional() }, ({ limit }) => {
+        const p = {};
+        if (limit)
+            p.limit = String(limit);
+        return fetchBotindex('/hyperliquid/hip6/launch-candidates', p);
+    });
     tool('botindex_hl_coin_analytics', 'Deep HL coin analytics. $0.05', { address: zod_1.z.string() }, ({ address }) => fetchBotindex(`/hyperliquid/coin-analytics?address=${encodeURIComponent(address)}`));
     return server;
 }
