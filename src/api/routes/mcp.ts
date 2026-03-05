@@ -1,27 +1,40 @@
 /**
  * MCP Streamable HTTP Transport — mounted at /mcp
  *
- * Exposes all BotIndex tools via the Model Context Protocol
- * using Streamable HTTP transport for Smithery and other MCP clients.
+ * Uses dynamic import() to load ESM-only @modelcontextprotocol/sdk
+ * from this CommonJS project.
  */
 
 import { Router, type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 
 const MCP_SESSION_HEADER = 'mcp-session-id';
 const BASE_URL = process.env.BOTINDEX_URL || 'https://king-backend.fly.dev/api/botindex/v1';
 
-interface SessionContext {
-  server: McpServer;
-  transport: StreamableHTTPServerTransport;
+const mcpRouter = Router();
+
+// Lazy-loaded MCP SDK references
+let McpServer: any;
+let StreamableHTTPServerTransport: any;
+let sdkLoaded = false;
+
+const sessions = new Map<string, { server: any; transport: any }>();
+
+async function loadSdk(): Promise<boolean> {
+  if (sdkLoaded) return true;
+  try {
+    const mcpMod = await import('@modelcontextprotocol/sdk/server/mcp.js');
+    const httpMod = await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
+    McpServer = mcpMod.McpServer;
+    StreamableHTTPServerTransport = httpMod.StreamableHTTPServerTransport;
+    sdkLoaded = true;
+    return true;
+  } catch (err) {
+    console.error('Failed to load MCP SDK:', err);
+    return false;
+  }
 }
-
-const sessions = new Map<string, SessionContext>();
-
-// ── Helpers ──────────────────────────────────────────────────────
 
 async function fetchBotindex(path: string, params?: Record<string, string>): Promise<unknown> {
   const url = new URL(`${BASE_URL}${path}`);
@@ -30,31 +43,23 @@ async function fetchBotindex(path: string, params?: Record<string, string>): Pro
       if (v) url.searchParams.set(k, v);
     }
   }
-
   const res = await fetch(url.toString());
-
   if (res.status === 402) {
     const body = await res.json();
     return {
       x402_payment_required: true,
-      message: 'This endpoint requires x402 payment (USDC on Base). Include x402 payment header.',
+      message: 'This endpoint requires x402 payment (USDC on Base).',
       requirements: body,
-      endpoint: path,
       wallet: '0x7E6C8EAc1b1b8E628fa6169eEeDf3cF9638b3Cbd',
       network: 'base',
-      sdk: 'npm install @x402/client',
     };
   }
-
-  if (!res.ok) {
-    return { error: true, status: res.status, message: await res.text() };
-  }
-
+  if (!res.ok) return { error: true, status: res.status, message: await res.text() };
   return res.json();
 }
 
-function sendJsonRpcError(res: Response, status: number, code: number, message: string): void {
-  res.status(status).json({ jsonrpc: '2.0', error: { code, message }, id: null });
+function sendErr(res: Response, status: number, code: number, msg: string): void {
+  res.status(status).json({ jsonrpc: '2.0', error: { code, message: msg }, id: null });
 }
 
 function getSessionId(req: Request): string | undefined {
@@ -62,218 +67,119 @@ function getSessionId(req: Request): string | undefined {
   return id?.trim() || undefined;
 }
 
-// ── Tool Registration ────────────────────────────────────────────
-
-function createServer(): McpServer {
+function createServer(): any {
   const server = new McpServer({ name: 'botindex', version: '1.0.4' });
 
-  // Free discovery
-  server.tool('botindex_discover', 'Get the full BotIndex API catalog — all endpoints, pricing, descriptions. FREE.', {}, async () => {
-    const data = await fetchBotindex('/');
-    return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
-  });
+  const tool = (name: string, desc: string, schema: any, fn: (args: any) => Promise<unknown>) => {
+    server.tool(name, desc, schema, async (args: any) => {
+      const data = await fn(args);
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    });
+  };
+
+  // Free
+  tool('botindex_discover', 'Full BotIndex API catalog. FREE.', {}, () => fetchBotindex('/'));
 
   // Sports
-  server.tool('botindex_sports_odds', 'Live sports odds snapshot (NFL, NBA, UFC, NHL). $0.02', { sport: z.string().optional().describe('Filter: nfl, nba, ufc, nhl') }, async ({ sport }) => {
-    const p: Record<string, string> = {}; if (sport) p.sport = sport;
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/sports/odds', p), null, 2) }] };
+  tool('botindex_sports_odds', 'Live sports odds (NFL, NBA, UFC, NHL). $0.02', { sport: z.string().optional() }, ({ sport }: any) => {
+    const p: any = {}; if (sport) p.sport = sport; return fetchBotindex('/sports/odds', p);
   });
-
-  server.tool('botindex_sports_lines', 'Line movements with sharp money flags. $0.02', {}, async () => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/sports/lines'), null, 2) }] };
+  tool('botindex_sports_lines', 'Line movements with sharp money flags. $0.02', {}, () => fetchBotindex('/sports/lines'));
+  tool('botindex_sports_props', 'Prop bet movements. $0.02', {}, () => fetchBotindex('/sports/props'));
+  tool('botindex_sports_correlations', 'Player correlation matrix for DFS. $0.05', {}, () => fetchBotindex('/sports/correlations'));
+  tool('botindex_dfs_optimizer', 'DFS lineup optimizer. $0.10', { budget: z.number().optional(), sport: z.string().optional() }, ({ budget, sport }: any) => {
+    const p: any = {}; if (budget) p.budget = String(budget); if (sport) p.sport = sport; return fetchBotindex('/sports/optimizer', p);
   });
-
-  server.tool('botindex_sports_props', 'Top prop bet movements with confidence scores. $0.02', {}, async () => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/sports/props'), null, 2) }] };
-  });
-
-  server.tool('botindex_sports_correlations', 'Player correlation matrix for DFS. $0.05', {}, async () => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/sports/correlations'), null, 2) }] };
-  });
-
-  server.tool('botindex_dfs_optimizer', 'Correlation-adjusted DFS lineup optimizer. $0.10', {
-    budget: z.number().optional().describe('Salary cap budget'),
-    sport: z.string().optional().describe('Target sport'),
-  }, async ({ budget, sport }) => {
-    const p: Record<string, string> = {};
-    if (budget) p.budget = String(budget); if (sport) p.sport = sport;
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/sports/optimizer', p), null, 2) }] };
-  });
-
-  server.tool('botindex_arb_scanner', 'Cross-platform prediction market and sportsbook arbitrage scanner. $0.05', {}, async () => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/sports/arb'), null, 2) }] };
-  });
+  tool('botindex_arb_scanner', 'Cross-platform arb scanner. $0.05', {}, () => fetchBotindex('/sports/arb'));
 
   // Crypto
-  server.tool('botindex_crypto_tokens', 'Token universe with latest price data. $0.02', {}, async () => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/crypto/tokens'), null, 2) }] };
-  });
-
-  server.tool('botindex_crypto_graduating', 'Token graduation signals from Catapult to Hyperliquid. $0.02', {}, async () => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/crypto/graduating'), null, 2) }] };
-  });
+  tool('botindex_crypto_tokens', 'Token universe with prices. $0.02', {}, () => fetchBotindex('/crypto/tokens'));
+  tool('botindex_crypto_graduating', 'Token graduation signals. $0.02', {}, () => fetchBotindex('/crypto/graduating'));
 
   // Solana
-  server.tool('botindex_solana_launches', 'All tracked Metaplex Genesis token launches on Solana. $0.02', {}, async () => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/solana/launches'), null, 2) }] };
-  });
-
-  server.tool('botindex_solana_active', 'Currently active Metaplex Genesis launches. $0.02', {}, async () => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/solana/active'), null, 2) }] };
-  });
+  tool('botindex_solana_launches', 'Metaplex Genesis launches. $0.02', {}, () => fetchBotindex('/solana/launches'));
+  tool('botindex_solana_active', 'Active Genesis launches. $0.02', {}, () => fetchBotindex('/solana/active'));
 
   // Commerce
-  server.tool('botindex_commerce_compare', 'Compare merchant offers across agentic commerce protocols. $0.05', {
-    q: z.string().describe('Product search query'),
-    maxPrice: z.number().optional(),
-    protocol: z.enum(['acp', 'ucp', 'x402']).optional(),
-    limit: z.number().optional(),
-  }, async ({ q, maxPrice, protocol, limit }) => {
-    const p: Record<string, string> = { q };
-    if (maxPrice) p.maxPrice = String(maxPrice);
-    if (protocol) p.protocol = protocol;
-    if (limit) p.limit = String(limit);
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/commerce/compare', p), null, 2) }] };
+  tool('botindex_commerce_compare', 'Compare agentic commerce offers. $0.05', {
+    q: z.string(), maxPrice: z.number().optional(), protocol: z.enum(['acp', 'ucp', 'x402']).optional(), limit: z.number().optional(),
+  }, ({ q, maxPrice, protocol, limit }: any) => {
+    const p: any = { q }; if (maxPrice) p.maxPrice = String(maxPrice); if (protocol) p.protocol = protocol; if (limit) p.limit = String(limit);
+    return fetchBotindex('/commerce/compare', p);
   });
-
-  server.tool('botindex_commerce_protocols', 'Directory of agentic commerce protocols — ACP, UCP, x402. $0.01', {}, async () => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/commerce/protocols'), null, 2) }] };
-  });
+  tool('botindex_commerce_protocols', 'Agentic commerce protocol directory. $0.01', {}, () => fetchBotindex('/commerce/protocols'));
 
   // Premium
-  server.tool('botindex_signals', 'Aggregated premium signals: correlation leaders + prediction arb + heatmap. $0.10', {}, async () => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/signals'), null, 2) }] };
-  });
-
-  server.tool('botindex_agent_trace', 'Premium reasoning trace for a specific agent. $0.05', {
-    agentId: z.enum(['spreadhunter', 'rosterradar', 'arbwatch', 'memeradar', 'botindex']).describe('Agent ID'),
-  }, async ({ agentId }) => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex(`/trace/${agentId}`), null, 2) }] };
-  });
-
-  server.tool('botindex_dashboard', 'Full premium dashboard — all agents, traces, matrices. $0.50', {}, async () => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/dashboard'), null, 2) }] };
-  });
+  tool('botindex_signals', 'Aggregated premium signals. $0.10', {}, () => fetchBotindex('/signals'));
+  tool('botindex_agent_trace', 'Agent reasoning trace. $0.05', {
+    agentId: z.enum(['spreadhunter', 'rosterradar', 'arbwatch', 'memeradar', 'botindex']),
+  }, ({ agentId }: any) => fetchBotindex(`/trace/${agentId}`));
+  tool('botindex_dashboard', 'Full premium dashboard. $0.50', {}, () => fetchBotindex('/dashboard'));
 
   // Zora
-  server.tool('botindex_zora_trending_coins', 'Trending Zora attention market coins by volume velocity. $0.03', {
-    limit: z.number().optional(),
-  }, async ({ limit }) => {
-    const p: Record<string, string> = {}; if (limit) p.limit = String(limit);
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/zora/trending-coins', p), null, 2) }] };
+  tool('botindex_zora_trending_coins', 'Trending Zora coins. $0.03', { limit: z.number().optional() }, ({ limit }: any) => {
+    const p: any = {}; if (limit) p.limit = String(limit); return fetchBotindex('/zora/trending-coins', p);
   });
-
-  server.tool('botindex_zora_creator_scores', 'Creator performance scores on Zora. $0.03', {
-    limit: z.number().optional(),
-  }, async ({ limit }) => {
-    const p: Record<string, string> = {}; if (limit) p.limit = String(limit);
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/zora/creator-scores', p), null, 2) }] };
+  tool('botindex_zora_creator_scores', 'Zora creator scores. $0.03', { limit: z.number().optional() }, ({ limit }: any) => {
+    const p: any = {}; if (limit) p.limit = String(limit); return fetchBotindex('/zora/creator-scores', p);
   });
-
-  server.tool('botindex_zora_attention_momentum', 'Attention momentum — which Zora trends are accelerating. $0.03', {
-    limit: z.number().optional(),
-  }, async ({ limit }) => {
-    const p: Record<string, string> = {}; if (limit) p.limit = String(limit);
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/zora/attention-momentum', p), null, 2) }] };
+  tool('botindex_zora_attention_momentum', 'Zora attention momentum. $0.03', { limit: z.number().optional() }, ({ limit }: any) => {
+    const p: any = {}; if (limit) p.limit = String(limit); return fetchBotindex('/zora/attention-momentum', p);
   });
 
   // Hyperliquid
-  server.tool('botindex_hl_funding_arb', 'Funding rate arb opportunities between Hyperliquid and CEXs. $0.05', {}, async () => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/hyperliquid/funding-arb'), null, 2) }] };
-  });
-
-  server.tool('botindex_hl_correlation_matrix', 'Hyperliquid perpetual correlation matrix. $0.05', {}, async () => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/hyperliquid/correlation-matrix'), null, 2) }] };
-  });
-
-  server.tool('botindex_hl_liquidation_heatmap', 'Liquidation cluster heatmap by price level. $0.05', {}, async () => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex('/hyperliquid/liquidation-heatmap'), null, 2) }] };
-  });
-
-  server.tool('botindex_hl_coin_analytics', 'Deep analytics for a specific Hyperliquid coin. $0.05', {
-    address: z.string().describe('Coin address or symbol'),
-  }, async ({ address }) => {
-    return { content: [{ type: 'text', text: JSON.stringify(await fetchBotindex(`/hyperliquid/coin-analytics?address=${encodeURIComponent(address)}`), null, 2) }] };
-  });
+  tool('botindex_hl_funding_arb', 'HL funding rate arb. $0.05', {}, () => fetchBotindex('/hyperliquid/funding-arb'));
+  tool('botindex_hl_correlation_matrix', 'HL perp correlation matrix. $0.05', {}, () => fetchBotindex('/hyperliquid/correlation-matrix'));
+  tool('botindex_hl_liquidation_heatmap', 'HL liquidation heatmap. $0.05', {}, () => fetchBotindex('/hyperliquid/liquidation-heatmap'));
+  tool('botindex_hl_coin_analytics', 'Deep HL coin analytics. $0.05', { address: z.string() }, ({ address }: any) =>
+    fetchBotindex(`/hyperliquid/coin-analytics?address=${encodeURIComponent(address)}`));
 
   return server;
 }
 
-// ── Router ────────────────────────────────────────────────────────
+// ── Routes ────────────────────────────────────────────────────────
 
-const mcpRouter = Router();
-
-// Use raw JSON body (already parsed by express.json() upstream, but MCP SDK needs the raw object)
 mcpRouter.post('/', async (req: Request, res: Response) => {
+  if (!await loadSdk()) { sendErr(res, 503, -32603, 'MCP SDK unavailable'); return; }
   try {
     const sessionId = getSessionId(req);
-
     if (sessionId) {
-      const session = sessions.get(sessionId);
-      if (!session) {
-        sendJsonRpcError(res, 404, -32001, 'Session not found');
-        return;
-      }
-      await session.transport.handleRequest(req, res, req.body);
+      const s = sessions.get(sessionId);
+      if (!s) { sendErr(res, 404, -32001, 'Session not found'); return; }
+      await s.transport.handleRequest(req, res, req.body);
       return;
     }
-
-    // New session
     const server = createServer();
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
-      onsessioninitialized: (id) => {
-        sessions.set(id, { server, transport });
-      },
-      onsessionclosed: (id) => {
-        const s = sessions.get(id);
-        sessions.delete(id);
-        if (s) void s.server.close().catch(() => undefined);
-      },
+      onsessioninitialized: (id: string) => { sessions.set(id, { server, transport }); },
+      onsessionclosed: (id: string) => { const s = sessions.get(id); sessions.delete(id); if (s) void s.server.close().catch(() => {}); },
     });
-
     await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
-
-    if (!transport.sessionId) {
-      await server.close();
-    }
+    if (!transport.sessionId) await server.close();
   } catch (err) {
     console.error('MCP POST error:', err);
-    if (!res.headersSent) sendJsonRpcError(res, 500, -32603, 'Internal server error');
+    if (!res.headersSent) sendErr(res, 500, -32603, 'Internal server error');
   }
 });
 
-const handleSessionReq = async (req: Request, res: Response): Promise<void> => {
+const handleSession = async (req: Request, res: Response): Promise<void> => {
+  if (!await loadSdk()) { sendErr(res, 503, -32603, 'MCP SDK unavailable'); return; }
   const sessionId = getSessionId(req);
-  if (!sessionId) {
-    sendJsonRpcError(res, 400, -32000, 'Mcp-Session-Id header required');
-    return;
-  }
-  const session = sessions.get(sessionId);
-  if (!session) {
-    sendJsonRpcError(res, 404, -32001, 'Session not found');
-    return;
-  }
-  await session.transport.handleRequest(req, res);
-  if (req.method === 'DELETE') {
-    sessions.delete(sessionId);
-    await session.server.close().catch(() => undefined);
-  }
+  if (!sessionId) { sendErr(res, 400, -32000, 'Mcp-Session-Id header required'); return; }
+  const s = sessions.get(sessionId);
+  if (!s) { sendErr(res, 404, -32001, 'Session not found'); return; }
+  await s.transport.handleRequest(req, res);
+  if (req.method === 'DELETE') { sessions.delete(sessionId); await s.server.close().catch(() => {}); }
 };
 
 mcpRouter.get('/', async (req: Request, res: Response) => {
-  try { await handleSessionReq(req, res); } catch (err) {
-    console.error('MCP GET error:', err);
-    if (!res.headersSent) sendJsonRpcError(res, 500, -32603, 'Internal server error');
-  }
+  try { await handleSession(req, res); } catch (err) { console.error('MCP GET error:', err); if (!res.headersSent) sendErr(res, 500, -32603, 'Internal error'); }
 });
 
 mcpRouter.delete('/', async (req: Request, res: Response) => {
-  try { await handleSessionReq(req, res); } catch (err) {
-    console.error('MCP DELETE error:', err);
-    if (!res.headersSent) sendJsonRpcError(res, 500, -32603, 'Internal server error');
-  }
+  try { await handleSession(req, res); } catch (err) { console.error('MCP DELETE error:', err); if (!res.headersSent) sendErr(res, 500, -32603, 'Internal error'); }
 });
 
 export default mcpRouter;

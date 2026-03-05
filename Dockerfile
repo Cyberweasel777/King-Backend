@@ -1,16 +1,4 @@
-# Build stage
-FROM node:20-alpine AS builder
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci
-
-COPY tsconfig.json ./
-COPY src/ ./src/
-RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
-
-# Production stage
+# Single-stage: pre-built dist checked in or built locally
 FROM node:20-alpine
 
 WORKDIR /app
@@ -18,7 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
 
-COPY --from=builder /app/dist/ ./dist/
+COPY dist/ ./dist/
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
