@@ -13,6 +13,7 @@ import botindexGenesisRouter from './botindex-genesis';
 import botindexCommerceRouter from './botindex-commerce';
 import botindexZoraRouter from './botindex-zora';
 import botindexHyperliquidRouter from './botindex-hyperliquid';
+import botindexAliasesRouter from './botindex-aliases';
 import x402TestRouter from './x402-test';
 import x402PremiumRouter from './x402-premium';
 import memeradarRouter from './memeradar';
@@ -41,6 +42,9 @@ router.use('/botindex/crypto/meme-signals', memeradarRouter);
 router.use('/botindex/sports/arbitrage', arbwatchRouter);
 router.use('/botindex/sports/arbitrage', arbRouter);
 router.use('/botindex/commerce/price-tracking', skinsignalRouter);
+
+// Top-level branded aliases (discoverable names)
+router.use('/botindex', botindexAliasesRouter);
 
 // Legacy BotIndex + v1/x402 aliases
 router.use('/botindex', botindexRouter);
