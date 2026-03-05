@@ -95,6 +95,12 @@ app.use('/api', routes);
 // Error handling
 app.use(errorHandler);
 
+// Landing page at root
+app.get('/', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html');
+  res.send(getLandingPageHTML());
+});
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

@@ -186,6 +186,26 @@ router.get('/signals', async (req, res) => {
     }));
 
     const merged = [...generated, ...Array.from(manualSignals.values())].slice(0, limit);
+
+    // Teaser: free users see max 3 signals, paid users get full dataset
+    const isPaid = (req as any).__freeTrialAuthenticated || (req as any).apiKeyAuth?.plan === 'pro';
+    if (!isPaid && merged.length > 3) {
+      const teaser = merged.slice(0, 3).map(s => ({ ...s, confidence: undefined }));
+      res.json({
+        signals: teaser,
+        count: teaser.length,
+        total_available: merged.length,
+        source: 'generated',
+        truncated: true,
+        upgrade: {
+          message: `${merged.length - 3} more signals available with an API key.`,
+          register: 'https://king-backend.fly.dev/api/botindex/keys/register',
+          pricing: { basic: '$9/mo (10 req/hr)', pro: '$29/mo (unlimited)' },
+        },
+      });
+      return;
+    }
+
     res.json({ signals: merged, count: merged.length, source: 'generated' });
   } catch (err) {
     console.error('[BotIndex] /signals error', err);
