@@ -10,12 +10,14 @@ import helmet from 'helmet';
 import routes from './routes/index';
 import adminHitsRouter from './routes/admin-hits';
 import wellKnownRouter from './routes/well-known';
+import receiptsRouter, { trustLayerHandler } from './routes/receipts';
 import { mountBotindexX402TestRoute } from './routes/botindex';
 import { errorHandler } from './middleware/errorHandler';
 import { hitCounter } from './middleware/hitCounter';
 import { optionalApiKey } from './middleware/apiKeyAuth';
 import { anonRateLimit } from './middleware/anonRateLimit';
 import { getX402RuntimeConfig } from './middleware/x402Gate';
+import { initReceiptSigning, receiptMiddleware } from './middleware/receiptMiddleware';
 import { initDb } from '../shared/payments/database';
 import logger from '../config/logger';
 
@@ -56,6 +58,9 @@ app.get('/health', async (req, res) => {
 // Track BotIndex/x402 endpoint hits (in-memory, zero I/O)
 app.use(hitCounter);
 
+// Agent Action Receipts for all BotIndex responses
+app.use('/api/botindex', receiptMiddleware);
+
 // Mount admin telemetry first so it bypasses app-level subscription guards
 app.use('/api', adminHitsRouter);
 
@@ -75,6 +80,11 @@ app.use('/api/botindex', anonRateLimit([
   '/x402',
 ]));
 
+// Receipt and trust-layer endpoints
+app.use('/api/botindex/receipts', receiptsRouter);
+app.use('/api/botindex/.well-known', receiptsRouter);
+app.get('/api/botindex/trust', trustLayerHandler);
+
 // Mount all routes
 app.use('/api', routes);
 
@@ -89,6 +99,7 @@ app.use((req, res) => {
 async function start() {
   // Initialize database
   await initDb();
+  await initReceiptSigning();
   
   app.listen(PORT, () => {
     logger.info(
