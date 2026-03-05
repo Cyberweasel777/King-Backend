@@ -192,7 +192,7 @@ function getHip6AlertScores(limit = 20) {
     const bounded = Math.max(1, Math.min(100, limit));
     const latest = history[0];
     const previous = history[1];
-    if (!latest || !previous) {
+    if (!latest) {
         return {
             source: 'derived_from_recent_history',
             generatedAt: new Date().toISOString(),
@@ -200,7 +200,7 @@ function getHip6AlertScores(limit = 20) {
             alerts: [],
         };
     }
-    const prevMap = new Map(previous.topCandidates.map((c) => [c.symbol, c]));
+    const prevMap = new Map((previous?.topCandidates ?? []).map((c) => [c.symbol, c]));
     const alerts = latest.topCandidates.map((current) => {
         const prev = prevMap.get(current.symbol);
         const previousReadiness = prev?.launchReadinessScore ?? 0;
@@ -208,7 +208,7 @@ function getHip6AlertScores(limit = 20) {
         const previousVolume = prev?.dayNotionalVolume ?? 0;
         const volumeDeltaPct = previousVolume > 0
             ? ((current.dayNotionalVolume - previousVolume) / previousVolume) * 100
-            : 0;
+            : (current.dayNotionalVolume > 0 ? 100 : 0);
         const previousFundingRate = prev?.fundingRate ?? 0;
         const fundingDeltaBps = (current.fundingRate - previousFundingRate) * 10_000;
         const alertScore = computeAlertScore(scoreDelta, volumeDeltaPct, fundingDeltaBps, current.launchReadinessScore);
@@ -227,7 +227,7 @@ function getHip6AlertScores(limit = 20) {
     return {
         source: 'derived_from_recent_history',
         generatedAt: new Date().toISOString(),
-        lookbackSnapshots: Math.min(history.length, 2),
+        lookbackSnapshots: history.length,
         alerts: alerts.slice(0, bounded),
     };
 }
