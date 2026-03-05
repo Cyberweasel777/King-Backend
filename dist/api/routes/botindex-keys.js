@@ -8,10 +8,12 @@ const stripe_1 = __importDefault(require("stripe"));
 const zod_1 = require("zod");
 const logger_1 = __importDefault(require("../../config/logger"));
 const apiKeyAuth_1 = require("../middleware/apiKeyAuth");
+const conversion_funnel_1 = require("../../services/botindex/conversion-funnel");
 const router = (0, express_1.Router)();
 const SUCCESS_URL = 'https://king-backend.fly.dev/api/botindex/keys/success?session_id={CHECKOUT_SESSION_ID}';
 const CANCEL_URL = 'https://king-backend.fly.dev/api/botindex/keys/cancel';
 const PORTAL_RETURN_URL = 'https://king-backend.fly.dev/api/botindex/keys/cancel';
+const ADMIN_ID = process.env.ADMIN_ID || '8063432083';
 const registerSchema = zod_1.z.object({
     email: zod_1.z.string().email(),
     plan: zod_1.z.enum(['basic', 'pro']).optional(),
@@ -64,6 +66,7 @@ router.get('/register', async (req, res) => {
         const planParam = req.query.plan;
         const plan = (planParam === 'pro') ? 'pro' : 'basic';
         const priceId = getPlanPriceId(plan);
+        (0, conversion_funnel_1.trackFunnelEvent)('register_page_hit', plan);
         const session = await stripe.checkout.sessions.create({
             mode: 'subscription',
             payment_method_types: ['card'],
@@ -76,6 +79,7 @@ router.get('/register', async (req, res) => {
             res.status(500).json({ error: 'checkout_session_failed', message: 'Stripe did not return a checkout URL' });
             return;
         }
+        (0, conversion_funnel_1.trackFunnelEvent)('checkout_session_created', plan);
         res.redirect(303, session.url);
     }
     catch (error) {
@@ -97,6 +101,7 @@ router.post('/register', async (req, res) => {
         const stripe = getStripeClient();
         const plan = parsed.data.plan || 'basic';
         const priceId = getPlanPriceId(plan);
+        (0, conversion_funnel_1.trackFunnelEvent)('register_page_hit', plan);
         const session = await stripe.checkout.sessions.create({
             mode: 'subscription',
             customer_email: parsed.data.email,
@@ -113,6 +118,7 @@ router.post('/register', async (req, res) => {
             res.status(500).json({ error: 'checkout_session_failed', message: 'Stripe did not return a checkout URL' });
             return;
         }
+        (0, conversion_funnel_1.trackFunnelEvent)('checkout_session_created', plan);
         res.json({
             checkoutUrl: session.url,
             sessionId: session.id,
@@ -147,6 +153,7 @@ router.get('/success', async (req, res) => {
             return;
         }
         const plan = resolvePlanFromSession(session);
+        (0, conversion_funnel_1.trackFunnelEvent)('checkout_completed', plan);
         const apiKey = (0, apiKeyAuth_1.generateApiKey)();
         (0, apiKeyAuth_1.createApiKeyEntry)({
             apiKey,
@@ -154,6 +161,7 @@ router.get('/success', async (req, res) => {
             stripeCustomerId: customerId,
             plan,
         });
+        (0, conversion_funnel_1.trackFunnelEvent)('api_key_issued', plan);
         res.json({
             apiKey,
             plan,
@@ -210,6 +218,14 @@ router.post('/portal', apiKeyAuth_1.requireApiKey, async (req, res) => {
         logger_1.default.error({ err: error, apiKey: auth.apiKey }, 'Failed to create BotIndex billing portal session');
         res.status(500).json({ error: 'portal_session_failed', message: 'Unable to create billing portal session' });
     }
+});
+router.get('/admin/funnel', (req, res) => {
+    const adminId = typeof req.query.adminId === 'string' ? req.query.adminId : '';
+    if (adminId !== ADMIN_ID) {
+        res.status(403).json({ error: 'forbidden', message: 'Invalid adminId' });
+        return;
+    }
+    res.json((0, conversion_funnel_1.getFunnelStats)());
 });
 router.get('/cancel', (_req, res) => {
     res.json({ message: 'Checkout cancelled. Return to API docs to try again.' });

@@ -9,12 +9,14 @@ import {
   getApiKeyEntry,
   requireApiKey,
 } from '../middleware/apiKeyAuth';
+import { getFunnelStats, trackFunnelEvent } from '../../services/botindex/conversion-funnel';
 
 const router = Router();
 
 const SUCCESS_URL = 'https://king-backend.fly.dev/api/botindex/keys/success?session_id={CHECKOUT_SESSION_ID}';
 const CANCEL_URL = 'https://king-backend.fly.dev/api/botindex/keys/cancel';
 const PORTAL_RETURN_URL = 'https://king-backend.fly.dev/api/botindex/keys/cancel';
+const ADMIN_ID = process.env.ADMIN_ID || '8063432083';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -74,6 +76,8 @@ router.get('/register', async (req: Request, res: Response) => {
     const plan: BotIndexApiPlan = (planParam === 'pro') ? 'pro' : 'basic';
     const priceId = getPlanPriceId(plan);
 
+    trackFunnelEvent('register_page_hit', plan);
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
@@ -88,6 +92,7 @@ router.get('/register', async (req: Request, res: Response) => {
       return;
     }
 
+    trackFunnelEvent('checkout_session_created', plan);
     res.redirect(303, session.url);
   } catch (error) {
     logger.error({ err: error }, 'Failed to create BotIndex key checkout session (GET)');
@@ -111,6 +116,8 @@ router.post('/register', async (req: Request, res: Response) => {
     const plan: BotIndexApiPlan = parsed.data.plan || 'basic';
     const priceId = getPlanPriceId(plan);
 
+    trackFunnelEvent('register_page_hit', plan);
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer_email: parsed.data.email,
@@ -128,6 +135,8 @@ router.post('/register', async (req: Request, res: Response) => {
       res.status(500).json({ error: 'checkout_session_failed', message: 'Stripe did not return a checkout URL' });
       return;
     }
+
+    trackFunnelEvent('checkout_session_created', plan);
 
     res.json({
       checkoutUrl: session.url,
@@ -168,6 +177,8 @@ router.get('/success', async (req: Request, res: Response) => {
     }
 
     const plan = resolvePlanFromSession(session);
+    trackFunnelEvent('checkout_completed', plan);
+
     const apiKey = generateApiKey();
     createApiKeyEntry({
       apiKey,
@@ -175,6 +186,7 @@ router.get('/success', async (req: Request, res: Response) => {
       stripeCustomerId: customerId,
       plan,
     });
+    trackFunnelEvent('api_key_issued', plan);
 
     res.json({
       apiKey,
@@ -238,6 +250,16 @@ router.post('/portal', requireApiKey, async (req: Request, res: Response) => {
     logger.error({ err: error, apiKey: auth.apiKey }, 'Failed to create BotIndex billing portal session');
     res.status(500).json({ error: 'portal_session_failed', message: 'Unable to create billing portal session' });
   }
+});
+
+router.get('/admin/funnel', (req: Request, res: Response) => {
+  const adminId = typeof req.query.adminId === 'string' ? req.query.adminId : '';
+  if (adminId !== ADMIN_ID) {
+    res.status(403).json({ error: 'forbidden', message: 'Invalid adminId' });
+    return;
+  }
+
+  res.json(getFunnelStats());
 });
 
 router.get('/cancel', (_req: Request, res: Response) => {
