@@ -18,6 +18,7 @@ import { optionalApiKey } from './middleware/apiKeyAuth';
 import { anonRateLimit } from './middleware/anonRateLimit';
 import { getX402RuntimeConfig } from './middleware/x402Gate';
 import { initReceiptSigning, receiptMiddleware } from './middleware/receiptMiddleware';
+import mcpRouter from './routes/mcp';
 import { initDb } from '../shared/payments/database';
 import logger from '../config/logger';
 
@@ -40,6 +41,9 @@ app.use(express.json({ limit: '10mb' }));
 
 // Agent discovery endpoints (no auth, no middleware)
 app.use('/.well-known', wellKnownRouter);
+
+// MCP Streamable HTTP transport (no auth — Smithery handles auth)
+app.use('/mcp', mcpRouter);
 
 // Health check
 app.get('/health', async (req, res) => {
