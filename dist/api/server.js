@@ -115,6 +115,10 @@ app.get('/api/botindex/trust', receipts_1.trustLayerHandler);
 app.use('/api', index_1.default);
 // Error handling
 app.use(errorHandler_1.errorHandler);
+// Root redirect to landing page on Vercel
+app.get('/', (_req, res) => {
+    res.redirect(301, 'https://botindex.dev');
+});
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });

@@ -95,10 +95,9 @@ app.use('/api', routes);
 // Error handling
 app.use(errorHandler);
 
-// Landing page at root
+// Root redirect to landing page on Vercel
 app.get('/', (_req, res) => {
-  res.setHeader('Content-Type', 'text/html');
-  res.send(getLandingPageHTML());
+  res.redirect(301, 'https://botindex.dev');
 });
 
 // 404 handler

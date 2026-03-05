@@ -57,6 +57,33 @@ async function resolveEmailFromSession(stripe, session) {
     }
     return customer.email || null;
 }
+// GET /register — browser-friendly: redirects straight to Stripe Checkout
+router.get('/register', async (req, res) => {
+    try {
+        const stripe = getStripeClient();
+        const planParam = req.query.plan;
+        const plan = (planParam === 'pro') ? 'pro' : 'basic';
+        const priceId = getPlanPriceId(plan);
+        const session = await stripe.checkout.sessions.create({
+            mode: 'subscription',
+            payment_method_types: ['card'],
+            line_items: [{ price: priceId, quantity: 1 }],
+            success_url: SUCCESS_URL,
+            cancel_url: CANCEL_URL,
+            metadata: { plan },
+        });
+        if (!session.url) {
+            res.status(500).json({ error: 'checkout_session_failed', message: 'Stripe did not return a checkout URL' });
+            return;
+        }
+        res.redirect(303, session.url);
+    }
+    catch (error) {
+        logger_1.default.error({ err: error }, 'Failed to create BotIndex key checkout session (GET)');
+        res.status(500).json({ error: 'checkout_session_failed', message: 'Unable to create checkout session' });
+    }
+});
+// POST /register — API-friendly: returns JSON with checkout URL
 router.post('/register', async (req, res) => {
     const parsed = registerSchema.safeParse(req.body);
     if (!parsed.success) {
