@@ -1,6 +1,6 @@
 # BotIndex — AI-Native Signal Intelligence API
 
-> No API keys. No signup. **50 free premium requests per wallet.** Then pay per request with USDC via [x402](https://github.com/coinbase/x402).
+> **Three ways in.** No signup form. No dashboard. Just data.
 
 **Live:** [king-backend.fly.dev](https://king-backend.fly.dev/health)
 
@@ -17,22 +17,49 @@ curl https://king-backend.fly.dev/api/botindex/zora/trending-coins
 
 # Free — Hyperliquid funding rate arbitrage
 curl https://king-backend.fly.dev/api/botindex/hyperliquid/funding-arb
-
-# Premium with free trial — send your wallet, get 50 free requests
-curl -H "X-Wallet: 0xYOUR_WALLET_ADDRESS" \
-  https://king-backend.fly.dev/api/botindex/v1/signals
-# → Returns real data + X-BotIndex-Free-Remaining: 49
-
-# After 50 requests, same endpoint requires x402 payment
-curl https://king-backend.fly.dev/api/botindex/x402/correlation-leaders
-# → Returns 402 with payment instructions
 ```
 
-### Free Trial
+---
 
-Every wallet gets **50 free premium requests**. No signup, no email, no API key.
+## Get Access (Pick One)
 
-Just send an `X-Wallet: 0x...` header with any request. The response includes `X-BotIndex-Free-Remaining` so you always know where you stand.
+### Option 1: API Key — 500 free requests/month
+
+```bash
+# Register with your email, get a key instantly
+curl -X POST https://king-backend.fly.dev/api/botindex/v1/keys/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@example.com"}'
+
+# → { "apiKey": "bi_live_abc123...", "tier": "free", "monthlyLimit": 500 }
+
+# Use it on any endpoint
+curl -H "X-API-Key: bi_live_abc123..." \
+  https://king-backend.fly.dev/api/botindex/v1/signals
+
+# Check your usage anytime
+curl -H "X-API-Key: bi_live_abc123..." \
+  https://king-backend.fly.dev/api/botindex/v1/keys/info
+```
+
+### Option 2: Wallet Trial — 50 free requests
+
+No email needed. Send your wallet address, get 50 premium requests.
+
+```bash
+curl -H "X-Wallet: 0xYOUR_WALLET_ADDRESS" \
+  https://king-backend.fly.dev/api/botindex/v1/signals
+# → X-BotIndex-Free-Remaining: 49
+```
+
+### Option 3: x402 Pay-Per-Request — Unlimited
+
+After free tiers, pay $0.01–$0.10 per request in USDC on Base. No subscriptions, no billing dashboard. Your wallet is your identity.
+
+```bash
+curl https://king-backend.fly.dev/api/botindex/x402/correlation-leaders
+# → 402 with payment instructions
+```
 
 ---
 
