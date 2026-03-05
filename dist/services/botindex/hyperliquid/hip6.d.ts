@@ -46,5 +46,6 @@ export type Hip6AlertScoresResponse = {
 };
 export declare function getHip6LaunchCandidates(limit?: number): Promise<Hip6LaunchCandidatesResponse>;
 export declare function getHip6FeedHistory(limit?: number): Hip6FeedHistoryResponse;
+export declare function ensureHip6Primed(): Promise<void>;
 export declare function getHip6AlertScores(limit?: number): Hip6AlertScoresResponse;
 //# sourceMappingURL=hip6.d.ts.map

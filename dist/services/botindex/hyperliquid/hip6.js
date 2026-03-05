@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getHip6LaunchCandidates = getHip6LaunchCandidates;
 exports.getHip6FeedHistory = getHip6FeedHistory;
+exports.ensureHip6Primed = ensureHip6Primed;
 exports.getHip6AlertScores = getHip6AlertScores;
 const logger_1 = __importDefault(require("../../../config/logger"));
 const HL_INFO_URL = 'https://api.hyperliquid.xyz/info';
@@ -181,6 +182,11 @@ function getHip6FeedHistory(limit = 24) {
         history: history.slice(0, bounded),
         note: 'History is in-memory and resets on app restart/deploy.',
     };
+}
+async function ensureHip6Primed() {
+    if (history.length > 0)
+        return;
+    await getHip6LaunchCandidates(SNAPSHOT_TOP_N);
 }
 function getHip6AlertScores(limit = 20) {
     const bounded = Math.max(1, Math.min(100, limit));

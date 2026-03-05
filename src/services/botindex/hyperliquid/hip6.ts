@@ -247,6 +247,11 @@ export function getHip6FeedHistory(limit = 24): Hip6FeedHistoryResponse {
   };
 }
 
+export async function ensureHip6Primed(): Promise<void> {
+  if (history.length > 0) return;
+  await getHip6LaunchCandidates(SNAPSHOT_TOP_N);
+}
+
 export function getHip6AlertScores(limit = 20): Hip6AlertScoresResponse {
   const bounded = Math.max(1, Math.min(100, limit));
   const latest = history[0];

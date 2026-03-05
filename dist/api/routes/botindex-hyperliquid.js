@@ -91,39 +91,63 @@ router.get('/hyperliquid/hip6/status', async (_req, res) => {
         mode: 'signal_intelligence',
         source: 'live_hyperliquid_market_data',
         endpoints: {
+            feedHistory: '/api/botindex/hyperliquid/hip6/feed-history',
+            alertScores: '/api/botindex/hyperliquid/hip6/alert-scores',
             launchCandidates: '/api/botindex/hyperliquid/hip6/launch-candidates',
         },
         note: 'Signal layer for HIP-6 opportunity monitoring. Not an official Hyperliquid auction feed.',
         timestamp: new Date().toISOString(),
     });
 });
-router.get('/hyperliquid/hip6/feed-history', (req, res) => {
-    const limitRaw = Number.parseInt(String(req.query.limit ?? '24'), 10);
-    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, limitRaw)) : 24;
-    const data = (0, hip6_1.getHip6FeedHistory)(limit);
-    res.json({
-        ...data,
-        count: data.history.length,
-        metadata: {
-            ...METADATA,
-            endpoint: '/botindex/hyperliquid/hip6/feed-history',
-            price: 'free',
-        },
-    });
+router.get('/hyperliquid/hip6/feed-history', async (req, res) => {
+    try {
+        await (0, hip6_1.ensureHip6Primed)();
+        const limitRaw = Number.parseInt(String(req.query.limit ?? '24'), 10);
+        const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, limitRaw)) : 24;
+        const data = (0, hip6_1.getHip6FeedHistory)(limit);
+        res.json({
+            ...data,
+            count: data.history.length,
+            metadata: {
+                ...METADATA,
+                endpoint: '/botindex/hyperliquid/hip6/feed-history',
+                price: 'free',
+            },
+        });
+    }
+    catch (error) {
+        logger_1.default.error({ err: error }, 'Failed to fetch HIP-6 feed history');
+        res.status(500).json({
+            error: 'hyperliquid_hip6_feed_history_failed',
+            message: error instanceof Error ? error.message : 'Unknown error',
+            metadata: METADATA,
+        });
+    }
 });
-router.get('/hyperliquid/hip6/alert-scores', (req, res) => {
-    const limitRaw = Number.parseInt(String(req.query.limit ?? '20'), 10);
-    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, limitRaw)) : 20;
-    const data = (0, hip6_1.getHip6AlertScores)(limit);
-    res.json({
-        ...data,
-        count: data.alerts.length,
-        metadata: {
-            ...METADATA,
-            endpoint: '/botindex/hyperliquid/hip6/alert-scores',
-            price: 'free',
-        },
-    });
+router.get('/hyperliquid/hip6/alert-scores', async (req, res) => {
+    try {
+        await (0, hip6_1.ensureHip6Primed)();
+        const limitRaw = Number.parseInt(String(req.query.limit ?? '20'), 10);
+        const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, limitRaw)) : 20;
+        const data = (0, hip6_1.getHip6AlertScores)(limit);
+        res.json({
+            ...data,
+            count: data.alerts.length,
+            metadata: {
+                ...METADATA,
+                endpoint: '/botindex/hyperliquid/hip6/alert-scores',
+                price: 'free',
+            },
+        });
+    }
+    catch (error) {
+        logger_1.default.error({ err: error }, 'Failed to fetch HIP-6 alert scores');
+        res.status(500).json({
+            error: 'hyperliquid_hip6_alert_scores_failed',
+            message: error instanceof Error ? error.message : 'Unknown error',
+            metadata: METADATA,
+        });
+    }
 });
 router.get('/hyperliquid/hip6/launch-candidates', (0, x402Gate_1.createX402Gate)({ price: '$0.01', description: 'HIP-6 launch candidate ranking from live HL market data (0.01 USDC)' }), async (req, res) => {
     try {
