@@ -27,6 +27,7 @@ import shellRouter from './shell';
 import signalsRouter from './signals';
 import arbRouter from './arb';
 import botindexKeysRouter from './botindex-keys';
+import adminDashboardRouter from './admin-dashboard';
 import { optionalApiKey } from '../middleware/apiKeyAuth';
 
 const router = Router();
@@ -85,6 +86,9 @@ router.use('/contracts', contractsRouter);
 
 // Shell endpoints for landing/dashboard rollouts
 router.use('/', shellRouter);
+
+// Admin dashboard (traffic, conversions, funnel)
+router.use('/admin/dashboard', adminDashboardRouter);
 
 // TODO: Add remaining 12 apps here
 // router.use('/spreadhunter', spreadhunterRouter);

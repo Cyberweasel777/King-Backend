@@ -30,6 +30,7 @@ const shell_1 = __importDefault(require("./shell"));
 const signals_1 = __importDefault(require("./signals"));
 const arb_1 = __importDefault(require("./arb"));
 const botindex_keys_1 = __importDefault(require("./botindex-keys"));
+const admin_dashboard_1 = __importDefault(require("./admin-dashboard"));
 const apiKeyAuth_1 = require("../middleware/apiKeyAuth");
 const router = (0, express_1.Router)();
 // Global optional API key auth so paid subscribers bypass x402 pay-per-call gates.
@@ -76,6 +77,8 @@ router.use('/payments', payments_global_1.default);
 router.use('/contracts', contracts_1.default);
 // Shell endpoints for landing/dashboard rollouts
 router.use('/', shell_1.default);
+// Admin dashboard (traffic, conversions, funnel)
+router.use('/admin/dashboard', admin_dashboard_1.default);
 // TODO: Add remaining 12 apps here
 // router.use('/spreadhunter', spreadhunterRouter);
 // router.use('/deckvault', deckvaultRouter);
