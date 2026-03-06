@@ -13,9 +13,9 @@ import { getFunnelStats, trackFunnelEvent } from '../../services/botindex/conver
 
 const router = Router();
 
-const SUCCESS_URL = 'https://king-backend.fly.dev/api/botindex/keys/success?session_id={CHECKOUT_SESSION_ID}';
-const CANCEL_URL = 'https://king-backend.fly.dev/api/botindex/keys/cancel';
-const PORTAL_RETURN_URL = 'https://king-backend.fly.dev/api/botindex/keys/cancel';
+const SUCCESS_URL = 'https://api.botindex.dev/api/botindex/keys/success?session_id={CHECKOUT_SESSION_ID}';
+const CANCEL_URL = 'https://api.botindex.dev/api/botindex/keys/cancel';
+const PORTAL_RETURN_URL = 'https://api.botindex.dev/api/botindex/keys/cancel';
 const ADMIN_ID = process.env.ADMIN_ID || '8063432083';
 
 const registerSchema = z.object({

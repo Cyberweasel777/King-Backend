@@ -91,7 +91,7 @@ export function anonRateLimit(paths: string[]): RequestHandler {
         error: 'rate_limited',
         message: `Free anonymous access is limited to ${ANON_HOURLY_LIMIT} requests per hour. Register for an API key for higher limits.`,
         register: {
-          url: 'https://king-backend.fly.dev/api/botindex/keys/register',
+          url: 'https://api.botindex.dev/api/botindex/keys/register',
           method: 'POST',
           body: '{ "email": "you@example.com", "plan": "basic" }',
           plans: {

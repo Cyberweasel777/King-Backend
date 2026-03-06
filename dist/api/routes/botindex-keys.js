@@ -10,9 +10,9 @@ const logger_1 = __importDefault(require("../../config/logger"));
 const apiKeyAuth_1 = require("../middleware/apiKeyAuth");
 const conversion_funnel_1 = require("../../services/botindex/conversion-funnel");
 const router = (0, express_1.Router)();
-const SUCCESS_URL = 'https://king-backend.fly.dev/api/botindex/keys/success?session_id={CHECKOUT_SESSION_ID}';
-const CANCEL_URL = 'https://king-backend.fly.dev/api/botindex/keys/cancel';
-const PORTAL_RETURN_URL = 'https://king-backend.fly.dev/api/botindex/keys/cancel';
+const SUCCESS_URL = 'https://api.botindex.dev/api/botindex/keys/success?session_id={CHECKOUT_SESSION_ID}';
+const CANCEL_URL = 'https://api.botindex.dev/api/botindex/keys/cancel';
+const PORTAL_RETURN_URL = 'https://api.botindex.dev/api/botindex/keys/cancel';
 const ADMIN_ID = process.env.ADMIN_ID || '8063432083';
 const registerSchema = zod_1.z.object({
     email: zod_1.z.string().email(),
