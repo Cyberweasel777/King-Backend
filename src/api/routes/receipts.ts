@@ -1,9 +1,12 @@
 import type { Request, RequestHandler, Response } from 'express';
 import { Router } from 'express';
+import { verifyReceipt } from '@botindex/aar';
+import type { AgentActionReceipt } from '../middleware/receiptMiddleware';
 import {
   findReceiptById,
   getReceiptPublicKeyBase64,
   queryReceipts,
+  toAARReceipt,
   TRUST_LAYER_JSON,
 } from '../middleware/receiptMiddleware';
 
@@ -40,6 +43,32 @@ function parsePrincipal(raw: unknown): string | null {
 
 function respondValidationError(res: Response, message: string): void {
   res.status(400).json({ error: 'invalid_query', message });
+}
+
+function parseVerificationPublicKey(raw: unknown): Uint8Array | string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const value = raw.trim();
+  if (!value) return undefined;
+  if (/^[A-Za-z0-9+/=]+$/.test(value) && /[+/=]/.test(value)) {
+    return Buffer.from(value, 'base64');
+  }
+  return value;
+}
+
+function isLegacyReceiptPayload(value: unknown): value is AgentActionReceipt {
+  if (!value || typeof value !== 'object') return false;
+  const receipt = value as Record<string, unknown>;
+  return (
+    typeof receipt.receiptId === 'string' &&
+    typeof receipt.agent === 'string' &&
+    typeof receipt.principal === 'string' &&
+    typeof receipt.action === 'string' &&
+    typeof receipt.scope === 'string' &&
+    typeof receipt.inputHash === 'string' &&
+    typeof receipt.outputHash === 'string' &&
+    typeof receipt.timestamp === 'string' &&
+    typeof receipt.signature === 'string'
+  );
 }
 
 export const trustLayerHandler: RequestHandler = (_req, res) => {
@@ -178,6 +207,34 @@ router.get('/:receiptId', async (req: Request, res: Response) => {
   }
 
   res.json(receipt);
+});
+
+router.post('/verify', (req: Request, res: Response) => {
+  if (!isReceiptsBase(req)) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+
+  if (!req.body || typeof req.body !== 'object') {
+    respondValidationError(res, 'request body must be a JSON object');
+    return;
+  }
+
+  const payload = req.body as Record<string, unknown>;
+  const receiptInput = payload.receipt ?? payload;
+  const receipt = isLegacyReceiptPayload(receiptInput)
+    ? toAARReceipt(receiptInput)
+    : receiptInput;
+
+  const publicKey =
+    parseVerificationPublicKey(payload.publicKey) ??
+    Buffer.from(getReceiptPublicKeyBase64(), 'base64');
+
+  const result = verifyReceipt(receipt as any, publicKey);
+  res.json({
+    ok: result.ok,
+    reason: result.reason ?? null,
+  });
 });
 
 export default router;

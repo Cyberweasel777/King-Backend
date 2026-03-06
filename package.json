@@ -17,6 +17,7 @@
     "smoke:payment-rails": "node scripts/e2e-smoke-payment-rails.mjs"
   },
   "dependencies": {
+    "@botindex/aar": "file:./packages/aar",
     "@coinbase/coinbase-sdk": "^0.25.0",
     "@metaplex-foundation/genesis": "^0.23.0",
     "@metaplex-foundation/umi": "^1.5.1",
