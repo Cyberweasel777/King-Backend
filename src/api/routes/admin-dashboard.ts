@@ -16,6 +16,8 @@ function checkAdmin(req: Request, res: Response): boolean {
 router.get('/', (req: Request, res: Response) => {
   if (!checkAdmin(req, res)) return;
 
+  // Allow inline scripts for this admin dashboard
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';");
   res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
