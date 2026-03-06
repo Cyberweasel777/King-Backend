@@ -9,6 +9,7 @@ const zod_1 = require("zod");
 const logger_1 = __importDefault(require("../../config/logger"));
 const apiKeyAuth_1 = require("../middleware/apiKeyAuth");
 const conversion_funnel_1 = require("../../services/botindex/conversion-funnel");
+const key_delivery_email_1 = require("../../services/botindex/key-delivery-email");
 const router = (0, express_1.Router)();
 const SUCCESS_URL = 'https://api.botindex.dev/api/botindex/keys/success?session_id={CHECKOUT_SESSION_ID}';
 const CANCEL_URL = 'https://api.botindex.dev/api/botindex/keys/cancel';
@@ -162,6 +163,12 @@ router.get('/success', async (req, res) => {
             plan,
         });
         (0, conversion_funnel_1.trackFunnelEvent)('api_key_issued', plan);
+        try {
+            await (0, key_delivery_email_1.sendApiKeyEmail)({ to: email, apiKey, plan });
+        }
+        catch (emailError) {
+            logger_1.default.error({ err: emailError, email }, 'Failed to send BotIndex API key email');
+        }
         res.json({
             apiKey,
             plan,

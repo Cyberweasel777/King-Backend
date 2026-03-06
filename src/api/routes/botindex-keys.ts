@@ -10,6 +10,7 @@ import {
   requireApiKey,
 } from '../middleware/apiKeyAuth';
 import { getFunnelStats, trackFunnelEvent } from '../../services/botindex/conversion-funnel';
+import { sendApiKeyEmail } from '../../services/botindex/key-delivery-email';
 
 const router = Router();
 
@@ -187,6 +188,12 @@ router.get('/success', async (req: Request, res: Response) => {
       plan,
     });
     trackFunnelEvent('api_key_issued', plan);
+
+    try {
+      await sendApiKeyEmail({ to: email, apiKey, plan });
+    } catch (emailError) {
+      logger.error({ err: emailError, email }, 'Failed to send BotIndex API key email');
+    }
 
     res.json({
       apiKey,
