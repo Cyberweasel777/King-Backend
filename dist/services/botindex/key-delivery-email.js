@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendApiKeyEmail = sendApiKeyEmail;
 const logger_1 = __importDefault(require("../../config/logger"));
 const RESEND_API_BASE = 'https://api.resend.com/emails';
-const DEFAULT_FROM = process.env.BOTINDEX_EMAIL_FROM || 'BotIndex <no-reply@botindex.dev>';
+const DEFAULT_FROM = process.env.BOTINDEX_EMAIL_FROM || 'BotIndex <onboarding@resend.dev>';
 function docsUrlForPlan(plan) {
     return plan === 'pro'
         ? 'https://botindex.dev#quickstart'

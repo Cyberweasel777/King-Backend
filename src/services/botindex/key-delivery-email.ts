@@ -9,7 +9,7 @@ type SendApiKeyEmailParams = {
 };
 
 const RESEND_API_BASE = 'https://api.resend.com/emails';
-const DEFAULT_FROM = process.env.BOTINDEX_EMAIL_FROM || 'BotIndex <no-reply@botindex.dev>';
+const DEFAULT_FROM = process.env.BOTINDEX_EMAIL_FROM || 'BotIndex <onboarding@resend.dev>';
 
 function docsUrlForPlan(plan: Plan): string {
   return plan === 'pro'
