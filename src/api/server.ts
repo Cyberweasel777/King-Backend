@@ -19,6 +19,7 @@ import { anonRateLimit } from './middleware/anonRateLimit';
 import { getX402RuntimeConfig } from './middleware/x402Gate';
 import { initReceiptSigning, receiptMiddleware } from './middleware/receiptMiddleware';
 import mcpRouter from './routes/mcp';
+import docsRouter from './routes/docs';
 import { initDb } from '../shared/payments/database';
 import logger from '../config/logger';
 
@@ -91,6 +92,9 @@ app.get('/api/botindex/trust', trustLayerHandler);
 
 // Mount all routes
 app.use('/api', routes);
+
+// API Documentation
+app.use('/docs', docsRouter);
 
 // Error handling
 app.use(errorHandler);
