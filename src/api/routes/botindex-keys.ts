@@ -6,6 +6,7 @@ import {
   BotIndexApiPlan,
   createApiKeyEntry,
   generateApiKey,
+  getAllApiKeys,
   getApiKeyEntry,
   requireApiKey,
 } from '../middleware/apiKeyAuth';
@@ -290,6 +291,44 @@ router.get('/admin/funnel', (req: Request, res: Response) => {
   }
 
   res.json(getFunnelStats());
+});
+
+router.get('/admin/keys', (req: Request, res: Response) => {
+  const adminId = typeof req.query.adminId === 'string' ? req.query.adminId : '';
+  if (adminId !== ADMIN_ID) {
+    res.status(403).json({ error: 'forbidden', message: 'Invalid adminId' });
+    return;
+  }
+
+  const allKeys = getAllApiKeys();
+  const free = allKeys.filter(k => k.entry.plan === 'free');
+  const paid = allKeys.filter(k => k.entry.plan !== 'free');
+
+  res.json({
+    total: allKeys.length,
+    free: {
+      count: free.length,
+      totalRequests: free.reduce((sum, k) => sum + k.entry.requestCount, 0),
+      keys: free.map(k => ({
+        key: k.key,
+        plan: k.entry.plan,
+        requests: k.entry.requestCount,
+        created: k.entry.createdAt,
+        lastUsed: k.entry.lastUsed,
+      })),
+    },
+    paid: {
+      count: paid.length,
+      totalRequests: paid.reduce((sum, k) => sum + k.entry.requestCount, 0),
+      keys: paid.map(k => ({
+        key: k.key,
+        plan: k.entry.plan,
+        requests: k.entry.requestCount,
+        created: k.entry.createdAt,
+        lastUsed: k.entry.lastUsed,
+      })),
+    },
+  });
 });
 
 router.get('/cancel', (_req: Request, res: Response) => {

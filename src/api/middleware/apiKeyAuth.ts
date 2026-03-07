@@ -170,3 +170,10 @@ export const optionalApiKey: RequestHandler = (req: Request, _res: Response, nex
 };
 
 loadLedger();
+
+export function getAllApiKeys(): { key: string; entry: ApiKeyLedgerEntry }[] {
+  return Array.from(apiKeyLedger.entries()).map(([key, entry]) => ({
+    key: `${key.slice(0, 16)}...`,
+    entry,
+  }));
+}

@@ -7,6 +7,7 @@ exports.optionalApiKey = exports.requireApiKey = void 0;
 exports.generateApiKey = generateApiKey;
 exports.createApiKeyEntry = createApiKeyEntry;
 exports.getApiKeyEntry = getApiKeyEntry;
+exports.getAllApiKeys = getAllApiKeys;
 const crypto_1 = __importDefault(require("crypto"));
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
@@ -138,4 +139,10 @@ const optionalApiKey = (req, _res, next) => {
 };
 exports.optionalApiKey = optionalApiKey;
 loadLedger();
+function getAllApiKeys() {
+    return Array.from(apiKeyLedger.entries()).map(([key, entry]) => ({
+        key: `${key.slice(0, 16)}...`,
+        entry,
+    }));
+}
 //# sourceMappingURL=apiKeyAuth.js.map

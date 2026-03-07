@@ -30,4 +30,8 @@ export declare function createApiKeyEntry(params: {
 export declare function getApiKeyEntry(apiKey: string): ApiKeyLedgerEntry | null;
 export declare const requireApiKey: RequestHandler;
 export declare const optionalApiKey: RequestHandler;
+export declare function getAllApiKeys(): {
+    key: string;
+    entry: ApiKeyLedgerEntry;
+}[];
 //# sourceMappingURL=apiKeyAuth.d.ts.map
