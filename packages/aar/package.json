@@ -1,0 +1,48 @@
+{
+  "name": "@botindex/aar",
+  "version": "1.0.0",
+  "description": "Standalone Agent Action Receipt (AAR) SDK for signing, verification, hashing, middleware, and discovery.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./middleware/express": {
+      "types": "./dist/middleware/express.d.ts",
+      "import": "./dist/middleware/express.js",
+      "require": "./dist/middleware/express.js"
+    },
+    "./middleware/fastapi": {
+      "types": "./dist/middleware/fastapi.d.ts",
+      "import": "./dist/middleware/fastapi.js",
+      "require": "./dist/middleware/fastapi.js"
+    },
+    "./compat/mastercard-vi": {
+      "types": "./dist/compat/mastercard-vi.d.ts",
+      "import": "./dist/compat/mastercard-vi.js",
+      "require": "./dist/compat/mastercard-vi.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.4"
+  }
+}

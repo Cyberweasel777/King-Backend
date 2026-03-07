@@ -7,6 +7,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import { wellKnownHandler } from '@botindex/aar';
 import routes from './routes/index';
 import adminHitsRouter from './routes/admin-hits';
 import wellKnownRouter from './routes/well-known';
@@ -17,7 +18,11 @@ import { hitCounter } from './middleware/hitCounter';
 import { optionalApiKey } from './middleware/apiKeyAuth';
 import { anonRateLimit } from './middleware/anonRateLimit';
 import { getX402RuntimeConfig } from './middleware/x402Gate';
-import { initReceiptSigning, receiptMiddleware } from './middleware/receiptMiddleware';
+import {
+  getReceiptSigningSecretKey,
+  initReceiptSigning,
+  receiptMiddleware,
+} from './middleware/receiptMiddleware';
 import mcpRouter from './routes/mcp';
 import docsRouter from './routes/docs';
 import { initDb } from '../shared/payments/database';
@@ -42,6 +47,19 @@ app.use(express.json({ limit: '10mb' }));
 
 // Agent discovery endpoints (no auth, no middleware)
 app.use('/.well-known', wellKnownRouter);
+app.get('/.well-known/aar-configuration', (req, res, next) => {
+  try {
+    wellKnownHandler({
+      agentId: 'botindex/v1',
+      agentName: 'BotIndex',
+      agentVersion: '1.0',
+      secretKey: getReceiptSigningSecretKey(),
+      receiptHeader: 'X-BotIndex-Receipt',
+    })(req, res);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // MCP Streamable HTTP transport (no auth — Smithery handles auth)
 app.use('/mcp', mcpRouter);

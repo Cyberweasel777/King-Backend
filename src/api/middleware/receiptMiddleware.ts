@@ -2,7 +2,17 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import nacl from 'tweetnacl';
+import {
+  createReceipt,
+  generateKeyPair,
+  hashInput,
+  hashOutput,
+  loadSecretKey,
+  publicKeyFromSecret,
+  signReceipt as signAarReceipt,
+  verifyReceipt as verifyAarReceipt,
+} from '@botindex/aar';
+import type { AARReceipt, Cost, PrincipalType, UnsignedReceipt } from '@botindex/aar';
 import logger from '../../config/logger';
 
 const RECEIPT_HEADER = 'X-BotIndex-Receipt';
@@ -13,14 +23,6 @@ const MAX_RECEIPTS = 10_000;
 const FLUSH_DELAY_MS = 2_000;
 const RECEIPT_KEY_BEGIN = '-----BEGIN BOTINDEX RECEIPT SIGNING KEY-----';
 const RECEIPT_KEY_END = '-----END BOTINDEX RECEIPT SIGNING KEY-----';
-
-type CanonicalValue =
-  | null
-  | string
-  | number
-  | boolean
-  | CanonicalValue[]
-  | { [key: string]: CanonicalValue };
 
 interface SigningKeyState {
   secretKey: Uint8Array;
@@ -89,61 +91,6 @@ let signingInitPromise: Promise<void> | null = null;
 let flushTimer: NodeJS.Timeout | null = null;
 let flushInProgress = false;
 
-function toCanonicalValue(input: unknown): CanonicalValue | undefined {
-  if (input === undefined) return undefined;
-  if (input === null) return null;
-
-  if (typeof input === 'string' || typeof input === 'number' || typeof input === 'boolean') {
-    return input;
-  }
-
-  if (typeof input === 'bigint') {
-    return input.toString();
-  }
-
-  if (Buffer.isBuffer(input)) {
-    return input.toString('base64');
-  }
-
-  if (input instanceof Uint8Array) {
-    return Buffer.from(input).toString('base64');
-  }
-
-  if (input instanceof Date) {
-    return input.toISOString();
-  }
-
-  if (Array.isArray(input)) {
-    const arr: CanonicalValue[] = [];
-    for (const item of input) {
-      const normalized = toCanonicalValue(item);
-      if (normalized !== undefined) {
-        arr.push(normalized);
-      }
-    }
-    return arr;
-  }
-
-  if (typeof input === 'object') {
-    const out: { [key: string]: CanonicalValue } = {};
-    const obj = input as Record<string, unknown>;
-    for (const key of Object.keys(obj).sort()) {
-      const normalized = toCanonicalValue(obj[key]);
-      if (normalized !== undefined) {
-        out[key] = normalized;
-      }
-    }
-    return out;
-  }
-
-  return String(input);
-}
-
-function canonicalStringify(value: unknown): string {
-  const normalized = toCanonicalValue(value);
-  return JSON.stringify(normalized ?? null);
-}
-
 function sha256Hex(value: string | Buffer): string {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
@@ -156,20 +103,15 @@ function ensureSigningState(): SigningKeyState {
 }
 
 function parseSigningKeyFile(raw: string): Uint8Array | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-
-  const blockMatch = trimmed.match(
-    new RegExp(`${RECEIPT_KEY_BEGIN}([\\s\\S]+?)${RECEIPT_KEY_END}`)
-  );
-  const encoded = (blockMatch?.[1] || trimmed).replace(/\s+/g, '');
-  const secret = Buffer.from(encoded, 'base64');
-
-  if (secret.length !== nacl.sign.secretKeyLength) {
+  if (!raw.trim()) {
     return null;
   }
 
-  return new Uint8Array(secret);
+  try {
+    return loadSecretKey(raw);
+  } catch {
+    return null;
+  }
 }
 
 function toSigningKeyPem(secretKey: Uint8Array): string {
@@ -190,16 +132,15 @@ export async function initReceiptSigning(): Promise<void> {
         if (!secret) {
           throw new Error('Invalid receipt signing key file');
         }
-        const keyPair = nacl.sign.keyPair.fromSecretKey(secret);
         signingKeyState = {
-          secretKey: keyPair.secretKey,
-          publicKey: keyPair.publicKey,
+          secretKey: secret,
+          publicKey: publicKeyFromSecret(secret),
         };
         logger.info({ path: RECEIPT_SIGNING_KEY_PATH }, 'Receipt signing key loaded');
         return;
       }
 
-      const keyPair = nacl.sign.keyPair();
+      const keyPair = generateKeyPair();
       await fs.promises.mkdir(path.dirname(RECEIPT_SIGNING_KEY_PATH), { recursive: true });
       await fs.promises.writeFile(RECEIPT_SIGNING_KEY_PATH, toSigningKeyPem(keyPair.secretKey), {
         mode: 0o600,
@@ -221,11 +162,83 @@ export async function initReceiptSigning(): Promise<void> {
   return signingInitPromise;
 }
 
+function resolvePrincipalType(principal: string): PrincipalType {
+  if (principal === 'anonymous') return 'other';
+  if (/^[a-f0-9]{64}$/i.test(principal)) return 'service';
+  return 'user';
+}
+
+function parseAction(action: string): { method: string; target: string } {
+  const [method, ...parts] = action.split(' ');
+  const target = parts.join(' ').trim() || '/api/botindex';
+  return {
+    method: method ? method.toUpperCase() : 'GET',
+    target,
+  };
+}
+
+function normalizeCost(cost: string | number | null): Cost {
+  return {
+    amount: cost === null ? '0' : String(cost),
+    currency: 'USD',
+    unit: 'request',
+  };
+}
+
+function toUnsignedAarReceipt(receipt: UnsignedAgentActionReceipt): UnsignedReceipt {
+  const parsedAction = parseAction(receipt.action);
+  return createReceipt({
+    receiptId: receipt.receiptId,
+    timestamp: receipt.timestamp,
+    agent: { id: receipt.agent },
+    principal: {
+      id: receipt.principal,
+      type: resolvePrincipalType(receipt.principal),
+    },
+    action: {
+      type: 'http.request',
+      target: parsedAction.target,
+      method: parsedAction.method,
+      status: 'success',
+    },
+    scope: {
+      permissions: [receipt.scope],
+    },
+    inputHash: { alg: 'sha256', digest: receipt.inputHash },
+    outputHash: { alg: 'sha256', digest: receipt.outputHash },
+    cost: normalizeCost(receipt.cost),
+    metadata: {
+      botindex: {
+        action: receipt.action,
+        scope: receipt.scope,
+        legacyCost: receipt.cost,
+      },
+    },
+    signature: {
+      kid: `${receipt.agent}#key-1`,
+    },
+  });
+}
+
+export function toAARReceipt(receipt: AgentActionReceipt): AARReceipt {
+  const unsigned = toUnsignedAarReceipt(receipt);
+  return {
+    ...unsigned,
+    signature: {
+      ...unsigned.signature,
+      sig: receipt.signature,
+    },
+  };
+}
+
 function signReceipt(receipt: UnsignedAgentActionReceipt): string {
-  const { secretKey } = ensureSigningState();
-  const payload = Buffer.from(canonicalStringify(receipt), 'utf-8');
-  const signature = nacl.sign.detached(new Uint8Array(payload), secretKey);
-  return Buffer.from(signature).toString('base64');
+  const { secretKey, publicKey } = ensureSigningState();
+  const signed = signAarReceipt(toUnsignedAarReceipt(receipt), secretKey);
+  const verified = verifyAarReceipt(signed, publicKey);
+  if (!verified.ok) {
+    throw new Error(verified.reason || 'receipt signature verification failed');
+  }
+  return signed.signature.sig;
 }
 
 function normalizeApiKeyHash(apiKey: string): string {
@@ -523,6 +536,11 @@ export function getReceiptPublicKeyBase64(): string {
   return Buffer.from(publicKey).toString('base64');
 }
 
+export function getReceiptSigningSecretKey(): Uint8Array {
+  const { secretKey } = ensureSigningState();
+  return secretKey;
+}
+
 export function getReceiptByIdFromMemory(receiptId: string): AgentActionReceipt | null {
   const found = receiptStore.get(receiptId);
   if (!found) return null;
@@ -597,7 +615,7 @@ function createUnsignedReceipt(req: Request, outputHash: string): UnsignedAgentA
     principal: resolvePrincipal(req),
     action: `${req.method.toUpperCase()} ${actionPath}`,
     scope: deriveScope(actionPath),
-    inputHash: sha256Hex(canonicalStringify({ query: req.query, body: req.body })),
+    inputHash: hashInput({ query: req.query, body: req.body }).digest,
     outputHash,
     timestamp: new Date().toISOString(),
     cost: resolveCost(req),
@@ -617,7 +635,7 @@ export const receiptMiddleware: RequestHandler = (req: Request, res: Response, n
 
     try {
       const outputBody = chunks.length > 0 ? Buffer.concat(chunks) : Buffer.alloc(0);
-      const outputHash = sha256Hex(outputBody);
+      const outputHash = hashOutput(outputBody).digest;
       const unsignedReceipt = createUnsignedReceipt(req, outputHash);
       const receipt: AgentActionReceipt = {
         ...unsignedReceipt,
