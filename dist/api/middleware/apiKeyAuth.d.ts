@@ -1,8 +1,8 @@
 import type { RequestHandler } from 'express';
-export type BotIndexApiPlan = 'basic' | 'pro';
+export type BotIndexApiPlan = 'free' | 'basic' | 'pro';
 export interface ApiKeyLedgerEntry {
     email: string;
-    stripeCustomerId: string;
+    stripeCustomerId?: string;
     plan: BotIndexApiPlan;
     createdAt: string;
     lastUsed: string;
@@ -24,7 +24,7 @@ export declare function generateApiKey(): string;
 export declare function createApiKeyEntry(params: {
     apiKey: string;
     email: string;
-    stripeCustomerId: string;
+    stripeCustomerId?: string;
     plan: BotIndexApiPlan;
 }): ApiKeyLedgerEntry;
 export declare function getApiKeyEntry(apiKey: string): ApiKeyLedgerEntry | null;

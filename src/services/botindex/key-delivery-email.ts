@@ -1,6 +1,6 @@
 import logger from '../../config/logger';
 
-type Plan = 'basic' | 'pro';
+type Plan = 'free' | 'basic' | 'pro';
 
 type SendApiKeyEmailParams = {
   to: string;

@@ -30,6 +30,7 @@ function getPlanPriceId(plan) {
     const basic = process.env.BOTINDEX_STRIPE_PRICE_BASIC;
     const pro = process.env.BOTINDEX_STRIPE_PRICE_PRO;
     const byPlan = {
+        free: undefined,
         basic,
         pro,
     };
@@ -63,9 +64,27 @@ async function resolveEmailFromSession(stripe, session) {
 // GET /register — browser-friendly: redirects straight to Stripe Checkout
 router.get('/register', async (req, res) => {
     try {
-        const stripe = getStripeClient();
         const planParam = req.query.plan;
-        const plan = (planParam === 'pro') ? 'pro' : 'basic';
+        const plan = (planParam === 'free') ? 'free' : (planParam === 'pro') ? 'pro' : 'basic';
+        if (plan === 'free') {
+            (0, conversion_funnel_1.trackFunnelEvent)('register_page_hit', 'free');
+            (0, conversion_funnel_1.trackFunnelEvent)('checkout_completed', 'free');
+            const apiKey = (0, apiKeyAuth_1.generateApiKey)();
+            (0, apiKeyAuth_1.createApiKeyEntry)({
+                apiKey,
+                email: 'free-tier@botindex.dev',
+                plan: 'free',
+            });
+            (0, conversion_funnel_1.trackFunnelEvent)('api_key_issued', 'free');
+            res.json({
+                apiKey,
+                plan: 'free',
+                rateLimit: '3 req/hr',
+                message: "Free tier API key. Save this - it won't be shown again.",
+            });
+            return;
+        }
+        const stripe = getStripeClient();
         const priceId = getPlanPriceId(plan);
         (0, conversion_funnel_1.trackFunnelEvent)('register_page_hit', plan);
         const session = await stripe.checkout.sessions.create({

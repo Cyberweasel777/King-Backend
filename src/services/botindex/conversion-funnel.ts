@@ -11,7 +11,7 @@ export type FunnelEventType =
 type FunnelEvent = {
   type: FunnelEventType;
   ts: string;
-  plan?: 'basic' | 'pro';
+  plan?: 'free' | 'basic' | 'pro';
 };
 
 type FunnelStore = {
@@ -56,7 +56,7 @@ function scheduleFlush(): void {
   }, 500);
 }
 
-export function trackFunnelEvent(type: FunnelEventType, plan?: 'basic' | 'pro'): void {
+export function trackFunnelEvent(type: FunnelEventType, plan?: 'free' | 'basic' | 'pro'): void {
   store.events.push({ type, plan, ts: new Date().toISOString() });
   if (store.events.length > MAX_EVENTS) {
     store.events = store.events.slice(-MAX_EVENTS);
