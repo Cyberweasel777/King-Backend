@@ -4,11 +4,11 @@ import fs from 'fs';
 import path from 'path';
 import logger from '../../config/logger';
 
-export type BotIndexApiPlan = 'basic' | 'pro';
+export type BotIndexApiPlan = 'free' | 'basic' | 'pro';
 
 export interface ApiKeyLedgerEntry {
   email: string;
-  stripeCustomerId: string;
+  stripeCustomerId?: string;
   plan: BotIndexApiPlan;
   createdAt: string;
   lastUsed: string;
@@ -111,7 +111,7 @@ export function generateApiKey(): string {
 export function createApiKeyEntry(params: {
   apiKey: string;
   email: string;
-  stripeCustomerId: string;
+  stripeCustomerId?: string;
   plan: BotIndexApiPlan;
 }): ApiKeyLedgerEntry {
   const now = new Date().toISOString();
