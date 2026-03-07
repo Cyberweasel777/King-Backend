@@ -56,6 +56,7 @@ const anonRateLimit_1 = require("./middleware/anonRateLimit");
 const x402Gate_1 = require("./middleware/x402Gate");
 const receiptMiddleware_1 = require("./middleware/receiptMiddleware");
 const mcp_1 = __importDefault(require("./routes/mcp"));
+const docs_1 = __importDefault(require("./routes/docs"));
 const database_1 = require("../shared/payments/database");
 const logger_1 = __importDefault(require("../config/logger"));
 const app = (0, express_1.default)();
@@ -113,6 +114,8 @@ app.use('/api/botindex/.well-known', receipts_1.default);
 app.get('/api/botindex/trust', receipts_1.trustLayerHandler);
 // Mount all routes
 app.use('/api', index_1.default);
+// API Documentation
+app.use('/docs', docs_1.default);
 // Error handling
 app.use(errorHandler_1.errorHandler);
 // Root redirect to landing page on Vercel

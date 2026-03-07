@@ -145,10 +145,20 @@ router.get('/register', async (req, res) => {
                 return;
             }
             res.json({
-                apiKey,
+                key: apiKey,
                 plan: 'free',
                 rateLimit: '3 req/hr',
                 message: "Free tier API key. Save this - it won't be shown again.",
+                tryItNow: {
+                    curl: `curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/v1/signals`,
+                    docs: 'https://api.botindex.dev/docs',
+                    quickstart: '1. Copy the curl command above\n2. Paste in your terminal\n3. You\'re in',
+                },
+                nextSteps: [
+                    { endpoint: '/api/botindex/v1/signals', description: 'Live market signals' },
+                    { endpoint: '/api/botindex/hyperliquid/funding-arb', description: 'Funding rate arbitrage opportunities' },
+                    { endpoint: '/api/botindex/hyperliquid/hip6/feed-history', description: 'HIP-6 launch candidate feed history' },
+                ],
             });
             return;
         }
@@ -257,9 +267,19 @@ router.get('/success', async (req, res) => {
             logger_1.default.error({ err: emailError, email }, 'Failed to send BotIndex API key email');
         }
         res.json({
-            apiKey,
+            key: apiKey,
             plan,
             message: "Save this key - it won't be shown again",
+            tryItNow: {
+                curl: `curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/v1/signals`,
+                docs: 'https://api.botindex.dev/docs',
+                quickstart: '1. Copy the curl command above\n2. Paste in your terminal\n3. You\'re in',
+            },
+            nextSteps: [
+                { endpoint: '/api/botindex/v1/signals', description: 'Live market signals' },
+                { endpoint: '/api/botindex/hyperliquid/funding-arb', description: 'Funding rate arbitrage opportunities' },
+                { endpoint: '/api/botindex/hyperliquid/hip6/feed-history', description: 'HIP-6 launch candidate feed history' },
+            ],
         });
     }
     catch (error) {
