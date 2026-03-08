@@ -63,9 +63,20 @@ app.get('/health', async (req, res) => {
 // Track BotIndex/x402 endpoint hits (in-memory, zero I/O)
 app.use(hitCounter);
 
-// Landing page beacon (public, no auth)
-import botindexBeaconRouter from './routes/botindex-beacon';
-app.use('/api', botindexBeaconRouter);
+// Landing page beacon (public, no auth — must be before ALL other middleware)
+const BEACON_PIXEL = Buffer.from(
+  'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+  'base64'
+);
+app.get('/api/botindex/beacon', (req, res) => {
+  res.set({
+    'Content-Type': 'image/gif',
+    'Content-Length': String(BEACON_PIXEL.length),
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    'Access-Control-Allow-Origin': '*',
+  });
+  res.end(BEACON_PIXEL);
+});
 
 // Agent Action Receipts for all BotIndex responses
 app.use('/api/botindex', receiptMiddleware);
