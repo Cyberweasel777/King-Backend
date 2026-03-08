@@ -64,11 +64,11 @@ async function sendUpgradePrompt(
 ): Promise<void> {
   const userId = ctx.from?.id.toString() || '';
   const tiers = getAvailableTiers(appId);
-  
+
   let message = `🔒 *Premium Feature Required*\n\n`;
   message += `This command requires the *${requiredTier.toUpperCase()}* tier or higher.\n\n`;
   message += `*Choose a plan:*\n\n`;
-  
+
   for (const tier of tiers) {
     if (tier.id === 'free') continue;
     const price = tier.price === 0 ? 'Free' : `$${(tier.price / 100).toFixed(2)}/${tier.interval}`;
@@ -76,10 +76,11 @@ async function sendUpgradePrompt(
     message += tier.features.slice(0, 3).map(f => `  ✓ ${f}`).join('\n');
     message += '\n\n';
   }
-  
-  // TODO: Replace with actual checkout URL
-  const checkoutUrl = `${process.env.API_BASE_URL}/payments/${appId}/checkout?user=${userId}`;
-  
+
+  // Build checkout URL using the global payments endpoint
+  const baseUrl = process.env.API_BASE_URL || 'https://king-backend.fly.dev';
+  const checkoutUrl = `${baseUrl}/api/payments/checkout?app=${appId}&tier=${requiredTier}&user=${encodeURIComponent(userId)}`;
+
   await ctx.reply(message, {
     parse_mode: 'Markdown',
     reply_markup: {
@@ -122,8 +123,9 @@ export function createPricingCommand(appId: AppId) {
   return async (ctx: Context): Promise<void> => {
     const message = getTierComparison(appId);
     const userId = ctx.from?.id.toString() || '';
-    const checkoutUrl = `${process.env.API_BASE_URL}/payments/${appId}/checkout?user=${userId}`;
-    
+    const baseUrl = process.env.API_BASE_URL || 'https://king-backend.fly.dev';
+    const checkoutUrl = `${baseUrl}/api/payments/checkout?app=${appId}&tier=pro&user=${encodeURIComponent(userId)}`;
+
     await ctx.reply(message, {
       parse_mode: 'Markdown',
       reply_markup: {
@@ -142,8 +144,9 @@ export function createPricingCommand(appId: AppId) {
 export function createSubscribeCommand(appId: AppId) {
   return async (ctx: Context): Promise<void> => {
     const userId = ctx.from?.id.toString() || '';
-    const checkoutUrl = `${process.env.API_BASE_URL}/payments/${appId}/checkout?user=${userId}`;
-    
+    const baseUrl = process.env.API_BASE_URL || 'https://king-backend.fly.dev';
+    const checkoutUrl = `${baseUrl}/api/payments/checkout?app=${appId}&tier=pro&user=${encodeURIComponent(userId)}`;
+
     await ctx.reply(
       'Ready to upgrade? Click below to choose your plan:',
       {
