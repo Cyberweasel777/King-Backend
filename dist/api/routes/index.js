@@ -38,6 +38,8 @@ const admin_dashboard_1 = __importDefault(require("./admin-dashboard"));
 const botindex_beacon_1 = __importDefault(require("./botindex-beacon"));
 const apiKeyAuth_1 = require("../middleware/apiKeyAuth");
 const router = (0, express_1.Router)();
+// Beacon must be before auth — it's a public tracking pixel
+router.use('/', botindex_beacon_1.default);
 // Global optional API key auth so paid subscribers bypass x402 pay-per-call gates.
 router.use(apiKeyAuth_1.optionalApiKey, (req, _res, next) => {
     if (req.apiKeyAuth) {
@@ -88,8 +90,7 @@ router.use('/contracts', contracts_1.default);
 router.use('/', shell_1.default);
 // Admin dashboard (traffic, conversions, funnel)
 router.use('/admin/dashboard', admin_dashboard_1.default);
-// Landing page beacon tracking (pixel)
-router.use('/', botindex_beacon_1.default);
+// (beacon mounted above auth layer)
 // TODO: Add remaining 12 apps here
 // router.use('/spreadhunter', spreadhunterRouter);
 // router.use('/deckvault', deckvaultRouter);
