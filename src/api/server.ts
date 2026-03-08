@@ -63,6 +63,10 @@ app.get('/health', async (req, res) => {
 // Track BotIndex/x402 endpoint hits (in-memory, zero I/O)
 app.use(hitCounter);
 
+// Landing page beacon (public, no auth)
+import botindexBeaconRouter from './routes/botindex-beacon';
+app.use('/api', botindexBeaconRouter);
+
 // Agent Action Receipts for all BotIndex responses
 app.use('/api/botindex', receiptMiddleware);
 
