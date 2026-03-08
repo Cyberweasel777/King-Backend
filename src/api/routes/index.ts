@@ -32,6 +32,7 @@ import signalsRouter from './signals';
 import arbRouter from './arb';
 import botindexKeysRouter from './botindex-keys';
 import adminDashboardRouter from './admin-dashboard';
+import botindexBeaconRouter from './botindex-beacon';
 import { optionalApiKey } from '../middleware/apiKeyAuth';
 
 const router = Router();
@@ -97,6 +98,9 @@ router.use('/', shellRouter);
 
 // Admin dashboard (traffic, conversions, funnel)
 router.use('/admin/dashboard', adminDashboardRouter);
+
+// Landing page beacon tracking (pixel)
+router.use('/', botindexBeaconRouter);
 
 // TODO: Add remaining 12 apps here
 // router.use('/spreadhunter', spreadhunterRouter);
