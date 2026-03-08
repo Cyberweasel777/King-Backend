@@ -18,6 +18,10 @@ const botindex_zora_1 = __importDefault(require("./botindex-zora"));
 const botindex_hyperliquid_1 = __importDefault(require("./botindex-hyperliquid"));
 const botindex_aliases_1 = __importDefault(require("./botindex-aliases"));
 const botindex_social_1 = __importDefault(require("./botindex-social"));
+const botindex_doppler_1 = __importDefault(require("./botindex-doppler"));
+const botindex_hip6_1 = __importDefault(require("./botindex-hip6"));
+const botindex_hip4_1 = __importDefault(require("./botindex-hip4"));
+const botindex_trust_1 = __importDefault(require("./botindex-trust"));
 const x402_test_1 = __importDefault(require("./x402-test"));
 const x402_premium_1 = __importDefault(require("./x402-premium"));
 const memeradar_1 = __importDefault(require("./memeradar"));
@@ -31,6 +35,7 @@ const signals_1 = __importDefault(require("./signals"));
 const arb_1 = __importDefault(require("./arb"));
 const botindex_keys_1 = __importDefault(require("./botindex-keys"));
 const admin_dashboard_1 = __importDefault(require("./admin-dashboard"));
+const botindex_beacon_1 = __importDefault(require("./botindex-beacon"));
 const apiKeyAuth_1 = require("../middleware/apiKeyAuth");
 const router = (0, express_1.Router)();
 // Global optional API key auth so paid subscribers bypass x402 pay-per-call gates.
@@ -48,6 +53,10 @@ router.use('/botindex', botindex_zora_1.default);
 router.use('/botindex', botindex_hyperliquid_1.default);
 router.use('/botindex', botindex_sports_1.default);
 router.use('/botindex', botindex_crypto_1.default);
+router.use('/botindex', botindex_doppler_1.default);
+router.use('/botindex', botindex_hip6_1.default);
+router.use('/botindex', botindex_hip4_1.default);
+router.use('/botindex', botindex_trust_1.default);
 router.use('/botindex', botindex_commerce_1.default);
 router.use('/botindex/genesis', botindex_genesis_1.default);
 router.use('/botindex/signals', signals_1.default);
@@ -79,6 +88,8 @@ router.use('/contracts', contracts_1.default);
 router.use('/', shell_1.default);
 // Admin dashboard (traffic, conversions, funnel)
 router.use('/admin/dashboard', admin_dashboard_1.default);
+// Landing page beacon tracking (pixel)
+router.use('/', botindex_beacon_1.default);
 // TODO: Add remaining 12 apps here
 // router.use('/spreadhunter', spreadhunterRouter);
 // router.use('/deckvault', deckvaultRouter);

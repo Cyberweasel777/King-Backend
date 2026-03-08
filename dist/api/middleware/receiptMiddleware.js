@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.receiptMiddleware = exports.TRUST_LAYER_JSON = void 0;
 exports.initReceiptSigning = initReceiptSigning;
 exports.getReceiptPublicKeyBase64 = getReceiptPublicKeyBase64;
+exports.getSigningKeyState = getSigningKeyState;
 exports.getReceiptByIdFromMemory = getReceiptByIdFromMemory;
 exports.findReceiptById = findReceiptById;
 exports.queryReceipts = queryReceipts;
@@ -443,6 +444,9 @@ async function loadReceiptsFromDisk(fromMs, toMs) {
 function getReceiptPublicKeyBase64() {
     const { publicKey } = ensureSigningState();
     return Buffer.from(publicKey).toString('base64');
+}
+function getSigningKeyState() {
+    return ensureSigningState();
 }
 function getReceiptByIdFromMemory(receiptId) {
     const found = receiptStore.get(receiptId);

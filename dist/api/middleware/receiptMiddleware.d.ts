@@ -1,4 +1,8 @@
 import type { RequestHandler } from 'express';
+interface SigningKeyState {
+    secretKey: Uint8Array;
+    publicKey: Uint8Array;
+}
 export interface AgentActionReceipt {
     receiptId: string;
     agent: string;
@@ -40,8 +44,10 @@ export declare const TRUST_LAYER_JSON: {
 };
 export declare function initReceiptSigning(): Promise<void>;
 export declare function getReceiptPublicKeyBase64(): string;
+export declare function getSigningKeyState(): SigningKeyState;
 export declare function getReceiptByIdFromMemory(receiptId: string): AgentActionReceipt | null;
 export declare function findReceiptById(receiptId: string): Promise<AgentActionReceipt | null>;
 export declare function queryReceipts(options: ReceiptQueryOptions): Promise<AgentActionReceipt[]>;
 export declare const receiptMiddleware: RequestHandler;
+export {};
 //# sourceMappingURL=receiptMiddleware.d.ts.map

@@ -37,6 +37,9 @@ import { optionalApiKey } from '../middleware/apiKeyAuth';
 
 const router = Router();
 
+// Beacon must be before auth — it's a public tracking pixel
+router.use('/', botindexBeaconRouter);
+
 // Global optional API key auth so paid subscribers bypass x402 pay-per-call gates.
 router.use(optionalApiKey, (req, _res, next) => {
   if (req.apiKeyAuth) {
@@ -99,8 +102,7 @@ router.use('/', shellRouter);
 // Admin dashboard (traffic, conversions, funnel)
 router.use('/admin/dashboard', adminDashboardRouter);
 
-// Landing page beacon tracking (pixel)
-router.use('/', botindexBeaconRouter);
+// (beacon mounted above auth layer)
 
 // TODO: Add remaining 12 apps here
 // router.use('/spreadhunter', spreadhunterRouter);

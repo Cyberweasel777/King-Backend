@@ -54,6 +54,12 @@ function optionalHeader(req, headerName) {
 function shouldTrack(pathname) {
     return pathname.includes('botindex') || pathname.includes('x402');
 }
+function beaconKey(req) {
+    if (!req.path.endsWith('/botindex/beacon'))
+        return null;
+    const page = typeof req.query.page === 'string' ? req.query.page : 'unknown';
+    return `/botindex/beacon:${page}`;
+}
 function reportConvexLogError(error) {
     const now = Date.now();
     if (now - lastConvexErrorAt < 60_000)
@@ -125,10 +131,12 @@ process.on('SIGINT', flushToDisk);
 function hitCounter(req, res, next) {
     const p = req.path;
     if (shouldTrack(p)) {
-        if (!hits[p]) {
-            hits[p] = { count: 0, lastHit: '', uniqueVisitors: 0, visitorHashes: [] };
+        // For beacon requests, split by page param for per-site tracking
+        const trackKey = beaconKey(req) || p;
+        if (!hits[trackKey]) {
+            hits[trackKey] = { count: 0, lastHit: '', uniqueVisitors: 0, visitorHashes: [] };
         }
-        const entry = hits[p];
+        const entry = hits[trackKey];
         entry.count += 1;
         entry.lastHit = new Date().toISOString();
         const visitorHash = hashIp(getClientIp(req));
