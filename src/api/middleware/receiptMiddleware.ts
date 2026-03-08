@@ -523,6 +523,10 @@ export function getReceiptPublicKeyBase64(): string {
   return Buffer.from(publicKey).toString('base64');
 }
 
+export function getSigningKeyState(): SigningKeyState {
+  return ensureSigningState();
+}
+
 export function getReceiptByIdFromMemory(receiptId: string): AgentActionReceipt | null {
   const found = receiptStore.get(receiptId);
   if (!found) return null;
