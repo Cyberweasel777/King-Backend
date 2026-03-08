@@ -140,8 +140,23 @@ router.get('/', (req, res) => {
     function render(data) {
       const { hits, funnel } = data;
       
-      // Get top endpoints
+      // Separate beacon (landing page) traffic from API traffic
+      const beaconEntries = Object.entries(hits.endpoints || {})
+        .filter(([path]) => path.includes('beacon:'))
+        .map(([path, info]) => ({
+          page: path.replace('/botindex/beacon:', ''),
+          count: info.count,
+          uniques: info.uniqueVisitors,
+          lastHit: info.lastHit
+        }))
+        .sort((a, b) => b.count - a.count);
+      
+      const beaconTotalViews = beaconEntries.reduce((s, e) => s + e.count, 0);
+      const beaconTotalUniques = beaconEntries.reduce((s, e) => s + e.uniques, 0);
+
+      // Get top endpoints (exclude beacon internals)
       const endpoints = Object.entries(hits.endpoints || {})
+        .filter(([path]) => !path.includes('beacon'))
         .map(([path, info]) => ({ path, count: info.count, uniques: info.uniqueVisitors }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 10);
@@ -184,6 +199,42 @@ router.get('/', (req, res) => {
             <div class="value status-good">\${funnel.apiKeysIssued || 0}</div>
           </div>
         </div>
+        
+        <h2>Landing Page Traffic</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Page Views</h3>
+            <div class="value">\${beaconTotalViews.toLocaleString()}</div>
+          </div>
+          <div class="card">
+            <h3>Unique Visitors</h3>
+            <div class="value">\${beaconTotalUniques.toLocaleString()}</div>
+          </div>
+        </div>
+        \${beaconEntries.length > 0 ? \`
+        <div class="card" style="margin-bottom: 24px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Page</th>
+                <th>Views</th>
+                <th>Uniques</th>
+                <th>Last Visit</th>
+              </tr>
+            </thead>
+            <tbody>
+              \${beaconEntries.map(b => \`
+                <tr>
+                  <td><span style="color: #a78bfa;">\${b.page}</span></td>
+                  <td>\${b.count}</td>
+                  <td>\${b.uniques}</td>
+                  <td style="color: #888;">\${new Date(b.lastHit).toLocaleString()}</td>
+                </tr>
+              \`).join('')}
+            </tbody>
+          </table>
+        </div>
+        \` : '<div class="card" style="margin-bottom: 24px; color: #888;">No landing page visits tracked yet. Beacon pixels are deployed — data will appear after first visit.</div>'}
         
         <h2>Conversion Funnel</h2>
         <div class="card">
