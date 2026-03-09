@@ -70,13 +70,19 @@ function optionalHeader(req: Request, headerName: string): string | undefined {
 }
 
 function shouldTrack(pathname: string): boolean {
-  return pathname.includes('botindex') || pathname.includes('x402');
+  return pathname.includes('botindex') || pathname.includes('x402') || pathname.includes('polyhacks');
 }
 
 function beaconKey(req: Request): string | null {
-  if (!req.path.endsWith('/botindex/beacon')) return null;
-  const page = typeof req.query.page === 'string' ? req.query.page : 'unknown';
-  return `/botindex/beacon:${page}`;
+  if (req.path.endsWith('/botindex/beacon')) {
+    const page = typeof req.query.page === 'string' ? req.query.page : 'unknown';
+    return `/botindex/beacon:${page}`;
+  }
+  if (req.path.endsWith('/polyhacks/beacon')) {
+    const page = typeof req.query.page === 'string' ? req.query.page : 'unknown';
+    return `/polyhacks/beacon:${page}`;
+  }
+  return null;
 }
 
 function reportConvexLogError(error: unknown): void {
