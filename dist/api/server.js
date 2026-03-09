@@ -88,11 +88,22 @@ app.get('/health', async (req, res) => {
         },
     });
 });
-// Track BotIndex/x402 endpoint hits (in-memory, zero I/O)
+// Track BotIndex/x402/PolyHacks endpoint hits (in-memory, zero I/O)
 app.use(hitCounter_1.hitCounter);
-// Landing page beacon (public, no auth — must be before ALL other middleware)
+// Landing page beacons (public, no auth — must be before ALL other middleware)
 const BEACON_PIXEL = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+// BotIndex beacon
 app.get('/api/botindex/beacon', (req, res) => {
+    res.set({
+        'Content-Type': 'image/gif',
+        'Content-Length': String(BEACON_PIXEL.length),
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Access-Control-Allow-Origin': '*',
+    });
+    res.end(BEACON_PIXEL);
+});
+// PolyHacks beacon
+app.get('/api/polyhacks/beacon', (req, res) => {
     res.set({
         'Content-Type': 'image/gif',
         'Content-Length': String(BEACON_PIXEL.length),

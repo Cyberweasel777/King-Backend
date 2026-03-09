@@ -52,13 +52,18 @@ function optionalHeader(req, headerName) {
     return value.length > 0 ? value : undefined;
 }
 function shouldTrack(pathname) {
-    return pathname.includes('botindex') || pathname.includes('x402');
+    return pathname.includes('botindex') || pathname.includes('x402') || pathname.includes('polyhacks');
 }
 function beaconKey(req) {
-    if (!req.path.endsWith('/botindex/beacon'))
-        return null;
-    const page = typeof req.query.page === 'string' ? req.query.page : 'unknown';
-    return `/botindex/beacon:${page}`;
+    if (req.path.endsWith('/botindex/beacon')) {
+        const page = typeof req.query.page === 'string' ? req.query.page : 'unknown';
+        return `/botindex/beacon:${page}`;
+    }
+    if (req.path.endsWith('/polyhacks/beacon')) {
+        const page = typeof req.query.page === 'string' ? req.query.page : 'unknown';
+        return `/polyhacks/beacon:${page}`;
+    }
+    return null;
 }
 function reportConvexLogError(error) {
     const now = Date.now();
