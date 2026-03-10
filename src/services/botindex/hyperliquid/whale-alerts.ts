@@ -4,8 +4,18 @@ const HL_API = 'https://api.hyperliquid.xyz/info';
 
 // Known whale addresses (top traders from Hyperliquid leaderboard)
 // These are public addresses visible on the Hyperliquid explorer
+// Updated: 2026-03-10 - Top traders by 30D PnL with active positions
 const WHALE_ADDRESSES = [
-  '0x7E6B2f5c8A2e60E01F4e7e4dF6F3e0D1b2c3A4d5', // placeholder - will be replaced with real addresses
+  '0xa5b0edf6b55128e0ddae8e51ac538c3188401d41', // $42M account, $187M BTC+ETH longs (the $194M whale from recon)
+  '0x393d0b87ed38fc779fd9611144ae649ba6082109', // #1 30D PnL: +$53M (currently flat/sub-account)
+  '0x488d2a9b70cc18ef66057a48ab3d59da1c59fe08', // #2 30D PnL: +$9.8M (currently flat/sub-account)
+  '0x0c5e5e6554b54d1445c3247ce620c400b8033dd4', // #3 30D PnL: +$8.4M (currently flat/sub-account)
+  '0x179f3d11483dafe616d56b32c4ce2562faabbbbb', // #5 30D PnL: +$7.6M (currently flat/sub-account)
+  '0xe44bd27c9f10fa2f89fdb3ab4b4f0e460da29ea8', // #6 30D PnL: +$6.9M (currently flat/sub-account)
+  '0x87f9cd15f5050a9283b8896300f7c8cf69ece2cf', // #7 30D PnL: +$6.2M (currently flat/sub-account)
+  '0x90b38c5728f184c87ef46479cf7b402d7b98b98a', // #8 30D PnL: +$6.0M (currently flat/sub-account)
+  '0x05cafe987297448f21a3c7ae0ae815fddecac655', // #9 30D PnL: +$5.9M (currently flat/sub-account)
+  '0x85530f0ff6496c72a619f37a60f3c1a59077737f', // #10 30D PnL: +$5.9M (currently flat/sub-account)
 ];
 
 interface WhalePosition {
