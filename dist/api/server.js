@@ -132,11 +132,18 @@ app.use('/api/botindex', (0, anonRateLimit_1.anonRateLimit)([
     '/doppler',
     '/zora',
     '/x402',
+    '/zora/intel',
+    '/hyperliquid/intel',
+    '/crypto/intel',
+    '/doppler/intel',
 ]));
 // Receipt and trust-layer endpoints
 app.use('/api/botindex/receipts', receipts_1.default);
 app.use('/api/botindex/.well-known', receipts_1.default);
 app.get('/api/botindex/trust', receipts_1.trustLayerHandler);
+// Premium Intel endpoints (DeepSeek-powered, $0.05/call)
+const botindex_intel_1 = __importDefault(require("./routes/botindex-intel"));
+app.use('/api/botindex', botindex_intel_1.default);
 // Mount all routes
 app.use('/api', index_1.default);
 // API Documentation
