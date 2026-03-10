@@ -100,15 +100,18 @@ app.use('/api', adminHitsRouter);
 // BotIndex API key auth (runs before free-trial/x402 route middleware)
 app.use('/api/botindex', optionalApiKey);
 
-// Anonymous rate limiting on high-value free endpoints (5 req/hr without API key)
+// Anonymous rate limiting on high-value endpoints (3 req/day without API key, 100/day with free key)
 app.use('/api/botindex', anonRateLimit([
   '/signals',
   '/v1/signals',
   '/v1/sports',
   '/v1/crypto',
+  '/v1/crypto/tokens',
   '/v1/solana',
   '/v1/commerce',
+  '/v1/zora',
   '/hyperliquid',
+  '/doppler',
   '/zora',
   '/x402',
 ]));
