@@ -9,6 +9,7 @@ export type BotIndexApiPlan = 'free' | 'basic' | 'pro';
 export interface ApiKeyLedgerEntry {
   email: string;
   stripeCustomerId?: string;
+  walletAddress?: string;
   plan: BotIndexApiPlan;
   createdAt: string;
   lastUsed: string;
@@ -108,16 +109,26 @@ export function generateApiKey(): string {
   return apiKey;
 }
 
+export function updateApiKeyWallet(apiKey: string, walletAddress: string): boolean {
+  const entry = apiKeyLedger.get(apiKey);
+  if (!entry) return false;
+  entry.walletAddress = walletAddress.toLowerCase();
+  scheduleLedgerFlush();
+  return true;
+}
+
 export function createApiKeyEntry(params: {
   apiKey: string;
   email: string;
   stripeCustomerId?: string;
+  walletAddress?: string;
   plan: BotIndexApiPlan;
 }): ApiKeyLedgerEntry {
   const now = new Date().toISOString();
   const entry: ApiKeyLedgerEntry = {
     email: params.email,
     stripeCustomerId: params.stripeCustomerId,
+    walletAddress: params.walletAddress?.toLowerCase(),
     plan: params.plan,
     createdAt: now,
     lastUsed: now,

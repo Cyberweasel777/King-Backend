@@ -3,6 +3,7 @@ export type BotIndexApiPlan = 'free' | 'basic' | 'pro';
 export interface ApiKeyLedgerEntry {
     email: string;
     stripeCustomerId?: string;
+    walletAddress?: string;
     plan: BotIndexApiPlan;
     createdAt: string;
     lastUsed: string;
@@ -21,10 +22,12 @@ declare global {
     }
 }
 export declare function generateApiKey(): string;
+export declare function updateApiKeyWallet(apiKey: string, walletAddress: string): boolean;
 export declare function createApiKeyEntry(params: {
     apiKey: string;
     email: string;
     stripeCustomerId?: string;
+    walletAddress?: string;
     plan: BotIndexApiPlan;
 }): ApiKeyLedgerEntry;
 export declare function getApiKeyEntry(apiKey: string): ApiKeyLedgerEntry | null;
