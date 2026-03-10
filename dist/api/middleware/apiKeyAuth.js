@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.optionalApiKey = exports.requireApiKey = void 0;
 exports.generateApiKey = generateApiKey;
+exports.updateApiKeyWallet = updateApiKeyWallet;
 exports.createApiKeyEntry = createApiKeyEntry;
 exports.getApiKeyEntry = getApiKeyEntry;
 exports.getAllApiKeys = getAllApiKeys;
@@ -88,11 +89,20 @@ function generateApiKey() {
     }
     return apiKey;
 }
+function updateApiKeyWallet(apiKey, walletAddress) {
+    const entry = apiKeyLedger.get(apiKey);
+    if (!entry)
+        return false;
+    entry.walletAddress = walletAddress.toLowerCase();
+    scheduleLedgerFlush();
+    return true;
+}
 function createApiKeyEntry(params) {
     const now = new Date().toISOString();
     const entry = {
         email: params.email,
         stripeCustomerId: params.stripeCustomerId,
+        walletAddress: params.walletAddress?.toLowerCase(),
         plan: params.plan,
         createdAt: now,
         lastUsed: now,

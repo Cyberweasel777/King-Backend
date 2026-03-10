@@ -9,6 +9,7 @@ import {
   getAllApiKeys,
   getApiKeyEntry,
   requireApiKey,
+  updateApiKeyWallet,
 } from '../middleware/apiKeyAuth';
 import { getFunnelStats, trackFunnelEvent } from '../../services/botindex/conversion-funnel';
 import { sendApiKeyEmail } from '../../services/botindex/key-delivery-email';
@@ -337,6 +338,14 @@ router.get('/info', requireApiKey, (req: Request, res: Response) => {
     requestCount: entry.requestCount,
     createdAt: entry.createdAt,
     status: entry.status,
+    walletConnected: !!entry.walletAddress,
+    walletAddress: entry.walletAddress || null,
+    ...(entry.walletAddress ? {} : {
+      connectWallet: {
+        url: 'https://api.botindex.dev/api/botindex/keys/connect',
+        description: 'Connect your wallet for x402 payments and 10% discount',
+      },
+    }),
   });
 });
 
@@ -404,6 +413,7 @@ router.get('/admin/keys', (req: Request, res: Response) => {
         requests: k.entry.requestCount,
         created: k.entry.createdAt,
         lastUsed: k.entry.lastUsed,
+        wallet: k.entry.walletAddress || null,
       })),
     },
     paid: {
@@ -415,9 +425,166 @@ router.get('/admin/keys', (req: Request, res: Response) => {
         requests: k.entry.requestCount,
         created: k.entry.createdAt,
         lastUsed: k.entry.lastUsed,
+        wallet: k.entry.walletAddress || null,
       })),
     },
   });
+});
+
+// POST /connect-wallet — link a wallet address to an existing API key
+const connectWalletSchema = z.object({
+  wallet: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Must be a valid Ethereum address'),
+});
+
+router.post('/connect-wallet', requireApiKey, async (req: Request, res: Response) => {
+  const auth = req.apiKeyAuth;
+  if (!auth) {
+    res.status(401).json({ error: 'invalid_api_key', message: 'Valid X-API-Key header is required.' });
+    return;
+  }
+
+  const parsed = connectWalletSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'invalid_wallet',
+      message: 'Provide a valid Ethereum wallet address (0x...)',
+    });
+    return;
+  }
+
+  const updated = updateApiKeyWallet(auth.apiKey, parsed.data.wallet);
+  if (!updated) {
+    res.status(404).json({ error: 'key_not_found', message: 'API key not found in ledger.' });
+    return;
+  }
+
+  logger.info({ email: auth.email, wallet: parsed.data.wallet.toLowerCase() }, 'Wallet connected to API key');
+
+  res.json({
+    message: 'Wallet connected successfully.',
+    wallet: parsed.data.wallet.toLowerCase(),
+    benefits: [
+      'x402 direct payment — pay per call without subscription',
+      '10% discount on all x402-paid calls vs Stripe pricing',
+      'On-chain usage receipts (AAR) for every paid call',
+      'Loyalty tier tracking — cumulative spend unlocks perks',
+    ],
+  });
+});
+
+// GET /connect — browser-friendly wallet connect page
+router.get('/connect', (_req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/html');
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BotIndex — Connect Wallet</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #e5e5e5; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 24px; }
+    .card { max-width: 480px; width: 100%; border: 1px solid #27272a; border-radius: 16px; background: #18181b; padding: 32px; }
+    h1 { font-size: 22px; color: #fff; margin-bottom: 8px; }
+    .subtitle { color: #a1a1aa; font-size: 14px; margin-bottom: 24px; }
+    label { display: block; font-size: 13px; color: #a1a1aa; margin-bottom: 6px; margin-top: 16px; }
+    input { width: 100%; padding: 10px 14px; background: #0a0a0a; border: 1px solid #3f3f46; border-radius: 8px; color: #e5e5e5; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; outline: none; }
+    input:focus { border-color: #22d3ee; }
+    .btn { display: block; width: 100%; padding: 12px; margin-top: 20px; background: #22d3ee20; color: #22d3ee; border: 1px solid #22d3ee40; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .btn:hover { background: #22d3ee30; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .or { text-align: center; color: #71717a; font-size: 12px; margin: 16px 0; }
+    .btn-metamask { display: block; width: 100%; padding: 12px; background: #f6851b15; color: #f6851b; border: 1px solid #f6851b40; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .btn-metamask:hover { background: #f6851b30; }
+    .status { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 13px; display: none; }
+    .status.success { display: block; background: #22c55e15; border: 1px solid #22c55e40; color: #4ade80; }
+    .status.error { display: block; background: #ef444415; border: 1px solid #ef444440; color: #f87171; }
+    .benefits { margin-top: 20px; }
+    .benefits h3 { font-size: 13px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+    .benefit { font-size: 13px; color: #a1a1aa; padding: 4px 0; }
+    .benefit::before { content: '✦ '; color: #22d3ee; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Connect Your Wallet</h1>
+    <p class="subtitle">Link your wallet to your BotIndex API key for x402 payments and loyalty perks.</p>
+
+    <label for="apiKey">Your API Key</label>
+    <input type="text" id="apiKey" placeholder="bi_..." autocomplete="off">
+
+    <button class="btn-metamask" onclick="connectMetaMask()" id="mmBtn">Connect with MetaMask</button>
+    <div class="or">or enter manually</div>
+
+    <label for="wallet">Wallet Address</label>
+    <input type="text" id="wallet" placeholder="0x...">
+
+    <button class="btn" onclick="submitWallet()" id="submitBtn">Link Wallet</button>
+    <div class="status" id="status"></div>
+
+    <div class="benefits">
+      <h3>Why connect?</h3>
+      <div class="benefit">Pay per call with x402 — no subscription required</div>
+      <div class="benefit">10% discount vs Stripe on all paid endpoints</div>
+      <div class="benefit">Verifiable on-chain receipts for every call</div>
+      <div class="benefit">Loyalty tier — cumulative spend unlocks perks</div>
+    </div>
+  </div>
+  <script>
+    async function connectMetaMask() {
+      if (!window.ethereum) {
+        showStatus('MetaMask not detected. Install it or enter your wallet address manually.', 'error');
+        return;
+      }
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        if (accounts[0]) {
+          document.getElementById('wallet').value = accounts[0];
+          showStatus('Wallet detected: ' + accounts[0].slice(0, 8) + '...' + accounts[0].slice(-6), 'success');
+        }
+      } catch (e) {
+        showStatus('MetaMask connection cancelled.', 'error');
+      }
+    }
+
+    async function submitWallet() {
+      const apiKey = document.getElementById('apiKey').value.trim();
+      const wallet = document.getElementById('wallet').value.trim();
+      if (!apiKey || !wallet) {
+        showStatus('Please enter both your API key and wallet address.', 'error');
+        return;
+      }
+      if (!/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
+        showStatus('Invalid wallet address format.', 'error');
+        return;
+      }
+      document.getElementById('submitBtn').disabled = true;
+      try {
+        const res = await fetch('/api/botindex/keys/connect-wallet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+          body: JSON.stringify({ wallet }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showStatus('Wallet connected! You can now use x402 payments.', 'success');
+        } else {
+          showStatus(data.message || 'Failed to connect wallet.', 'error');
+        }
+      } catch (e) {
+        showStatus('Network error. Try again.', 'error');
+      }
+      document.getElementById('submitBtn').disabled = false;
+    }
+
+    function showStatus(msg, type) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = 'status ' + type;
+    }
+  </script>
+</body>
+</html>`);
 });
 
 router.get('/cancel', (_req: Request, res: Response) => {

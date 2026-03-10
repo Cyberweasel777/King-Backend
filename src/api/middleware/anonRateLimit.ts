@@ -95,15 +95,27 @@ export function anonRateLimit(paths: string[]): RequestHandler {
       res.status(429).json({
         error: 'rate_limited',
         message: `Anonymous access is limited to ${ANON_DAILY_LIMIT} requests per day. Register a free API key for 100 requests/day.`,
-        register: {
-          url: 'https://king-backend.fly.dev/api/botindex/keys/register',
-          method: 'POST',
-          body: '{ "email": "you@example.com" }',
-          limits: {
-            anonymous: `${ANON_DAILY_LIMIT} req/day`,
-            free_api_key: '100 req/day',
-            pro: 'Unlimited',
+        upgrade: {
+          free_key: {
+            url: 'https://api.botindex.dev/api/botindex/keys/register?plan=free',
+            method: 'GET',
+            description: 'Free API key — 100 req/day, no credit card',
           },
+          pro_stripe: {
+            url: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
+            method: 'GET',
+            description: 'Pro plan — unlimited requests, $29/mo via Stripe',
+          },
+          x402_wallet: {
+            url: 'https://api.botindex.dev/api/botindex/keys/connect',
+            description: 'Pay per call with crypto wallet — 10% cheaper, no subscription',
+          },
+        },
+        limits: {
+          anonymous: `${ANON_DAILY_LIMIT} req/day`,
+          free_api_key: '100 req/day',
+          pro: 'Unlimited',
+          x402: 'Pay per call (no limit)',
         },
         retryAfterSeconds,
       });
