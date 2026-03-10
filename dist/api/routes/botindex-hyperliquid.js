@@ -8,6 +8,7 @@ const x402Gate_1 = require("../middleware/x402Gate");
 const logger_1 = __importDefault(require("../../config/logger"));
 const funding_arb_1 = require("../../services/botindex/hyperliquid/funding-arb");
 const correlation_1 = require("../../services/botindex/hyperliquid/correlation");
+const whale_alerts_1 = require("../../services/botindex/hyperliquid/whale-alerts");
 const liquidations_1 = require("../../services/botindex/hyperliquid/liquidations");
 const hip6_1 = require("../../services/botindex/hyperliquid/hip6");
 const router = (0, express_1.Router)();
@@ -168,6 +169,61 @@ router.get('/hyperliquid/hip6/launch-candidates', (0, x402Gate_1.createX402Gate)
         logger_1.default.error({ err: error }, 'Failed to fetch HIP-6 launch candidates');
         res.status(500).json({
             error: 'hyperliquid_hip6_launch_candidates_failed',
+            message: error instanceof Error ? error.message : 'Unknown error',
+            metadata: METADATA,
+        });
+    }
+});
+// --- Whale Alerts ---
+router.get('/hyperliquid/whale-alerts', async (_req, res) => {
+    try {
+        const data = await (0, whale_alerts_1.getHyperliquidWhaleAlerts)();
+        res.json({
+            summary: {
+                totalTrackedValue: data.totalTrackedValue,
+                whalesTracked: data.whalesTracked,
+                topPositions: data.topPositions.slice(0, 3).map(p => ({
+                    coin: p.coin,
+                    side: p.side,
+                    positionValue: p.positionValue,
+                    leverage: p.leverage,
+                })),
+                recentTradeCount: data.recentLargeTrades.length,
+            },
+            upgrade: 'Full whale data requires API key or x402 payment. GET /api/botindex/hyperliquid/whale-alerts/full',
+            timestamp: data.timestamp,
+            metadata: {
+                ...METADATA,
+                endpoint: '/botindex/hyperliquid/whale-alerts',
+                price: 'free (summary)',
+            },
+        });
+    }
+    catch (error) {
+        logger_1.default.error({ err: error }, 'Failed to fetch Hyperliquid whale alerts');
+        res.status(500).json({
+            error: 'hyperliquid_whale_alerts_failed',
+            message: error instanceof Error ? error.message : 'Unknown error',
+            metadata: METADATA,
+        });
+    }
+});
+router.get('/hyperliquid/whale-alerts/full', (0, x402Gate_1.createX402Gate)({ price: '$0.05', description: 'Full Hyperliquid whale positions + recent large trades (0.05 USDC)' }), async (_req, res) => {
+    try {
+        const data = await (0, whale_alerts_1.getHyperliquidWhaleAlerts)();
+        res.json({
+            ...data,
+            metadata: {
+                ...METADATA,
+                endpoint: '/botindex/hyperliquid/whale-alerts/full',
+                price: '$0.05',
+            },
+        });
+    }
+    catch (error) {
+        logger_1.default.error({ err: error }, 'Failed to fetch Hyperliquid whale alerts (full)');
+        res.status(500).json({
+            error: 'hyperliquid_whale_alerts_full_failed',
             message: error instanceof Error ? error.message : 'Unknown error',
             metadata: METADATA,
         });
