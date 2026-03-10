@@ -14,8 +14,11 @@ import type { RequestHandler } from 'express';
  *
  * On pass-through, sets __freeTrialAuthenticated = true so downstream
  * x402 gates don't block the request.
+ *
+ * @param paths - Paths to rate limit
+ * @param exclude - Specific sub-paths to exclude (for x402-paid endpoints)
  */
-export declare function anonRateLimit(paths: string[]): RequestHandler;
+export declare function anonRateLimit(paths: string[], exclude?: string[]): RequestHandler;
 /** Get rate limit stats for admin/monitoring */
 export declare function getAnonRateLimitStats(): {
     anonDailyLimit: number;

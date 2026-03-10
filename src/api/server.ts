@@ -101,6 +101,7 @@ app.use('/api', adminHitsRouter);
 app.use('/api/botindex', optionalApiKey);
 
 // Anonymous rate limiting on high-value endpoints (3 req/day without API key, 100/day with free key)
+// Excludes x402-paid endpoints — those handle access control via payment gates
 app.use('/api/botindex', anonRateLimit([
   '/signals',
   '/v1/signals',
@@ -118,6 +119,12 @@ app.use('/api/botindex', anonRateLimit([
   '/hyperliquid/intel',
   '/crypto/intel',
   '/doppler/intel',
+], [
+  '/hyperliquid/funding-arb',
+  '/hyperliquid/correlation-matrix',
+  '/hyperliquid/liquidation-heatmap',
+  '/hyperliquid/hip6/launch-candidates',
+  '/hyperliquid/whale-alerts/full',
 ]));
 
 // Receipt and trust-layer endpoints

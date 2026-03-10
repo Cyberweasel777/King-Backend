@@ -40,9 +40,13 @@ function getClientIp(req) {
  *
  * On pass-through, sets __freeTrialAuthenticated = true so downstream
  * x402 gates don't block the request.
+ *
+ * @param paths - Paths to rate limit
+ * @param exclude - Specific sub-paths to exclude (for x402-paid endpoints)
  */
-function anonRateLimit(paths) {
+function anonRateLimit(paths, exclude = []) {
     const pathSet = new Set(paths);
+    const excludeSet = new Set(exclude);
     return (req, res, next) => {
         // Skip if authenticated via API key
         if (req.apiKeyAuth) {
@@ -51,6 +55,11 @@ function anonRateLimit(paths) {
         }
         // Skip if free trial authenticated (wallet-based)
         if (req.__freeTrialAuthenticated) {
+            next();
+            return;
+        }
+        // Skip excluded paths (x402-paid endpoints handle their own access control)
+        if (excludeSet.has(req.path) || Array.from(excludeSet).some(p => req.path.startsWith(p))) {
             next();
             return;
         }

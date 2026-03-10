@@ -119,6 +119,7 @@ app.use('/api', admin_hits_1.default);
 // BotIndex API key auth (runs before free-trial/x402 route middleware)
 app.use('/api/botindex', apiKeyAuth_1.optionalApiKey);
 // Anonymous rate limiting on high-value endpoints (3 req/day without API key, 100/day with free key)
+// Excludes x402-paid endpoints — those handle access control via payment gates
 app.use('/api/botindex', (0, anonRateLimit_1.anonRateLimit)([
     '/signals',
     '/v1/signals',
@@ -136,6 +137,12 @@ app.use('/api/botindex', (0, anonRateLimit_1.anonRateLimit)([
     '/hyperliquid/intel',
     '/crypto/intel',
     '/doppler/intel',
+], [
+    '/hyperliquid/funding-arb',
+    '/hyperliquid/correlation-matrix',
+    '/hyperliquid/liquidation-heatmap',
+    '/hyperliquid/hip6/launch-candidates',
+    '/hyperliquid/whale-alerts/full',
 ]));
 // Receipt and trust-layer endpoints
 app.use('/api/botindex/receipts', receipts_1.default);
