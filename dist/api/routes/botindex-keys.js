@@ -117,14 +117,30 @@ router.get('/register', async (req, res) => {
     <div class="key-box" id="keyBox" onclick="copyKey()">${apiKey}</div>
     <div class="warning">⚠️ Save this key now. It won't be shown again.</div>
     <div class="next-steps">
-      <h2>Quick Start</h2>
+      <h2>Try it now — paste any command</h2>
       <div class="step">
-        <strong>Test it:</strong><br>
+        <strong>🐋 Whale Alerts</strong> — $187M+ in tracked positions<br>
+        <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/hyperliquid/whale-alerts</code>
+      </div>
+      <div class="step">
+        <strong>📊 Market Signals</strong> — correlations, arb, heatmaps<br>
         <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/v1/signals</code>
       </div>
       <div class="step">
-        <strong>MCP Config:</strong><br>
-        <code>{ "env": { "BOTINDEX_API_KEY": "${apiKey}" } }</code>
+        <strong>💰 Funding Arb</strong> — cross-exchange rate discrepancies<br>
+        <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/hyperliquid/funding-arb</code>
+      </div>
+      <div class="step">
+        <strong>🔥 Zora Trending</strong> — attention market momentum<br>
+        <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/zora/trending-coins</code>
+      </div>
+      <div class="step">
+        <strong>🗺️ All 29 Endpoints</strong> — full API catalog<br>
+        <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/v1/</code>
+      </div>
+      <div class="step">
+        <strong>MCP Setup:</strong> <code>npx botindex-mcp-server</code><br>
+        Config: <code>{ "env": { "BOTINDEX_API_KEY": "${apiKey}" } }</code>
       </div>
     </div>
     <div class="links">
@@ -147,18 +163,45 @@ router.get('/register', async (req, res) => {
             res.json({
                 key: apiKey,
                 plan: 'free',
-                rateLimit: '3 req/hr',
-                message: "Free tier API key. Save this - it won't be shown again.",
-                tryItNow: {
-                    curl: `curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/v1/signals`,
-                    docs: 'https://api.botindex.dev/docs',
-                    quickstart: '1. Copy the curl command above\n2. Paste in your terminal\n3. You\'re in',
+                rateLimit: '100 req/day',
+                message: "Your API key is ready. Copy a command below and paste it in your terminal — you'll get live data in 2 seconds.",
+                quickstart: {
+                    step_1: 'Copy any curl command below and paste it in your terminal',
+                    step_2: 'Add the X-API-Key header to all requests',
+                    step_3: 'Explore all 29 tools at the discovery endpoint',
                 },
-                nextSteps: [
-                    { endpoint: '/api/botindex/v1/signals', description: 'Live market signals' },
-                    { endpoint: '/api/botindex/hyperliquid/funding-arb', description: 'Funding rate arbitrage opportunities' },
-                    { endpoint: '/api/botindex/hyperliquid/hip6/feed-history', description: 'HIP-6 launch candidate feed history' },
-                ],
+                try_now: {
+                    whale_alerts: {
+                        description: '🐋 Hyperliquid whale positions ($187M+ tracked)',
+                        curl: `curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/hyperliquid/whale-alerts`,
+                    },
+                    market_signals: {
+                        description: '📊 Aggregated premium signals — correlations, arb, heatmaps',
+                        curl: `curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/v1/signals`,
+                    },
+                    funding_arb: {
+                        description: '💰 Hyperliquid funding rate arbitrage opportunities',
+                        curl: `curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/hyperliquid/funding-arb`,
+                    },
+                    zora_trending: {
+                        description: '🔥 Trending Zora attention market coins',
+                        curl: `curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/zora/trending-coins`,
+                    },
+                    discover_all: {
+                        description: '🗺️ Full API catalog — all 29 endpoints with pricing',
+                        curl: `curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/v1/`,
+                    },
+                },
+                mcp_setup: {
+                    npm: 'npx botindex-mcp-server',
+                    config: `{ "env": { "BOTINDEX_API_KEY": "${apiKey}" } }`,
+                    smithery: 'https://smithery.ai/server/botindex',
+                },
+                upgrade: {
+                    pro: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
+                    x402: 'Pay per call with crypto — no subscription needed',
+                },
+                docs: 'https://botindex.dev',
             });
             return;
         }
