@@ -144,6 +144,9 @@ app.get('/api/botindex/trust', receipts_1.trustLayerHandler);
 // Premium Intel endpoints (DeepSeek-powered, $0.05/call)
 const botindex_intel_1 = __importDefault(require("./routes/botindex-intel"));
 app.use('/api/botindex', botindex_intel_1.default);
+// MCP Streamable HTTP transport (for Smithery + remote MCP clients)
+const mcp_transport_1 = __importDefault(require("./routes/mcp-transport"));
+app.use('/api/botindex', mcp_transport_1.default);
 // Mount all routes
 app.use('/api', index_1.default);
 // API Documentation
