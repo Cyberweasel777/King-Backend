@@ -1,12 +1,18 @@
-# Single-stage: pre-built dist checked in or built locally
+# Two-stage: build TypeScript, then run
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+COPY package*.json tsconfig.json ./
+RUN npm ci
+COPY src/ ./src/
+RUN npx tsc
+
 FROM node:20-alpine
 
 WORKDIR /app
-
 COPY package*.json ./
 RUN npm ci --only=production
-
-COPY dist/ ./dist/
+COPY --from=builder /app/dist/ ./dist/
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
