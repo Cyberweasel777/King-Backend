@@ -12,7 +12,7 @@ class ConvexHttpPaymentStore {
         const response = await fetch(`${this.url}/api/${kind}`, {
             method: 'POST',
             headers: {
-                Authorization: `Bearer ${this.adminKey}`,
+                Authorization: `Convex ${this.adminKey}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ path, args }),

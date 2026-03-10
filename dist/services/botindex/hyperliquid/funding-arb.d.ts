@@ -8,6 +8,7 @@ export type FundingArbOpportunity = {
 };
 export type FundingArbResponse = {
     opportunities: FundingArbOpportunity[];
+    note?: string;
 };
 export declare function getFundingArbOpportunities(): Promise<FundingArbResponse>;
 //# sourceMappingURL=funding-arb.d.ts.map
