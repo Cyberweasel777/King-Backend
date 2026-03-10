@@ -47,9 +47,6 @@ app.use('/.well-known', wellKnownRouter);
 // MCP Streamable HTTP transport (no auth — Smithery handles auth)
 app.use('/mcp', mcpRouter);
 
-// MCP Tool Catalog — for dynamic tool discovery by MCP servers
-app.use('/api/botindex', mcpCatalogRouter);
-
 // Health check
 app.get('/health', async (req, res) => {
   res.json({ 
@@ -72,6 +69,9 @@ const BEACON_PIXEL = Buffer.from(
   'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
   'base64'
 );
+
+// MCP Tool Catalog — for dynamic tool discovery by MCP servers (public, no auth)
+app.use('/api/botindex', mcpCatalogRouter);
 
 // BotIndex beacon
 app.get('/api/botindex/beacon', (req, res) => {

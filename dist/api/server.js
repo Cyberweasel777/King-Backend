@@ -76,8 +76,6 @@ app.use(express_1.default.json({ limit: '10mb' }));
 app.use('/.well-known', well_known_1.default);
 // MCP Streamable HTTP transport (no auth — Smithery handles auth)
 app.use('/mcp', mcp_1.default);
-// MCP Tool Catalog — for dynamic tool discovery by MCP servers
-app.use('/api/botindex', mcp_catalog_1.default);
 // Health check
 app.get('/health', async (req, res) => {
     res.json({
@@ -95,6 +93,8 @@ app.get('/health', async (req, res) => {
 app.use(hitCounter_1.hitCounter);
 // Landing page beacons (public, no auth — must be before ALL other middleware)
 const BEACON_PIXEL = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+// MCP Tool Catalog — for dynamic tool discovery by MCP servers (public, no auth)
+app.use('/api/botindex', mcp_catalog_1.default);
 // BotIndex beacon
 app.get('/api/botindex/beacon', (req, res) => {
     res.set({
