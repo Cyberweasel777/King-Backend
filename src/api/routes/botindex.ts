@@ -20,8 +20,8 @@ import { optionalApiKey } from '../middleware/apiKeyAuth';
 
 const router = Router();
 let x402RouteMounted = false;
-const BASIC_API_KEY_HOURLY_LIMIT = 10;
-const BASIC_API_KEY_WINDOW_MS = 60 * 60 * 1000;
+const BASIC_API_KEY_DAILY_LIMIT = 100;
+const BASIC_API_KEY_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 const basicApiKeyQuota = new Map<string, { windowStartMs: number; count: number }>();
 
 function consumeBasicApiKeyQuota(apiKey: string): { allowed: boolean; remaining: number; retryAfterSeconds: number } {
@@ -29,10 +29,10 @@ function consumeBasicApiKeyQuota(apiKey: string): { allowed: boolean; remaining:
   const current = basicApiKeyQuota.get(apiKey);
   if (!current || now - current.windowStartMs >= BASIC_API_KEY_WINDOW_MS) {
     basicApiKeyQuota.set(apiKey, { windowStartMs: now, count: 1 });
-    return { allowed: true, remaining: BASIC_API_KEY_HOURLY_LIMIT - 1, retryAfterSeconds: 0 };
+    return { allowed: true, remaining: BASIC_API_KEY_DAILY_LIMIT - 1, retryAfterSeconds: 0 };
   }
 
-  if (current.count >= BASIC_API_KEY_HOURLY_LIMIT) {
+  if (current.count >= BASIC_API_KEY_DAILY_LIMIT) {
     const elapsedMs = now - current.windowStartMs;
     const retryAfterSeconds = Math.max(1, Math.ceil((BASIC_API_KEY_WINDOW_MS - elapsedMs) / 1000));
     return { allowed: false, remaining: 0, retryAfterSeconds };
@@ -42,7 +42,7 @@ function consumeBasicApiKeyQuota(apiKey: string): { allowed: boolean; remaining:
   basicApiKeyQuota.set(apiKey, current);
   return {
     allowed: true,
-    remaining: Math.max(0, BASIC_API_KEY_HOURLY_LIMIT - current.count),
+    remaining: Math.max(0, BASIC_API_KEY_DAILY_LIMIT - current.count),
     retryAfterSeconds: 0,
   };
 }
@@ -70,7 +70,8 @@ export function mountBotindexX402TestRoute(): void {
         res.setHeader('Retry-After', String(quota.retryAfterSeconds));
         res.status(429).json({
           error: 'api_key_rate_limited',
-          message: `Basic plan API key limit reached (${BASIC_API_KEY_HOURLY_LIMIT}/hour) for this endpoint.`,
+          message: `Free API key limit reached (${BASIC_API_KEY_DAILY_LIMIT}/day). Upgrade to Pro for unlimited access.`,
+          upgrade: { pricing: { pro: '$29/mo (unlimited)' } },
         });
         return;
       }
@@ -198,9 +199,9 @@ router.get('/signals', async (req, res) => {
         source: 'generated',
         truncated: true,
         upgrade: {
-          message: `${merged.length - 3} more signals available with an API key.`,
+          message: `${merged.length - 3} more signals available. Register a free API key for full access (100 req/day).`,
           register: 'https://king-backend.fly.dev/api/botindex/keys/register',
-          pricing: { basic: '$9/mo (10 req/hr)', pro: '$29/mo (unlimited)' },
+          limits: { anonymous: '3 req/day', free_api_key: '100 req/day', pro: 'Unlimited ($29/mo)' },
         },
       });
       return;
