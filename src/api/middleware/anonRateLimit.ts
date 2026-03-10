@@ -81,68 +81,29 @@ export function anonRateLimit(paths: string[], exclude: string[] = []): RequestH
     }
 
     const ip = getClientIp(req);
-    const now = Date.now();
 
-    let entry = ipWindows.get(ip);
-    if (!entry || now - entry.windowStartMs >= WINDOW_MS) {
-      entry = { windowStartMs: now, count: 0 };
-      ipWindows.set(ip, entry);
-    }
+    logger.info({ ip, path: req.path, isAnon: true }, 'Anonymous request blocked — API key required');
 
-    entry.count++;
-
-    if (entry.count > ANON_DAILY_LIMIT) {
-      const elapsedMs = now - entry.windowStartMs;
-      const retryAfterSeconds = Math.max(1, Math.ceil((WINDOW_MS - elapsedMs) / 1000));
-
-      res.setHeader('Retry-After', String(retryAfterSeconds));
-      res.setHeader('X-BotIndex-Rate-Limit', String(ANON_DAILY_LIMIT));
-      res.setHeader('X-BotIndex-Rate-Remaining', '0');
-      res.setHeader('X-BotIndex-Hint', 'Register a free API key for 100 req/day: POST /api/botindex/keys/register');
-
-      logger.info({ ip, count: entry.count, path: req.path }, 'Anon daily rate limit hit');
-
-      res.status(429).json({
-        error: 'rate_limited',
-        message: `Anonymous access is limited to ${ANON_DAILY_LIMIT} requests per day. Register a free API key for 100 requests/day.`,
-        upgrade: {
-          free_key: {
-            url: 'https://api.botindex.dev/api/botindex/keys/register?plan=free',
-            method: 'GET',
-            description: 'Free API key — 100 req/day, no credit card',
-          },
-          pro_stripe: {
-            url: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
-            method: 'GET',
-            description: 'Pro plan — unlimited requests, $29/mo via Stripe',
-          },
-          x402_wallet: {
-            url: 'https://api.botindex.dev/api/botindex/keys/connect',
-            description: 'Pay per call with crypto wallet — 10% cheaper, no subscription',
-          },
+    res.status(401).json({
+      error: 'api_key_required',
+      message: 'An API key is required to access BotIndex endpoints. Get one free in 10 seconds — no credit card needed.',
+      get_key: {
+        url: 'https://api.botindex.dev/api/botindex/keys/register?plan=free',
+        method: 'GET',
+        description: 'Free API key — 100 req/day, instant activation. Copy a curl command from the response and you are live.',
+      },
+      upgrade: {
+        pro: {
+          url: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
+          description: 'Pro plan — unlimited requests, $29/mo via Stripe',
         },
-        limits: {
-          anonymous: `${ANON_DAILY_LIMIT} req/day`,
-          free_api_key: '100 req/day',
-          pro: 'Unlimited',
-          x402: 'Pay per call (no limit)',
+        x402: {
+          url: 'https://api.botindex.dev/api/botindex/keys/connect',
+          description: 'Pay per call with crypto — no subscription, no key needed',
         },
-        retryAfterSeconds,
-      });
-      return;
-    }
-
-    const remaining = Math.max(0, ANON_DAILY_LIMIT - entry.count);
-    res.setHeader('X-BotIndex-Rate-Limit', String(ANON_DAILY_LIMIT));
-    res.setHeader('X-BotIndex-Rate-Remaining', String(remaining));
-    res.setHeader('X-BotIndex-Hint', 'Register a free API key for 100 req/day: POST /api/botindex/keys/register');
-
-    // Signal downstream x402 gates that this anonymous request is allowed through
-    (req as any).__freeTrialAuthenticated = true;
-
-    logger.info({ ip, path: req.path, remaining, isAnon: true }, 'Anonymous API request');
-
-    next();
+      },
+      header: 'X-API-Key: <your-key>',
+    });
   };
 }
 
