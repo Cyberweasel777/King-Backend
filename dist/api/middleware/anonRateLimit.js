@@ -75,7 +75,7 @@ function anonRateLimit(paths) {
             res.setHeader('Retry-After', String(retryAfterSeconds));
             res.setHeader('X-BotIndex-Rate-Limit', String(ANON_DAILY_LIMIT));
             res.setHeader('X-BotIndex-Rate-Remaining', '0');
-            res.setHeader('X-BotIndex-Hint', 'Register a free API key for 100 req/day → POST /api/botindex/keys/register');
+            res.setHeader('X-BotIndex-Hint', 'Register a free API key for 100 req/day: POST /api/botindex/keys/register');
             logger_1.default.info({ ip, count: entry.count, path: req.path }, 'Anon daily rate limit hit');
             res.status(429).json({
                 error: 'rate_limited',
@@ -97,7 +97,7 @@ function anonRateLimit(paths) {
         const remaining = Math.max(0, ANON_DAILY_LIMIT - entry.count);
         res.setHeader('X-BotIndex-Rate-Limit', String(ANON_DAILY_LIMIT));
         res.setHeader('X-BotIndex-Rate-Remaining', String(remaining));
-        res.setHeader('X-BotIndex-Hint', 'Register a free API key for 100 req/day → POST /api/botindex/keys/register');
+        res.setHeader('X-BotIndex-Hint', 'Register a free API key for 100 req/day: POST /api/botindex/keys/register');
         // Signal downstream x402 gates that this anonymous request is allowed through
         req.__freeTrialAuthenticated = true;
         logger_1.default.info({ ip, path: req.path, remaining, isAnon: true }, 'Anonymous API request');
