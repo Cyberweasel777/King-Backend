@@ -129,6 +129,10 @@ app.get('/api/botindex/trust', trustLayerHandler);
 import botindexIntelRouter from './routes/botindex-intel';
 app.use('/api/botindex', botindexIntelRouter);
 
+// MCP Streamable HTTP transport (for Smithery + remote MCP clients)
+import mcpTransportRouter from './routes/mcp-transport';
+app.use('/api/botindex', mcpTransportRouter);
+
 // Mount all routes
 app.use('/api', routes);
 
