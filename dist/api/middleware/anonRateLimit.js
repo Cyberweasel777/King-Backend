@@ -5,7 +5,8 @@
  * Limits unauthenticated requests by IP to push visitors toward
  * API key registration. Authenticated requests (API key or x402) bypass.
  *
- * Default: 3 requests per hour per IP on gated endpoints.
+ * Default: 3 requests per DAY per IP on gated endpoints.
+ * Free API key: 100 req/day (handled in botindex routes).
  */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -14,10 +15,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.anonRateLimit = anonRateLimit;
 exports.getAnonRateLimitStats = getAnonRateLimitStats;
 const logger_1 = __importDefault(require("../../config/logger"));
-const ANON_HOURLY_LIMIT = parseInt(process.env.ANON_RATE_LIMIT || '3', 10);
-const WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const ANON_DAILY_LIMIT = parseInt(process.env.ANON_RATE_LIMIT || '3', 10);
+const WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 const ipWindows = new Map();
-// Cleanup stale entries every 10 minutes
+// Cleanup stale entries every 30 minutes
 setInterval(() => {
     const now = Date.now();
     for (const [ip, entry] of ipWindows.entries()) {
@@ -25,7 +26,7 @@ setInterval(() => {
             ipWindows.delete(ip);
         }
     }
-}, 10 * 60 * 1000);
+}, 30 * 60 * 1000);
 function getClientIp(req) {
     const forwarded = req.headers['x-forwarded-for'];
     if (typeof forwarded === 'string') {
@@ -36,6 +37,9 @@ function getClientIp(req) {
 /**
  * Rate limit anonymous requests. Place AFTER optionalApiKey middleware.
  * If req.apiKeyAuth is set, or __freeTrialAuthenticated is true, skip.
+ *
+ * On pass-through, sets __freeTrialAuthenticated = true so downstream
+ * x402 gates don't block the request.
  */
 function anonRateLimit(paths) {
     const pathSet = new Set(paths);
@@ -65,32 +69,38 @@ function anonRateLimit(paths) {
             ipWindows.set(ip, entry);
         }
         entry.count++;
-        if (entry.count > ANON_HOURLY_LIMIT) {
+        if (entry.count > ANON_DAILY_LIMIT) {
             const elapsedMs = now - entry.windowStartMs;
             const retryAfterSeconds = Math.max(1, Math.ceil((WINDOW_MS - elapsedMs) / 1000));
             res.setHeader('Retry-After', String(retryAfterSeconds));
-            res.setHeader('X-BotIndex-Rate-Limit', String(ANON_HOURLY_LIMIT));
+            res.setHeader('X-BotIndex-Rate-Limit', String(ANON_DAILY_LIMIT));
             res.setHeader('X-BotIndex-Rate-Remaining', '0');
-            logger_1.default.info({ ip, count: entry.count, path: req.path }, 'Anon rate limit hit');
+            res.setHeader('X-BotIndex-Hint', 'Register a free API key for 100 req/day → POST /api/botindex/keys/register');
+            logger_1.default.info({ ip, count: entry.count, path: req.path }, 'Anon daily rate limit hit');
             res.status(429).json({
                 error: 'rate_limited',
-                message: `Free anonymous access is limited to ${ANON_HOURLY_LIMIT} requests per hour. Register for an API key for higher limits.`,
+                message: `Anonymous access is limited to ${ANON_DAILY_LIMIT} requests per day. Register a free API key for 100 requests/day.`,
                 register: {
-                    url: 'https://api.botindex.dev/api/botindex/keys/register',
+                    url: 'https://king-backend.fly.dev/api/botindex/keys/register',
                     method: 'POST',
-                    body: '{ "email": "you@example.com", "plan": "basic" }',
-                    plans: {
-                        basic: 'API key with 10 req/hr on premium endpoints',
-                        pro: 'Unlimited API key access to all endpoints',
+                    body: '{ "email": "you@example.com" }',
+                    limits: {
+                        anonymous: `${ANON_DAILY_LIMIT} req/day`,
+                        free_api_key: '100 req/day',
+                        pro: 'Unlimited',
                     },
                 },
                 retryAfterSeconds,
             });
             return;
         }
-        const remaining = Math.max(0, ANON_HOURLY_LIMIT - entry.count);
-        res.setHeader('X-BotIndex-Rate-Limit', String(ANON_HOURLY_LIMIT));
+        const remaining = Math.max(0, ANON_DAILY_LIMIT - entry.count);
+        res.setHeader('X-BotIndex-Rate-Limit', String(ANON_DAILY_LIMIT));
         res.setHeader('X-BotIndex-Rate-Remaining', String(remaining));
+        res.setHeader('X-BotIndex-Hint', 'Register a free API key for 100 req/day → POST /api/botindex/keys/register');
+        // Signal downstream x402 gates that this anonymous request is allowed through
+        req.__freeTrialAuthenticated = true;
+        logger_1.default.info({ ip, path: req.path, remaining, isAnon: true }, 'Anonymous API request');
         next();
     };
 }
@@ -102,10 +112,10 @@ function getAnonRateLimitStats() {
     for (const [, entry] of ipWindows.entries()) {
         if (now - entry.windowStartMs < WINDOW_MS) {
             activeIps++;
-            if (entry.count > ANON_HOURLY_LIMIT)
+            if (entry.count > ANON_DAILY_LIMIT)
                 limitedIps++;
         }
     }
-    return { anonHourlyLimit: ANON_HOURLY_LIMIT, activeIps, limitedIps };
+    return { anonDailyLimit: ANON_DAILY_LIMIT, activeIps, limitedIps };
 }
 //# sourceMappingURL=anonRateLimit.js.map
