@@ -19,6 +19,7 @@ import { anonRateLimit } from './middleware/anonRateLimit';
 import { getX402RuntimeConfig } from './middleware/x402Gate';
 import { initReceiptSigning, receiptMiddleware } from './middleware/receiptMiddleware';
 import mcpRouter from './routes/mcp';
+import mcpCatalogRouter from './routes/mcp-catalog';
 import docsRouter from './routes/docs';
 import { initDb } from '../shared/payments/database';
 import logger from '../config/logger';
@@ -45,6 +46,9 @@ app.use('/.well-known', wellKnownRouter);
 
 // MCP Streamable HTTP transport (no auth — Smithery handles auth)
 app.use('/mcp', mcpRouter);
+
+// MCP Tool Catalog — for dynamic tool discovery by MCP servers
+app.use('/api/botindex', mcpCatalogRouter);
 
 // Health check
 app.get('/health', async (req, res) => {

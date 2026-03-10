@@ -56,6 +56,7 @@ const anonRateLimit_1 = require("./middleware/anonRateLimit");
 const x402Gate_1 = require("./middleware/x402Gate");
 const receiptMiddleware_1 = require("./middleware/receiptMiddleware");
 const mcp_1 = __importDefault(require("./routes/mcp"));
+const mcp_catalog_1 = __importDefault(require("./routes/mcp-catalog"));
 const docs_1 = __importDefault(require("./routes/docs"));
 const database_1 = require("../shared/payments/database");
 const logger_1 = __importDefault(require("../config/logger"));
@@ -75,6 +76,8 @@ app.use(express_1.default.json({ limit: '10mb' }));
 app.use('/.well-known', well_known_1.default);
 // MCP Streamable HTTP transport (no auth — Smithery handles auth)
 app.use('/mcp', mcp_1.default);
+// MCP Tool Catalog — for dynamic tool discovery by MCP servers
+app.use('/api/botindex', mcp_catalog_1.default);
 // Health check
 app.get('/health', async (req, res) => {
     res.json({
