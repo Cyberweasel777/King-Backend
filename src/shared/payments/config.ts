@@ -22,6 +22,7 @@ const APP_ENV_PREFIXES: Record<AppId, string> = {
   socialindex: 'SOCIALINDEX',
   botindex: 'BOTINDEX',
   arbwatch: 'ARBWATCH',
+  baseradar: 'BASERADAR',
 };
 
 export function getStripeSecretKey(appId: AppId): string | undefined {

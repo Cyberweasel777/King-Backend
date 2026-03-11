@@ -15,7 +15,7 @@ import { isStripeConfigured } from '../../shared/payments/config';
 
 const router = Router();
 
-const CANARY_APPS: AppId[] = ['botindex', 'memeradar', 'arbwatch', 'spreadhunter', 'rosterradar'];
+const CANARY_APPS: AppId[] = ['botindex', 'memeradar', 'arbwatch', 'spreadhunter', 'rosterradar', 'baseradar'];
 
 function getExternalUserId(req: Request): string | null {
   const h = req.header('x-external-user-id');

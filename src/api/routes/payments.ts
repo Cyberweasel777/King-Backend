@@ -43,7 +43,8 @@ const extractAppId = (req: Request, res: Response, next: Function) => {
   const validApps: AppId[] = [
     'spreadhunter', 'deckvault', 'packpal', 'dropfarm', 'dropscout',
     'launchradar', 'memeradar', 'memestock', 'nftpulse', 'pointtrack',
-    'rosterradar', 'skinsignal', 'socialindex', 'botindex', 'arbwatch'
+    'rosterradar', 'skinsignal', 'socialindex', 'botindex', 'arbwatch',
+    'baseradar'
   ];
   
   if (!validApps.includes(appId)) {

@@ -17,7 +17,8 @@ export type AppId =
   | 'skinsignal'
   | 'socialindex'
   | 'botindex'
-  | 'arbwatch';
+  | 'arbwatch'
+  | 'baseradar';
 
 export type SubscriptionTier = 'free' | 'starter' | 'basic' | 'pro' | 'elite' | 'enterprise';
 export type SubscriptionStatus = 'active' | 'inactive' | 'past_due' | 'canceled' | 'trialing';
