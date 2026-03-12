@@ -8,6 +8,7 @@
 import { Router, type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { logger } from '../../utils/logger';
 
 const MCP_SESSION_HEADER = 'mcp-session-id';
 const BASE_URL = process.env.BOTINDEX_URL || 'https://king-backend.fly.dev/api/botindex/v1';
@@ -31,7 +32,7 @@ async function loadSdk(): Promise<boolean> {
     sdkLoaded = true;
     return true;
   } catch (err) {
-    console.error('Failed to load MCP SDK:', err);
+    logger.error({ err }, 'Failed to load MCP SDK');
     return false;
   }
 }
@@ -169,7 +170,7 @@ mcpRouter.post('/', async (req: Request, res: Response) => {
     await transport.handleRequest(req, res, req.body);
     if (!transport.sessionId) await server.close();
   } catch (err) {
-    console.error('MCP POST error:', err);
+    logger.error({ err }, 'MCP POST error');
     if (!res.headersSent) sendErr(res, 500, -32603, 'Internal server error');
   }
 });
@@ -185,11 +186,11 @@ const handleSession = async (req: Request, res: Response): Promise<void> => {
 };
 
 mcpRouter.get('/', async (req: Request, res: Response) => {
-  try { await handleSession(req, res); } catch (err) { console.error('MCP GET error:', err); if (!res.headersSent) sendErr(res, 500, -32603, 'Internal error'); }
+  try { await handleSession(req, res); } catch (err) { logger.error({ err }, 'MCP GET error'); if (!res.headersSent) sendErr(res, 500, -32603, 'Internal error'); }
 });
 
 mcpRouter.delete('/', async (req: Request, res: Response) => {
-  try { await handleSession(req, res); } catch (err) { console.error('MCP DELETE error:', err); if (!res.headersSent) sendErr(res, 500, -32603, 'Internal error'); }
+  try { await handleSession(req, res); } catch (err) { logger.error({ err }, 'MCP DELETE error'); if (!res.headersSent) sendErr(res, 500, -32603, 'Internal error'); }
 });
 
 export default mcpRouter;

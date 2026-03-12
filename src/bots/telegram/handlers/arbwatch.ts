@@ -11,6 +11,7 @@ import {
   createPricingCommand, 
   createSubscribeCommand 
 } from '../../shared/payments';
+import { logger } from '../../../utils/logger';
 
 const APP_ID = 'arbwatch' as const;
 
@@ -113,8 +114,9 @@ export function createArbWatchBot(token: string) {
     }
   );
 
-  bot.catch((err: any, ctx: Context) => {
-    console.error(`[ArbWatch] Error:`, err);
+  bot.catch((err: unknown, ctx: Context) => {
+    const error = err instanceof Error ? err : new Error(String(err));
+    logger.error({ err: error, chatId: ctx.chat?.id, username: ctx.from?.username }, 'ArbWatch handler error');
     ctx.reply('⚠️ Error occurred.');
   });
 

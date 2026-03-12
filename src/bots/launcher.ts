@@ -9,6 +9,7 @@ import { createMemeRadarBot } from './telegram/handlers/memeradar';
 import { createArbWatchBot } from './telegram/handlers/arbwatch';
 import { createSpreadHunterBot } from './telegram/handlers/spreadhunter';
 import { createRosterRadarBot } from './telegram/handlers/rosterradar';
+import { logger } from '../utils/logger';
 
 interface BotConfig {
   name: string;
@@ -47,13 +48,13 @@ const bots: BotConfig[] = [
 const runningBots: Map<string, Telegraf> = new Map();
 
 export async function launchBots() {
-  console.log('Launching Telegram bots...');
+  logger.info('Launching Telegram bots...');
 
   for (const config of bots) {
     const token = process.env[config.tokenEnv];
 
     if (!token) {
-      console.warn(`${config.name}: No token found (set ${config.tokenEnv})`);
+      logger.warn({ bot: config.name, tokenEnv: config.tokenEnv }, 'No token found');
       continue;
     }
 
@@ -62,15 +63,15 @@ export async function launchBots() {
 
       // Start each bot independently so one failure/slow-start doesn't block others
       runningBots.set(config.name, bot);
-      console.log(`${config.name} bot launch initiated`);
+      logger.info({ bot: config.name }, 'Bot launch initiated');
 
       void bot.launch({ dropPendingUpdates: true })
         .then(() => {
-          console.log(`${config.name} bot launched`);
+          logger.info({ bot: config.name }, 'Bot launched');
         })
         .catch((err) => {
           runningBots.delete(config.name);
-          console.error(`${config.name} failed to launch:`, err);
+          logger.error({ bot: config.name, err }, 'Failed to launch bot');
         });
 
       // Enable graceful stop
@@ -78,7 +79,7 @@ export async function launchBots() {
       process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
     } catch (err) {
-      console.error(`${config.name} failed to initialize:`, err);
+      logger.error({ bot: config.name, err }, 'Failed to initialize bot');
     }
   }
 }
@@ -90,9 +91,9 @@ export async function shutdownAllBots(): Promise<void> {
   for (const [name, bot] of runningBots) {
     try {
       bot.stop('shutdown');
-      console.log(`Stopped ${name}`);
+      logger.info({ bot: name }, 'Stopped bot');
     } catch (err) {
-      console.error(`Error stopping ${name}:`, err);
+      logger.error({ bot: name, err }, 'Error stopping bot');
     }
   }
   runningBots.clear();
@@ -108,5 +109,5 @@ export function getBotStatus(): Record<string, boolean> {
 
 // Auto-launch if run directly
 if (require.main === module) {
-  launchBots().catch(console.error);
+  launchBots().catch((err) => logger.error({ err }, 'Failed to launch bots'));
 }

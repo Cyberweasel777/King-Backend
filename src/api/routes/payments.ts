@@ -6,6 +6,7 @@
 
 import { Router, Request, Response } from 'express';
 import { AppId } from '../../shared/payments/types';
+import { logger } from '../../utils/logger';
 import {
   isSubscribed,
   getSubscriptionStatus,
@@ -246,7 +247,7 @@ router.post('/:app/payments/webhook', extractAppId, async (req, res) => {
     const result = await handleWebhookEvent(appId, event);
     res.json(result);
   } catch (err: any) {
-    console.error(`Webhook error for ${appId}:`, err);
+    logger.error({ appId, err }, 'Webhook error');
     // Still return 200 to prevent Stripe retries
     res.json({ processed: false, message: err.message });
   }

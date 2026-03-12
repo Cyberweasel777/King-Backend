@@ -17,6 +17,7 @@ import {
   recordReferralConversion,
 } from './database';
 import { sendMetaCapiEvent } from './meta-capi';
+import { logger } from '../../utils/logger';
 
 /**
  * Verify and parse Stripe webhook payload
@@ -28,7 +29,7 @@ export function verifyWebhookPayload(
 ): Stripe.Event | null {
   const secret = getStripeWebhookSecret(appId);
   if (!secret) {
-    console.error(`No webhook secret for ${appId}`);
+    logger.error({ appId }, 'No webhook secret configured');
     return null;
   }
 
@@ -40,7 +41,7 @@ export function verifyWebhookPayload(
   try {
     return stripe.webhooks.constructEvent(payload, signature, secret);
   } catch (err: any) {
-    console.error(`Webhook signature verification failed: ${err.message}`);
+    logger.error({ appId, error: err.message }, 'Webhook signature verification failed');
     return null;
   }
 }

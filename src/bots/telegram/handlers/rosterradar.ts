@@ -5,6 +5,7 @@ import {
   createPricingCommand,
   createSubscribeCommand,
 } from '../../shared/payments';
+import { logger } from '../../../utils/logger';
 
 const APP_ID = 'rosterradar' as const;
 
@@ -76,7 +77,8 @@ export function createRosterRadarBot(token: string): Telegraf {
   );
 
   bot.catch((err: unknown, ctx: Context) => {
-    console.error('[RosterRadar] Error:', err);
+    const error = err instanceof Error ? err : new Error(String(err));
+    logger.error({ err: error, chatId: ctx.chat?.id, username: ctx.from?.username }, 'RosterRadar handler error');
     ctx.reply('⚠️ RosterRadar error. Retry shortly.').catch(() => {});
   });
 

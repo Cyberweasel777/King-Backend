@@ -5,6 +5,7 @@ import {
   createPricingCommand,
   createSubscribeCommand
 } from '../../shared/payments';
+import { logger } from '../../../utils/logger';
 
 const APP_ID = 'botindex' as const;
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:8080';
@@ -96,7 +97,7 @@ export function createBotIndexBot(token: string) {
         { parse_mode: 'Markdown' }
       );
     } catch (err) {
-      console.error('[BotIndex] signals error', err);
+      logger.error({ err, ctx: { chatId: ctx.chat?.id, username: ctx.from?.username } }, 'Signals error');
       await ctx.reply('⚠️ Failed to fetch signals. Try again shortly.');
     }
   });
@@ -127,7 +128,7 @@ export function createBotIndexBot(token: string) {
         { parse_mode: 'Markdown' }
       );
     } catch (err) {
-      console.error('[BotIndex] correlation error', err);
+      logger.error({ err, ctx: { chatId: ctx.chat?.id, username: ctx.from?.username } }, 'Correlation error');
       await ctx.reply('⚠️ Correlation lookup failed. Check token ids and retry.');
     }
   });
@@ -159,14 +160,15 @@ export function createBotIndexBot(token: string) {
           { parse_mode: 'Markdown' }
         );
       } catch (err) {
-        console.error('[BotIndex] leaders error', err);
+        logger.error({ err, ctx: { chatId: ctx.chat?.id, username: ctx.from?.username } }, 'Leaders error');
         await ctx.reply('⚠️ Failed to fetch leaders. Try again shortly.');
       }
     }
   );
 
-  bot.catch((err: any, ctx: Context) => {
-    console.error('[BotIndex] Error:', err);
+  bot.catch((err: unknown, ctx: Context) => {
+    const error = err instanceof Error ? err : new Error(String(err));
+    logger.error({ err: error, chatId: ctx.chat?.id, username: ctx.from?.username }, 'Bot handler error');
     ctx.reply('⚠️ BotIndex error. Retry in a minute.');
   });
 

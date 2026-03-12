@@ -13,6 +13,7 @@ import {
 } from './types';
 import { computeInitialGraceEnd, isLegacyArbwatchPaidTier } from './arbwatch-migration';
 import { getConvexPaymentStore } from './convex-client';
+import { logger } from '../../utils/logger';
 
 let cachedStore: ReturnType<typeof getConvexPaymentStore> | null = null;
 
@@ -251,5 +252,5 @@ export async function getReferralStats(appId: AppId, externalUserId: string): Pr
 }
 
 export async function initDb(): Promise<void> {
-  console.log('Payment database ready (Convex)');
+  logger.info('Payment database ready (Convex)');
 }

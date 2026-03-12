@@ -8,6 +8,7 @@
 import express from 'express';
 import paymentsRouter from './api/routes/payments';
 import { initDb } from './shared/payments/database';
+import { logger } from './utils/logger';
 
 const app = express();
 
@@ -34,8 +35,8 @@ async function startServer() {
   await initDb();
   
   app.listen(8080, () => {
-    console.log('King Backend running on port 8080');
-    console.log('Payment endpoints mounted at /api/{app}/payments/*');
+    logger.info('King Backend running on port 8080');
+    logger.info('Payment endpoints mounted at /api/{app}/payments/*');
   });
 }
 

@@ -1,0 +1,241 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "BotIndex API",
+    "version": "1.0.0",
+    "description": "Real-time DeFi analytics, whale tracking, funding arbitrage, and market intelligence for AI agents."
+  },
+  "servers": [
+    { "url": "https://king-backend.fly.dev" }
+  ],
+  "paths": {
+    "/api/botindex/hyperliquid/funding-arb": {
+      "get": {
+        "operationId": "getFundingArb",
+        "summary": "Get Hyperliquid vs Binance funding rate arbitrage opportunities",
+        "tags": ["Hyperliquid"],
+        "responses": { "200": { "description": "Funding arb opportunities" } }
+      }
+    },
+    "/api/botindex/zora/trending-coins": {
+      "get": {
+        "operationId": "getTrendingCoins",
+        "summary": "Get trending coins on Zora with volume and price data",
+        "tags": ["Zora"],
+        "responses": { "200": { "description": "Trending coins list" } }
+      }
+    },
+    "/api/botindex/hyperliquid/whale-alerts": {
+      "get": {
+        "operationId": "getWhaleAlerts",
+        "summary": "Get recent whale trade alerts on Hyperliquid (trades >$10K)",
+        "tags": ["Hyperliquid"],
+        "responses": { "200": { "description": "Whale trade alerts" } }
+      }
+    },
+    "/api/botindex/hyperliquid/correlation-matrix": {
+      "get": {
+        "operationId": "getCorrelationMatrix",
+        "summary": "Get cross-market correlation matrix for Hyperliquid perps",
+        "tags": ["Hyperliquid"],
+        "responses": { "200": { "description": "Correlation matrix" } }
+      }
+    },
+    "/api/botindex/hyperliquid/liquidation-heatmap": {
+      "get": {
+        "operationId": "getLiquidationHeatmap",
+        "summary": "Get liquidation price zones across Hyperliquid markets",
+        "tags": ["Hyperliquid"],
+        "responses": { "200": { "description": "Liquidation heatmap" } }
+      }
+    },
+    "/api/botindex/hyperliquid/hip6/launch-candidates": {
+      "get": {
+        "operationId": "getHip6Candidates",
+        "summary": "Get HIP-6 token launch candidates ranked by potential",
+        "tags": ["Hyperliquid"],
+        "responses": { "200": { "description": "HIP-6 launch candidates" } }
+      }
+    },
+    "/api/botindex/doppler/launches": {
+      "get": {
+        "operationId": "getDopplerLaunches",
+        "summary": "Get recent Doppler token launches with risk scores",
+        "tags": ["Doppler"],
+        "responses": { "200": { "description": "Doppler launches" } }
+      }
+    },
+    "/api/botindex/doppler/trending": {
+      "get": {
+        "operationId": "getDopplerTrending",
+        "summary": "Get trending Doppler launches by volume velocity",
+        "tags": ["Doppler"],
+        "responses": { "200": { "description": "Doppler trending" } }
+      }
+    },
+    "/api/botindex/crypto/tokens": {
+      "get": {
+        "operationId": "getCryptoTokens",
+        "summary": "Get token universe with latest prices from DexScreener",
+        "tags": ["Crypto"],
+        "responses": { "200": { "description": "Token list with prices" } }
+      }
+    },
+    "/api/botindex/crypto/graduating": {
+      "get": {
+        "operationId": "getCryptoGraduating",
+        "summary": "Get tokens graduating from Catapult to Hyperliquid",
+        "tags": ["Crypto"],
+        "responses": { "200": { "description": "Graduating tokens" } }
+      }
+    },
+    "/api/botindex/v1/signals": {
+      "get": {
+        "operationId": "getSignals",
+        "summary": "Get aggregated market signals across all domains",
+        "tags": ["Signals"],
+        "responses": { "200": { "description": "Market signals" } }
+      }
+    },
+    "/api/botindex/sports/odds": {
+      "get": {
+        "operationId": "getSportsOdds",
+        "summary": "Get live sports odds snapshot across major books",
+        "tags": ["Sports"],
+        "responses": { "200": { "description": "Sports odds" } }
+      }
+    },
+    "/api/botindex/sports/lines": {
+      "get": {
+        "operationId": "getLineMovements",
+        "summary": "Get sports line movements with sharp action flags",
+        "tags": ["Sports"],
+        "responses": { "200": { "description": "Line movements" } }
+      }
+    },
+    "/api/botindex/sports/correlations": {
+      "get": {
+        "operationId": "getSportsCorrelations",
+        "summary": "Get player correlation matrix for DFS and betting",
+        "tags": ["Sports"],
+        "responses": { "200": { "description": "Player correlations" } }
+      }
+    },
+    "/api/botindex/sports/arb": {
+      "get": {
+        "operationId": "getSportsArb",
+        "summary": "Scan cross-platform prediction/sportsbook arbitrage opportunities",
+        "tags": ["Sports"],
+        "responses": { "200": { "description": "Arb opportunities" } }
+      }
+    },
+    "/api/botindex/social/convergence": {
+      "get": {
+        "operationId": "getSocialConvergence",
+        "summary": "Get cross-platform convergence signals from crypto social media",
+        "tags": ["Social"],
+        "responses": { "200": { "description": "Convergence signals" } }
+      }
+    },
+    "/api/botindex/social/twitter/sentiment": {
+      "get": {
+        "operationId": "getTwitterSentiment",
+        "summary": "Get per-token Twitter sentiment from crypto watchlist",
+        "tags": ["Social"],
+        "responses": { "200": { "description": "Twitter sentiment" } }
+      }
+    },
+    "/api/botindex/social/twitter/trending": {
+      "get": {
+        "operationId": "getTwitterTrending",
+        "summary": "Get trending tokens on crypto Twitter",
+        "tags": ["Social"],
+        "responses": { "200": { "description": "Trending tokens" } }
+      }
+    },
+    "/api/botindex/zora/intel": {
+      "get": {
+        "operationId": "getZoraIntel",
+        "summary": "DeepSeek-powered deep analysis of Zora market trends",
+        "tags": ["Intel"],
+        "responses": { "200": { "description": "Zora intel analysis" } }
+      }
+    },
+    "/api/botindex/hyperliquid/intel": {
+      "get": {
+        "operationId": "getHyperliquidIntel",
+        "summary": "DeepSeek-powered deep analysis of Hyperliquid markets",
+        "tags": ["Intel"],
+        "responses": { "200": { "description": "Hyperliquid intel analysis" } }
+      }
+    },
+    "/api/botindex/crypto/intel": {
+      "get": {
+        "operationId": "getCryptoIntel",
+        "summary": "DeepSeek-powered deep analysis of crypto market trends",
+        "tags": ["Intel"],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Token symbol to analyze (e.g. BTC, ETH)"
+          }
+        ],
+        "responses": { "200": { "description": "Crypto intel analysis" } }
+      }
+    },
+    "/api/botindex/doppler/intel": {
+      "get": {
+        "operationId": "getDopplerIntel",
+        "summary": "DeepSeek-powered deep analysis of Doppler launches",
+        "tags": ["Intel"],
+        "responses": { "200": { "description": "Doppler intel analysis" } }
+      }
+    },
+    "/api/botindex/zora/attention-momentum": {
+      "get": {
+        "operationId": "getAttentionMomentum",
+        "summary": "Get Zora attention momentum scores for trending content",
+        "tags": ["Zora"],
+        "responses": { "200": { "description": "Attention momentum data" } }
+      }
+    },
+    "/api/botindex/hyperliquid/hip6/alert-scores": {
+      "get": {
+        "operationId": "getHip6AlertScores",
+        "summary": "Get HIP-6 auction alert scores for snipe opportunities",
+        "tags": ["Hyperliquid"],
+        "responses": { "200": { "description": "HIP-6 alert scores" } }
+      }
+    },
+    "/api/botindex/keys/register": {
+      "get": {
+        "operationId": "registerApiKey",
+        "summary": "Register a free BotIndex API key",
+        "tags": ["Keys"],
+        "parameters": [
+          {
+            "name": "plan",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["free", "pro"] },
+            "description": "Plan type (free or pro)"
+          }
+        ],
+        "responses": { "200": { "description": "API key registration" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    }
+  },
+  "security": [
+    { "ApiKeyAuth": [] }
+  ]
+}

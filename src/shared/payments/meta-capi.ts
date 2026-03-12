@@ -7,6 +7,7 @@
 import crypto from 'crypto';
 import { AppId } from './types';
 import { getMetaCapiAccessToken } from './config';
+import { logger } from '../../utils/logger';
 
 interface CapiEvent {
   eventName: string;
@@ -33,7 +34,7 @@ export async function sendMetaCapiEvent(
 
   const pixelId = extractPixelId(accessToken);
   if (!pixelId) {
-    console.error(`Invalid Meta CAPI token for ${appId}`);
+    logger.error({ appId }, 'Invalid Meta CAPI token');
     return false;
   }
 
@@ -73,13 +74,13 @@ export async function sendMetaCapiEvent(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`Meta CAPI error for ${appId}:`, error);
+      logger.error({ appId, error }, 'Meta CAPI request failed');
       return false;
     }
 
     return true;
   } catch (err) {
-    console.error(`Failed to send Meta CAPI event for ${appId}:`, err);
+    logger.error({ appId, err }, 'Failed to send Meta CAPI event');
     return false;
   }
 }

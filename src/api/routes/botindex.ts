@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { logger } from '../../utils/logger';
 
 import correlationRoutes from '../../services/botindex/api/correlation.routes';
 import { withSubscriptionHttp, withFreeLimit, getFreeLimitKey } from '../../shared/payments';
@@ -209,7 +210,7 @@ router.get('/signals', async (req, res) => {
 
     res.json({ signals: merged, count: merged.length, source: 'generated' });
   } catch (err) {
-    console.error('[BotIndex] /signals error', err);
+    logger.error({ err }, '/signals error');
     const fallback = Array.from(manualSignals.values()).slice(0, limit);
     res.json({ signals: fallback, count: fallback.length, source: 'manual_fallback' });
   }

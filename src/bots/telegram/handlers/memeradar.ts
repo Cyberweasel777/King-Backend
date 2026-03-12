@@ -12,9 +12,9 @@ import {
 } from '../../../services/memeradar';
 import { MemeRadarScheduler } from '../../../services/memeradar/scheduler';
 import { allowCommand, escapeMd, extractArg, shortAddress } from '../shared/middleware';
+import { logger } from '../../../utils/logger';
 
 const APP_ID = 'memeradar' as const;
-const LOG = '[MemeRadar]';
 
 function rateGuard(ctx: Context): boolean {
   return allowCommand(ctx.from?.id?.toString());
@@ -58,13 +58,13 @@ export function createMemeRadarBot(token: string) {
 
   bot.command('alerts_on', async (ctx) => {
     scheduler.subscribe(ctx.chat.id);
-    console.log(`${LOG} alerts_on ${chatMeta(ctx)}`);
+    logger.info({ chatId: ctx.chat?.id, username: ctx.from?.username }, 'alerts_on');
     await ctx.reply('✅ Alerts enabled. You will receive trigger alerts and a daily digest.');
   });
 
   bot.command('alerts_off', async (ctx) => {
     scheduler.unsubscribe(ctx.chat.id);
-    console.log(`${LOG} alerts_off ${chatMeta(ctx)}`);
+    logger.info({ chatId: ctx.chat?.id, username: ctx.from?.username }, 'alerts_off');
     await ctx.reply('🛑 Alerts disabled for this chat.');
   });
 
@@ -98,7 +98,7 @@ export function createMemeRadarBot(token: string) {
         { parse_mode: 'Markdown' }
       );
     } catch (err) {
-      console.error(`${LOG} /trending failed ${chatMeta(ctx)}`, err);
+      logger.error({ err, ctx: { chatId: ctx.chat?.id, username: ctx.from?.username } }, '/trending failed');
       await ctx.reply('⚠️ Failed to fetch trending data. Try again shortly.');
     }
   });
@@ -143,7 +143,7 @@ export function createMemeRadarBot(token: string) {
         { parse_mode: 'Markdown' }
       );
     } catch (err) {
-      console.error(`${LOG} /token failed ${chatMeta(ctx)} identifier=${identifier}`, err);
+      logger.error({ err, ctx: { chatId: ctx.chat?.id, username: ctx.from?.username }, identifier }, '/token failed');
       await ctx.reply('⚠️ Failed to fetch token data. Try again shortly.');
     }
   });
@@ -189,7 +189,7 @@ export function createMemeRadarBot(token: string) {
           { parse_mode: 'Markdown' }
         );
       } catch (err) {
-        console.error(`${LOG} /whales failed ${chatMeta(ctx)} wallet=${shortAddress(wallet)}`, err);
+        logger.error({ err, ctx: { chatId: ctx.chat?.id, username: ctx.from?.username }, wallet: shortAddress(wallet) }, '/whales failed');
         await ctx.reply('⚠️ Failed to fetch whale data. Try again shortly.');
       }
     }
@@ -197,9 +197,9 @@ export function createMemeRadarBot(token: string) {
 
   scheduler.start();
 
-  bot.catch((err: any, ctx: Context) => {
-    const meta = ctx?.from?.id ? chatMeta(ctx) : 'unknown';
-    console.error(`${LOG} unhandled error ${meta}`, err);
+  bot.catch((err: unknown, ctx: Context) => {
+    const error = err instanceof Error ? err : new Error(String(err));
+    logger.error({ err: error, chatId: ctx.chat?.id, username: ctx.from?.username }, 'Unhandled error');
     ctx.reply('⚠️ MemeRadar encountered an error. Retry in a minute.').catch(() => {});
   });
 
