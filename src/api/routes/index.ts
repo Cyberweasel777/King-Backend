@@ -44,12 +44,16 @@ const router = Router();
 // Beacon must be before auth — it's a public tracking pixel
 router.use('/', botindexBeaconRouter);
 
-// Global optional API key auth so paid subscribers bypass x402 pay-per-call gates.
+// Global optional API key auth — only PAID subscribers bypass x402 pay-per-call gates.
+// Free keys get higher rate limits but still hit x402 on premium endpoints.
 router.use(optionalApiKey, (req, _res, next) => {
   if (req.apiKeyAuth) {
-    (req as any).__apiKeyAuthenticated = true;
-    (req as any).__freeTrialAuthenticated = true;
-    (req as any).__billingMode = 'subscription';
+    const isPaid = req.apiKeyAuth.plan === 'pro' || req.apiKeyAuth.plan === 'basic';
+    if (isPaid) {
+      (req as any).__apiKeyAuthenticated = true;
+      (req as any).__freeTrialAuthenticated = true;
+      (req as any).__billingMode = 'subscription';
+    }
   }
   next();
 });
