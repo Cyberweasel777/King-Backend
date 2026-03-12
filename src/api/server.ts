@@ -163,6 +163,37 @@ app.use('/docs', docsRouter);
 // Error handling
 app.use(errorHandler);
 
+// Privacy policy for GPT Store
+app.get('/privacy', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html');
+  res.send(`<!DOCTYPE html><html><head><title>BotIndex Privacy Policy</title></head><body style="font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#333">
+<h1>BotIndex Privacy Policy</h1>
+<p><strong>Last updated:</strong> March 12, 2026</p>
+<h2>Data We Collect</h2>
+<p>When you use BotIndex through the GPT Store or API, we collect:</p>
+<ul>
+<li>API requests (endpoint, timestamp, IP address hash for rate limiting)</li>
+<li>Email address (only if you register an API key)</li>
+</ul>
+<h2>How We Use Your Data</h2>
+<ul>
+<li>Rate limiting and abuse prevention</li>
+<li>Service improvement and usage analytics</li>
+<li>Account management (API key holders only)</li>
+</ul>
+<h2>Data We Do NOT Collect</h2>
+<ul>
+<li>We do not store your ChatGPT conversations</li>
+<li>We do not sell or share personal data with third parties</li>
+<li>We do not use tracking cookies</li>
+</ul>
+<h2>Data Retention</h2>
+<p>API request logs are retained for 30 days. API key account data is retained until you request deletion.</p>
+<h2>Contact</h2>
+<p>For privacy inquiries: privacy@botindex.dev</p>
+</body></html>`);
+});
+
 // Root redirect to landing page on Vercel
 app.get('/', (_req, res) => {
   res.redirect(301, 'https://botindex.dev');
@@ -195,3 +226,4 @@ start().catch((error) => {
 });
 
 export default app;
+// This won't work appended at end, need to insert before 404 handler
