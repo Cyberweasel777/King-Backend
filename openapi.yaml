@@ -1,0 +1,878 @@
+openapi: 3.0.3
+info:
+  title: BotIndex API
+  version: 1.0.0
+  description: |
+    OpenAPI spec generated from route handlers in `src/api/routes/*` for endpoints under `/api/botindex/*`.
+
+    Authentication:
+    - API key via `X-API-Key` header
+    - Premium endpoints are x402-gated and can also be paid per-call (wallet flow)
+
+    Notes:
+    - Server base URL: `https://king-backend.fly.dev`
+    - `zora/new-coins` route is not present in current route files.
+servers:
+  - url: https://king-backend.fly.dev
+
+tags:
+  - name: Zora
+    description: Zora market endpoints (trending, creator scores, attention momentum). `new-coins` route not found in current code.
+  - name: Hyperliquid
+    description: Hyperliquid funding, correlation, liquidation, whales, HIP-6 endpoints.
+  - name: Doppler
+    description: Doppler launches, scoring, and trending routes.
+  - name: Crypto
+    description: Token universe and graduation signals.
+  - name: Sports
+    description: Odds, line movement, props, correlations, lineup optimizer, arbitrage scanner.
+  - name: Social
+    description: Convergence and Twitter sentiment/trending endpoints.
+  - name: Intel
+    description: Premium AI intelligence reports.
+  - name: Trust
+    description: AAR signing and SCC anchoring.
+  - name: Keys
+    description: API key registration and account lifecycle.
+  - name: Signals
+    description: Premium aggregated signals feed.
+
+paths:
+  /api/botindex/zora/trending-coins:
+    get:
+      tags: [Zora]
+      operationId: getZoraTrendingCoins
+      summary: Zora trending coins
+      description: Free Zora attention-market trending coins.
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 10 }
+      responses:
+        '200':
+          description: Trending coin payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  coins: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer }
+                  timestamp: { type: string, format: date-time }
+                  metadata: { $ref: '#/components/schemas/Metadata' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/botindex/zora/creator-scores:
+    get:
+      tags: [Zora]
+      operationId: getZoraCreatorScores
+      summary: Zora creator scores
+      description: "x402: $0.01 — Zora creator scores."
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 10 }
+      responses:
+        '200':
+          description: Creator score payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  creators: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer }
+                  timestamp: { type: string, format: date-time }
+                  metadata: { $ref: '#/components/schemas/Metadata' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/botindex/zora/attention-momentum:
+    get:
+      tags: [Zora]
+      operationId: getZoraAttentionMomentum
+      summary: Zora attention momentum
+      description: "x402: $0.01 — Zora attention momentum trends."
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 10 }
+      responses:
+        '200':
+          description: Attention momentum payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trends: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer }
+                  timestamp: { type: string, format: date-time }
+                  metadata: { $ref: '#/components/schemas/Metadata' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/botindex/hyperliquid/funding-arb:
+    get:
+      tags: [Hyperliquid]
+      operationId: getHyperliquidFundingArb
+      summary: Hyperliquid funding arbitrage
+      description: "x402: $0.01 — Hyperliquid vs Binance funding arbitrage opportunities."
+      responses:
+        '200':
+          description: Funding arb payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  opportunities: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer }
+                  timestamp: { type: string, format: date-time }
+                  metadata: { $ref: '#/components/schemas/Metadata' }
+
+  /api/botindex/hyperliquid/correlation-matrix:
+    get:
+      tags: [Hyperliquid]
+      operationId: getHyperliquidCorrelationMatrix
+      summary: Hyperliquid correlation matrix
+      description: "x402: $0.01 — Hyperliquid perpetual correlation matrix."
+      responses:
+        '200':
+          description: Correlation matrix payload
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/botindex/hyperliquid/liquidation-heatmap:
+    get:
+      tags: [Hyperliquid]
+      operationId: getHyperliquidLiquidationHeatmap
+      summary: Hyperliquid liquidation heatmap
+      description: "x402: $0.01 — liquidation cluster/heatmap output."
+      responses:
+        '200':
+          description: Liquidation heatmap payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  heatmap: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer }
+                  timestamp: { type: string, format: date-time }
+                  metadata: { $ref: '#/components/schemas/Metadata' }
+
+  /api/botindex/hyperliquid/whale-alerts:
+    get:
+      tags: [Hyperliquid]
+      operationId: getHyperliquidWhaleAlertsSummary
+      summary: Hyperliquid whale alerts (summary)
+      description: Free summary output; full data available at `/whale-alerts/full`.
+      responses:
+        '200':
+          description: Whale summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summary: { type: object, additionalProperties: true }
+                  upgrade: { type: string }
+                  timestamp: { type: string, format: date-time }
+                  metadata: { $ref: '#/components/schemas/Metadata' }
+
+  /api/botindex/hyperliquid/whale-alerts/full:
+    get:
+      tags: [Hyperliquid]
+      operationId: getHyperliquidWhaleAlertsFull
+      summary: Hyperliquid whale alerts (full)
+      description: "x402: $0.05 — full whale positions and large trades."
+      responses:
+        '200':
+          description: Full whale payload
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/botindex/hyperliquid/hip6/status:
+    get:
+      tags: [Hyperliquid]
+      operationId: getHip6Status
+      summary: HIP-6 status
+      description: Free HIP-6 signal layer status.
+      responses:
+        '200':
+          description: HIP-6 status
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/botindex/hyperliquid/hip6/feed-history:
+    get:
+      tags: [Hyperliquid]
+      operationId: getHip6FeedHistory
+      summary: HIP-6 feed history
+      description: Free rolling HIP-6 feed history snapshots.
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 200, default: 24 }
+      responses:
+        '200':
+          description: Feed history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  history: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer }
+                  metadata: { $ref: '#/components/schemas/Metadata' }
+
+  /api/botindex/hyperliquid/hip6/alert-scores:
+    get:
+      tags: [Hyperliquid]
+      operationId: getHip6AlertScores
+      summary: HIP-6 alert scores
+      description: Free HIP-6 alert score snapshots.
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Alert scores
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alerts: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer }
+                  metadata: { $ref: '#/components/schemas/Metadata' }
+
+  /api/botindex/hyperliquid/hip6/launch-candidates:
+    get:
+      tags: [Hyperliquid]
+      operationId: getHip6LaunchCandidates
+      summary: HIP-6 launch candidates
+      description: "x402: $0.01 — HIP-6 launch candidate rankings."
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: Launch candidate payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  candidates: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer }
+                  metadata: { $ref: '#/components/schemas/Metadata' }
+
+  /api/botindex/doppler/launches:
+    get:
+      tags: [Doppler]
+      operationId: getDopplerLaunches
+      summary: Recent Doppler launches
+      description: "x402: $0.01 — scored Doppler launches on Base."
+      parameters:
+        - in: query
+          name: hours
+          schema: { type: integer, minimum: 1, maximum: 168, default: 24 }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: min_score
+          schema: { type: number, minimum: 0, maximum: 100, default: 0 }
+        - in: query
+          name: chain
+          schema: { type: string, enum: [base], default: base }
+      responses:
+        '200':
+          description: Launch list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  launches: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer }
+                  source: { type: string }
+                  updatedAt: { type: string, format: date-time }
+
+  /api/botindex/doppler/score/{address}:
+    get:
+      tags: [Doppler]
+      operationId: getDopplerScore
+      summary: Doppler token score
+      description: "x402: $0.02 — deep token risk score."
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+            pattern: '^0x[a-fA-F0-9]{40}$'
+      responses:
+        '200':
+          description: Token score card
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/botindex/doppler/trending:
+    get:
+      tags: [Doppler]
+      operationId: getDopplerTrending
+      summary: Trending Doppler launches
+      description: "x402: $0.01 — Doppler launches ranked by volume velocity and filters."
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+        - in: query
+          name: min_liquidity
+          schema: { type: number, minimum: 0, default: 1000 }
+        - in: query
+          name: min_holders
+          schema: { type: integer, minimum: 0, default: 5 }
+        - in: query
+          name: max_age_hours
+          schema: { type: integer, minimum: 1, maximum: 336, default: 48 }
+      responses:
+        '200':
+          description: Trending launch list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trending: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer }
+                  source: { type: string }
+                  updatedAt: { type: string, format: date-time }
+
+  /api/botindex/crypto/tokens:
+    get:
+      tags: [Crypto]
+      operationId: getCryptoTokens
+      summary: Crypto token universe
+      description: "x402: $0.02 — token universe with latest price/change snapshots."
+      responses:
+        '200':
+          description: Token universe
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tokens: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer }
+                  source: { type: string }
+                  updatedAt: { type: string, format: date-time }
+                  metadata: { $ref: '#/components/schemas/Metadata' }
+
+  /api/botindex/crypto/graduating:
+    get:
+      tags: [Crypto]
+      operationId: getCryptoGraduating
+      summary: Crypto graduating tokens
+      description: "x402: $0.02 — graduation signals from Catapult/Hyperliquid via GradSniper proxy."
+      responses:
+        '200':
+          description: Graduating token payload
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/botindex/sports/odds:
+    get:
+      tags: [Sports]
+      operationId: getSportsOdds
+      summary: Sports odds snapshot
+      description: "x402: $0.02 — live odds snapshot."
+      responses:
+        '200':
+          description: Odds payload
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/botindex/sports/lines:
+    get:
+      tags: [Sports]
+      operationId: getSportsLineMovements
+      summary: Sports line movements
+      description: "x402: $0.02 — line movement tracker with sharp-action flags."
+      responses:
+        '200':
+          description: Line movement payload
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/botindex/sports/props:
+    get:
+      tags: [Sports]
+      operationId: getSportsProps
+      summary: Sports props
+      description: "x402: $0.02 — top prop movements with confidence signals."
+      responses:
+        '200':
+          description: Prop payload
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/botindex/sports/correlations:
+    get:
+      tags: [Sports]
+      operationId: getSportsCorrelations
+      summary: Sports correlations
+      description: "x402: $0.05 — player/team correlation matrix."
+      responses:
+        '200':
+          description: Correlation payload
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/botindex/sports/optimizer:
+    get:
+      tags: [Sports]
+      operationId: getSportsLineupOptimizer
+      summary: Sports lineup optimizer
+      description: "x402: $0.10 — correlation-adjusted DFS lineup optimizer."
+      responses:
+        '200':
+          description: Optimizer payload
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/botindex/sports/arb:
+    get:
+      tags: [Sports]
+      operationId: getSportsArbScanner
+      summary: Sports arbitrage scanner
+      description: "x402: $0.05 — cross-platform prediction/sportsbook arbitrage scanner."
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 10 }
+        - in: query
+          name: minEdge
+          schema: { type: number, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: Arbitrage scan payload
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/botindex/social/convergence:
+    get:
+      tags: [Social]
+      operationId: getSocialConvergence
+      summary: Social convergence signals
+      description: "x402: $0.02 — cross-platform convergence signals from crypto Twitter watchlist."
+      responses:
+        '200':
+          description: Convergence payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signals: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer }
+                  lastRefresh: { type: string, format: date-time }
+                  cacheAgeMinutes: { type: integer, nullable: true }
+                  stale: { type: boolean }
+                  metadata: { $ref: '#/components/schemas/Metadata' }
+
+  /api/botindex/social/twitter/sentiment:
+    get:
+      tags: [Social]
+      operationId: getSocialTwitterSentiment
+      summary: Twitter sentiment
+      description: "x402: $0.02 — token-filtered or aggregate sentiment from watchlist."
+      parameters:
+        - in: query
+          name: token
+          schema: { type: string }
+          description: Optional ticker symbol (e.g., SOL)
+      responses:
+        '200':
+          description: Sentiment payload
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/botindex/social/twitter/narratives:
+    get:
+      tags: [Social]
+      operationId: getSocialTwitterNarratives
+      summary: Trending narratives
+      description: "x402: $0.02 — trending narrative clusters from token co-occurrence."
+      responses:
+        '200':
+          description: Narrative clusters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  narratives: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer }
+                  lastRefresh: { type: string, format: date-time }
+                  metadata: { $ref: '#/components/schemas/Metadata' }
+
+  /api/botindex/social/twitter/trending:
+    get:
+      tags: [Social]
+      operationId: getSocialTwitterTrending
+      summary: Twitter trending tokens
+      description: "x402: $0.02 — most mentioned tokens over trailing 4h window."
+      responses:
+        '200':
+          description: Trending tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trending: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer }
+                  window: { type: string }
+                  totalTweetsAnalyzed: { type: integer }
+                  lastRefresh: { type: string, format: date-time }
+                  metadata: { $ref: '#/components/schemas/Metadata' }
+
+  /api/botindex/zora/intel:
+    get:
+      tags: [Zora, Intel]
+      operationId: getZoraIntel
+      summary: Zora AI intel report
+      description: "x402: $0.05 — DeepSeek-powered Zora intelligence report."
+      responses:
+        '200':
+          description: Intel report
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/botindex/hyperliquid/intel:
+    get:
+      tags: [Hyperliquid, Intel]
+      operationId: getHyperliquidIntel
+      summary: Hyperliquid AI intel report
+      description: "x402: $0.05 — funding/risk intelligence report."
+      responses:
+        '200':
+          description: Intel report
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/botindex/crypto/intel:
+    get:
+      tags: [Crypto, Intel]
+      operationId: getCryptoIntel
+      summary: Crypto AI intel report
+      description: "x402: $0.05 — correlation regime and signal intelligence report."
+      responses:
+        '200':
+          description: Intel report
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/botindex/doppler/intel:
+    get:
+      tags: [Doppler, Intel]
+      operationId: getDopplerIntel
+      summary: Doppler AI intel report
+      description: "x402: $0.05 — launch-quality and risk intelligence report."
+      responses:
+        '200':
+          description: Intel report
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/botindex/trust/aar/sign:
+    post:
+      tags: [Trust]
+      operationId: postTrustAarSign
+      summary: Sign Agent Action Receipt (AAR)
+      description: "x402: $0.001 — sign an Agent Action Receipt."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agent, principal, action, scope, input, output]
+              properties:
+                agent: { type: string }
+                principal: { type: string }
+                action: { type: string }
+                scope: { type: string }
+                input: { type: object, additionalProperties: true }
+                output: { type: object, additionalProperties: true }
+                cost:
+                  nullable: true
+                  oneOf:
+                    - { type: string }
+                    - { type: number }
+      responses:
+        '200':
+          description: Signed receipt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  receipt: { type: object, additionalProperties: true }
+                  publicKey: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/botindex/trust/scc/anchor:
+    post:
+      tags: [Trust]
+      operationId: postTrustSccAnchor
+      summary: Anchor Session Continuity Certificate (SCC)
+      description: "x402: $0.01 — anchor SCC certificate."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentId, sessionIndex, memoryRoot, capabilityHash, stateHash]
+              properties:
+                agentId: { type: string }
+                sessionIndex:
+                  oneOf:
+                    - { type: string }
+                    - { type: number }
+                memoryRoot: { type: string }
+                capabilityHash: { type: string }
+                stateHash: { type: string }
+                parentHash: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Anchored SCC
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/botindex/keys/register:
+    get:
+      tags: [Keys]
+      operationId: getKeysRegister
+      summary: Begin key registration
+      description: Browser-friendly registration entrypoint. `plan=free` returns key immediately; paid plans redirect to Stripe checkout.
+      parameters:
+        - in: query
+          name: plan
+          schema: { type: string, enum: [free, basic, pro], default: basic }
+      responses:
+        '200':
+          description: Free-tier key payload or HTML page
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+            text/html:
+              schema: { type: string }
+        '303':
+          description: Redirect to Stripe checkout
+    post:
+      tags: [Keys]
+      operationId: postKeysRegister
+      summary: Create checkout session (API)
+      description: API-friendly registration endpoint for paid plans.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+                plan: { type: string, enum: [basic, pro], default: basic }
+      responses:
+        '200':
+          description: Checkout session
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [checkoutUrl, sessionId]
+                properties:
+                  checkoutUrl: { type: string, format: uri }
+                  sessionId: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/botindex/keys/info:
+    get:
+      tags: [Keys]
+      operationId: getKeysInfo
+      summary: API key info
+      description: Returns plan and usage for current `X-API-Key`.
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Key/account metadata
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/botindex/keys/connect:
+    get:
+      tags: [Keys]
+      operationId: getKeysConnect
+      summary: Wallet connect page
+      description: Browser page for linking wallet to an API key for x402 payments.
+      responses:
+        '200':
+          description: HTML connect page
+          content:
+            text/html:
+              schema: { type: string }
+
+  /api/botindex/keys/connect-wallet:
+    post:
+      tags: [Keys]
+      operationId: postKeysConnectWallet
+      summary: Connect wallet to API key
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [wallet]
+              properties:
+                wallet:
+                  type: string
+                  pattern: '^0x[a-fA-F0-9]{40}$'
+      responses:
+        '200':
+          description: Wallet connected
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/botindex/keys/cancel:
+    get:
+      tags: [Keys]
+      operationId: getKeysCancel
+      summary: Registration cancel endpoint
+      responses:
+        '200':
+          description: Cancellation message
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+
+  /api/botindex/v1/signals:
+    get:
+      tags: [Signals]
+      operationId: getV1Signals
+      summary: Premium aggregated signals
+      description: "x402: $0.10 — correlation leaders + prediction arb + heatmap aggregate feed."
+      responses:
+        '200':
+          description: Aggregated signals payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signals: { type: array, items: { type: object, additionalProperties: true } }
+                  correlationLeaders: { type: array, items: { type: object, additionalProperties: true } }
+                  predictionArb: { type: object, additionalProperties: true }
+                  heatmap: { type: object, additionalProperties: true }
+                  count: { type: integer }
+                  timestamp: { type: string, format: date-time }
+                  metadata: { $ref: '#/components/schemas/Metadata' }
+
+  /api/botindex/v1/openapi.json:
+    get:
+      tags: [Signals]
+      operationId: getOpenApiJson
+      summary: OpenAPI JSON document
+      description: Minimal OpenAPI JSON document for client discovery.
+      responses:
+        '200':
+          description: OpenAPI JSON
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    Metadata:
+      type: object
+      properties:
+        protocol: { type: string, example: x402 }
+        version: { type: string }
+        provider: { type: string }
+        endpoint: { type: string }
+        price: { type: string }
+      additionalProperties: true
+
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        message: { type: string }
+      additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

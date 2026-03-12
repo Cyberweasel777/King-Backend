@@ -1,0 +1,73 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "BotIndex API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "https://king-backend.fly.dev" }
+  ],
+  "paths": {
+    "/api/botindex/zora/trending-coins": { "get": { "tags": ["Zora"], "summary": "Zora trending coins" } },
+    "/api/botindex/zora/creator-scores": { "get": { "tags": ["Zora"], "summary": "Zora creator scores" } },
+    "/api/botindex/zora/attention-momentum": { "get": { "tags": ["Zora"], "summary": "Zora attention momentum" } },
+
+    "/api/botindex/hyperliquid/funding-arb": { "get": { "tags": ["Hyperliquid"], "summary": "Funding arbitrage" } },
+    "/api/botindex/hyperliquid/correlation-matrix": { "get": { "tags": ["Hyperliquid"], "summary": "Correlation matrix" } },
+    "/api/botindex/hyperliquid/liquidation-heatmap": { "get": { "tags": ["Hyperliquid"], "summary": "Liquidation heatmap" } },
+    "/api/botindex/hyperliquid/whale-alerts": { "get": { "tags": ["Hyperliquid"], "summary": "Whale alerts summary" } },
+    "/api/botindex/hyperliquid/whale-alerts/full": { "get": { "tags": ["Hyperliquid"], "summary": "Whale alerts full" } },
+    "/api/botindex/hyperliquid/hip6/status": { "get": { "tags": ["Hyperliquid"], "summary": "HIP-6 status" } },
+    "/api/botindex/hyperliquid/hip6/feed-history": { "get": { "tags": ["Hyperliquid"], "summary": "HIP-6 feed history" } },
+    "/api/botindex/hyperliquid/hip6/alert-scores": { "get": { "tags": ["Hyperliquid"], "summary": "HIP-6 alert scores" } },
+    "/api/botindex/hyperliquid/hip6/launch-candidates": { "get": { "tags": ["Hyperliquid"], "summary": "HIP-6 launch candidates" } },
+
+    "/api/botindex/doppler/launches": { "get": { "tags": ["Doppler"], "summary": "Doppler launches" } },
+    "/api/botindex/doppler/score/{address}": { "get": { "tags": ["Doppler"], "summary": "Doppler score" } },
+    "/api/botindex/doppler/trending": { "get": { "tags": ["Doppler"], "summary": "Doppler trending" } },
+
+    "/api/botindex/crypto/tokens": { "get": { "tags": ["Crypto"], "summary": "Crypto tokens" } },
+    "/api/botindex/crypto/graduating": { "get": { "tags": ["Crypto"], "summary": "Crypto graduating" } },
+
+    "/api/botindex/sports/odds": { "get": { "tags": ["Sports"], "summary": "Sports odds" } },
+    "/api/botindex/sports/lines": { "get": { "tags": ["Sports"], "summary": "Line movements" } },
+    "/api/botindex/sports/props": { "get": { "tags": ["Sports"], "summary": "Props" } },
+    "/api/botindex/sports/correlations": { "get": { "tags": ["Sports"], "summary": "Correlations" } },
+    "/api/botindex/sports/optimizer": { "get": { "tags": ["Sports"], "summary": "Lineup optimizer" } },
+    "/api/botindex/sports/arb": { "get": { "tags": ["Sports"], "summary": "Arb scanner" } },
+
+    "/api/botindex/social/convergence": { "get": { "tags": ["Social"], "summary": "Convergence" } },
+    "/api/botindex/social/twitter/sentiment": { "get": { "tags": ["Social"], "summary": "Twitter sentiment" } },
+    "/api/botindex/social/twitter/narratives": { "get": { "tags": ["Social"], "summary": "Trending narratives" } },
+    "/api/botindex/social/twitter/trending": { "get": { "tags": ["Social"], "summary": "Twitter trending" } },
+
+    "/api/botindex/zora/intel": { "get": { "tags": ["Intel", "Zora"], "summary": "Zora intel" } },
+    "/api/botindex/hyperliquid/intel": { "get": { "tags": ["Intel", "Hyperliquid"], "summary": "Hyperliquid intel" } },
+    "/api/botindex/crypto/intel": { "get": { "tags": ["Intel", "Crypto"], "summary": "Crypto intel" } },
+    "/api/botindex/doppler/intel": { "get": { "tags": ["Intel", "Doppler"], "summary": "Doppler intel" } },
+
+    "/api/botindex/trust/aar/sign": { "post": { "tags": ["Trust"], "summary": "AAR sign" } },
+    "/api/botindex/trust/scc/anchor": { "post": { "tags": ["Trust"], "summary": "SCC anchor" } },
+
+    "/api/botindex/keys/register": {
+      "get": { "tags": ["Keys"], "summary": "Register key (browser)" },
+      "post": { "tags": ["Keys"], "summary": "Register key (API)" }
+    },
+    "/api/botindex/keys/info": { "get": { "tags": ["Keys"], "summary": "Key info" } },
+    "/api/botindex/keys/connect": { "get": { "tags": ["Keys"], "summary": "Connect wallet page" } },
+    "/api/botindex/keys/connect-wallet": { "post": { "tags": ["Keys"], "summary": "Connect wallet" } },
+    "/api/botindex/keys/cancel": { "get": { "tags": ["Keys"], "summary": "Registration canceled" } },
+
+    "/api/botindex/v1/signals": { "get": { "tags": ["Signals"], "summary": "Premium aggregated signals" } },
+    "/api/botindex/v1/openapi.json": { "get": { "tags": ["Signals"], "summary": "OpenAPI JSON" } }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    }
+  }
+}

@@ -47,6 +47,12 @@ app.use('/.well-known', wellKnownRouter);
 // MCP Streamable HTTP transport (no auth — Smithery handles auth)
 app.use('/mcp', mcpRouter);
 
+// OpenAPI spec (public, no auth)
+import openapiSpec from './routes/openapi.json';
+app.get('/api/botindex/v1/openapi.json', (_req, res) => {
+  res.json(openapiSpec);
+});
+
 // Health check
 app.get('/health', async (req, res) => {
   res.json({ 
