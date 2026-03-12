@@ -37,6 +37,7 @@ import arbRouter from './arb';
 import botindexKeysRouter from './botindex-keys';
 import adminDashboardRouter from './admin-dashboard';
 import botindexBeaconRouter from './botindex-beacon';
+import agorionRouter from './agorion';
 import { optionalApiKey } from '../middleware/apiKeyAuth';
 
 const router = Router();
@@ -109,6 +110,9 @@ router.use('/', shellRouter);
 
 // Admin dashboard (traffic, conversions, funnel)
 router.use('/admin/dashboard', adminDashboardRouter);
+
+// Agorion registry/discovery endpoints
+router.use('/agorion', agorionRouter);
 
 // (beacon mounted above auth layer)
 
