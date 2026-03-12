@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const payments_1 = __importDefault(require("./api/routes/payments"));
 const database_1 = require("./shared/payments/database");
+const logger_1 = require("./utils/logger");
 const app = (0, express_1.default)();
 // ========== MIDDLEWARE ==========
 // Raw body parser for Stripe webhooks (must be before JSON parser)
@@ -29,8 +30,8 @@ async function startServer() {
     // Initialize Supabase connection
     await (0, database_1.initDb)();
     app.listen(8080, () => {
-        console.log('King Backend running on port 8080');
-        console.log('Payment endpoints mounted at /api/{app}/payments/*');
+        logger_1.logger.info('King Backend running on port 8080');
+        logger_1.logger.info('Payment endpoints mounted at /api/{app}/payments/*');
     });
 }
 startServer();

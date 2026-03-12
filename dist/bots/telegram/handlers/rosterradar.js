@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createRosterRadarBot = createRosterRadarBot;
 const telegraf_1 = require("telegraf");
 const payments_1 = require("../../shared/payments");
+const logger_1 = require("../../../utils/logger");
 const APP_ID = 'rosterradar';
 function createRosterRadarBot(token) {
     const bot = new telegraf_1.Telegraf(token);
@@ -46,7 +47,8 @@ function createRosterRadarBot(token) {
             `_Full lineup payload shipping behind rollout flags._`, { parse_mode: 'Markdown' });
     });
     bot.catch((err, ctx) => {
-        console.error('[RosterRadar] Error:', err);
+        const error = err instanceof Error ? err : new Error(String(err));
+        logger_1.logger.error({ err: error, chatId: ctx.chat?.id, username: ctx.from?.username }, 'RosterRadar handler error');
         ctx.reply('⚠️ RosterRadar error. Retry shortly.').catch(() => { });
     });
     return bot;

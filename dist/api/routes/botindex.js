@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.mountBotindexX402TestRoute = mountBotindexX402TestRoute;
 const express_1 = require("express");
+const logger_1 = require("../../utils/logger");
 const correlation_routes_1 = __importDefault(require("../../services/botindex/api/correlation.routes"));
 const payments_1 = require("../../shared/payments");
 const x402_test_1 = __importDefault(require("./x402-test"));
@@ -175,7 +176,7 @@ router.get('/signals', async (req, res) => {
         res.json({ signals: merged, count: merged.length, source: 'generated' });
     }
     catch (err) {
-        console.error('[BotIndex] /signals error', err);
+        logger_1.logger.error({ err }, '/signals error');
         const fallback = Array.from(manualSignals.values()).slice(0, limit);
         res.json({ signals: fallback, count: fallback.length, source: 'manual_fallback' });
     }

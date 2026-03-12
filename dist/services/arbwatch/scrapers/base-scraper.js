@@ -10,6 +10,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BaseScraper = void 0;
 const axios_1 = __importDefault(require("axios"));
+const logger_1 = require("../../../utils/logger");
 class BaseScraper {
     config;
     client;
@@ -35,7 +36,7 @@ class BaseScraper {
         const timeSinceLastRequest = now - this.lastRequestTime;
         if (timeSinceLastRequest < this.config.rateLimitMs) {
             const waitTime = this.config.rateLimitMs - timeSinceLastRequest;
-            console.log(`${this.config.name}: Rate limiting - waiting ${waitTime}ms`);
+            logger_1.logger.debug({ scraper: this.config.name, waitTime }, 'Rate limiting');
             await new Promise(resolve => setTimeout(resolve, waitTime));
         }
         this.lastRequestTime = Date.now();
@@ -50,7 +51,7 @@ class BaseScraper {
         catch (error) {
             if (retries > 0) {
                 const delay = Math.pow(2, this.config.maxRetries - retries) * 1000;
-                console.warn(`${this.config.name}: Retry ${this.config.maxRetries - retries + 1}/${this.config.maxRetries} after ${delay}ms`);
+                logger_1.logger.warn({ scraper: this.config.name, retry: this.config.maxRetries - retries + 1, maxRetries: this.config.maxRetries, delay }, 'Retrying request');
                 await new Promise(resolve => setTimeout(resolve, delay));
                 return this.withRetry(operation, retries - 1);
             }

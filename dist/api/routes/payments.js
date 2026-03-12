@@ -6,6 +6,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const logger_1 = require("../../utils/logger");
 const access_control_1 = require("../../shared/payments/access-control");
 const stripe_client_1 = require("../../shared/payments/stripe-client");
 const webhook_handler_1 = require("../../shared/payments/webhook-handler");
@@ -197,7 +198,7 @@ router.post('/:app/payments/webhook', extractAppId, async (req, res) => {
         res.json(result);
     }
     catch (err) {
-        console.error(`Webhook error for ${appId}:`, err);
+        logger_1.logger.error({ appId, err }, 'Webhook error');
         // Still return 200 to prevent Stripe retries
         res.json({ processed: false, message: err.message });
     }

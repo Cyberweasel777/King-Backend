@@ -11,6 +11,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendMetaCapiEvent = sendMetaCapiEvent;
 const crypto_1 = __importDefault(require("crypto"));
 const config_1 = require("./config");
+const logger_1 = require("../../utils/logger");
 /**
  * Send event to Meta CAPI
  */
@@ -22,7 +23,7 @@ async function sendMetaCapiEvent(appId, event) {
     }
     const pixelId = extractPixelId(accessToken);
     if (!pixelId) {
-        console.error(`Invalid Meta CAPI token for ${appId}`);
+        logger_1.logger.error({ appId }, 'Invalid Meta CAPI token');
         return false;
     }
     const url = `https://graph.facebook.com/v18.0/${pixelId}/events?access_token=${accessToken}`;
@@ -57,13 +58,13 @@ async function sendMetaCapiEvent(appId, event) {
         });
         if (!response.ok) {
             const error = await response.text();
-            console.error(`Meta CAPI error for ${appId}:`, error);
+            logger_1.logger.error({ appId, error }, 'Meta CAPI request failed');
             return false;
         }
         return true;
     }
     catch (err) {
-        console.error(`Failed to send Meta CAPI event for ${appId}:`, err);
+        logger_1.logger.error({ appId, err }, 'Failed to send Meta CAPI event');
         return false;
     }
 }

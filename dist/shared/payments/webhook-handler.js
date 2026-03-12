@@ -13,13 +13,14 @@ const stripe_1 = __importDefault(require("stripe"));
 const config_1 = require("./config");
 const database_1 = require("./database");
 const meta_capi_1 = require("./meta-capi");
+const logger_1 = require("../../utils/logger");
 /**
  * Verify and parse Stripe webhook payload
  */
 function verifyWebhookPayload(appId, payload, signature) {
     const secret = (0, config_1.getStripeWebhookSecret)(appId);
     if (!secret) {
-        console.error(`No webhook secret for ${appId}`);
+        logger_1.logger.error({ appId }, 'No webhook secret configured');
         return null;
     }
     const secretKey = (0, config_1.getStripeSecretKey)(appId);
@@ -30,7 +31,7 @@ function verifyWebhookPayload(appId, payload, signature) {
         return stripe.webhooks.constructEvent(payload, signature, secret);
     }
     catch (err) {
-        console.error(`Webhook signature verification failed: ${err.message}`);
+        logger_1.logger.error({ appId, error: err.message }, 'Webhook signature verification failed');
         return null;
     }
 }

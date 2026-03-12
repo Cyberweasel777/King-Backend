@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createBotIndexBot = createBotIndexBot;
 const telegraf_1 = require("telegraf");
 const payments_1 = require("../../shared/payments");
+const logger_1 = require("../../../utils/logger");
 const APP_ID = 'botindex';
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:8080';
 const commandRateWindowMs = 60_000;
@@ -73,7 +74,7 @@ function createBotIndexBot(token) {
             await ctx.reply(`📊 *BotIndex Signals*\n\n${lines.join('\n')}`, { parse_mode: 'Markdown' });
         }
         catch (err) {
-            console.error('[BotIndex] signals error', err);
+            logger_1.logger.error({ err, ctx: { chatId: ctx.chat?.id, username: ctx.from?.username } }, 'Signals error');
             await ctx.reply('⚠️ Failed to fetch signals. Try again shortly.');
         }
     });
@@ -98,7 +99,7 @@ function createBotIndexBot(token) {
                 `Sample size: ${Number(data.sampleSize || 0)}`, { parse_mode: 'Markdown' });
         }
         catch (err) {
-            console.error('[BotIndex] correlation error', err);
+            logger_1.logger.error({ err, ctx: { chatId: ctx.chat?.id, username: ctx.from?.username } }, 'Correlation error');
             await ctx.reply('⚠️ Correlation lookup failed. Check token ids and retry.');
         }
     });
@@ -119,12 +120,13 @@ function createBotIndexBot(token) {
             await ctx.reply(`🧠 *Market Leaders (24h)*\n\n${lines.join('\n')}`, { parse_mode: 'Markdown' });
         }
         catch (err) {
-            console.error('[BotIndex] leaders error', err);
+            logger_1.logger.error({ err, ctx: { chatId: ctx.chat?.id, username: ctx.from?.username } }, 'Leaders error');
             await ctx.reply('⚠️ Failed to fetch leaders. Try again shortly.');
         }
     });
     bot.catch((err, ctx) => {
-        console.error('[BotIndex] Error:', err);
+        const error = err instanceof Error ? err : new Error(String(err));
+        logger_1.logger.error({ err: error, chatId: ctx.chat?.id, username: ctx.from?.username }, 'Bot handler error');
         ctx.reply('⚠️ BotIndex error. Retry in a minute.');
     });
     return bot;

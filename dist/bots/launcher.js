@@ -13,6 +13,7 @@ const memeradar_1 = require("./telegram/handlers/memeradar");
 const arbwatch_1 = require("./telegram/handlers/arbwatch");
 const spreadhunter_1 = require("./telegram/handlers/spreadhunter");
 const rosterradar_1 = require("./telegram/handlers/rosterradar");
+const logger_1 = require("../utils/logger");
 const bots = [
     {
         name: 'BotIndex',
@@ -42,32 +43,32 @@ const bots = [
 ];
 const runningBots = new Map();
 async function launchBots() {
-    console.log('Launching Telegram bots...');
+    logger_1.logger.info('Launching Telegram bots...');
     for (const config of bots) {
         const token = process.env[config.tokenEnv];
         if (!token) {
-            console.warn(`${config.name}: No token found (set ${config.tokenEnv})`);
+            logger_1.logger.warn({ bot: config.name, tokenEnv: config.tokenEnv }, 'No token found');
             continue;
         }
         try {
             const bot = config.createBot(token);
             // Start each bot independently so one failure/slow-start doesn't block others
             runningBots.set(config.name, bot);
-            console.log(`${config.name} bot launch initiated`);
+            logger_1.logger.info({ bot: config.name }, 'Bot launch initiated');
             void bot.launch({ dropPendingUpdates: true })
                 .then(() => {
-                console.log(`${config.name} bot launched`);
+                logger_1.logger.info({ bot: config.name }, 'Bot launched');
             })
                 .catch((err) => {
                 runningBots.delete(config.name);
-                console.error(`${config.name} failed to launch:`, err);
+                logger_1.logger.error({ bot: config.name, err }, 'Failed to launch bot');
             });
             // Enable graceful stop
             process.once('SIGINT', () => bot.stop('SIGINT'));
             process.once('SIGTERM', () => bot.stop('SIGTERM'));
         }
         catch (err) {
-            console.error(`${config.name} failed to initialize:`, err);
+            logger_1.logger.error({ bot: config.name, err }, 'Failed to initialize bot');
         }
     }
 }
@@ -77,10 +78,10 @@ async function shutdownAllBots() {
     for (const [name, bot] of runningBots) {
         try {
             bot.stop('shutdown');
-            console.log(`Stopped ${name}`);
+            logger_1.logger.info({ bot: name }, 'Stopped bot');
         }
         catch (err) {
-            console.error(`Error stopping ${name}:`, err);
+            logger_1.logger.error({ bot: name, err }, 'Error stopping bot');
         }
     }
     runningBots.clear();
@@ -94,6 +95,6 @@ function getBotStatus() {
 }
 // Auto-launch if run directly
 if (require.main === module) {
-    launchBots().catch(console.error);
+    launchBots().catch((err) => logger_1.logger.error({ err }, 'Failed to launch bots'));
 }
 //# sourceMappingURL=launcher.js.map

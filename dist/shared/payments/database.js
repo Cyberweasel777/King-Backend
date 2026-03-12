@@ -21,6 +21,7 @@ exports.getReferralStats = getReferralStats;
 exports.initDb = initDb;
 const arbwatch_migration_1 = require("./arbwatch-migration");
 const convex_client_1 = require("./convex-client");
+const logger_1 = require("../../utils/logger");
 let cachedStore = null;
 function store() {
     if (!cachedStore) {
@@ -205,6 +206,6 @@ async function getReferralStats(appId, externalUserId) {
     };
 }
 async function initDb() {
-    console.log('Payment database ready (Convex)');
+    logger_1.logger.info('Payment database ready (Convex)');
 }
 //# sourceMappingURL=database.js.map

@@ -44,12 +44,16 @@ const apiKeyAuth_1 = require("../middleware/apiKeyAuth");
 const router = (0, express_1.Router)();
 // Beacon must be before auth — it's a public tracking pixel
 router.use('/', botindex_beacon_1.default);
-// Global optional API key auth so paid subscribers bypass x402 pay-per-call gates.
+// Global optional API key auth — only PAID subscribers bypass x402 pay-per-call gates.
+// Free keys get higher rate limits but still hit x402 on premium endpoints.
 router.use(apiKeyAuth_1.optionalApiKey, (req, _res, next) => {
     if (req.apiKeyAuth) {
-        req.__apiKeyAuthenticated = true;
-        req.__freeTrialAuthenticated = true;
-        req.__billingMode = 'subscription';
+        const isPaid = req.apiKeyAuth.plan === 'pro' || req.apiKeyAuth.plan === 'basic';
+        if (isPaid) {
+            req.__apiKeyAuthenticated = true;
+            req.__freeTrialAuthenticated = true;
+            req.__billingMode = 'subscription';
+        }
     }
     next();
 });

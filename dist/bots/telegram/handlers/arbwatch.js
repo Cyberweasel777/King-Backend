@@ -8,6 +8,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createArbWatchBot = createArbWatchBot;
 const telegraf_1 = require("telegraf");
 const payments_1 = require("../../shared/payments");
+const logger_1 = require("../../../utils/logger");
 const APP_ID = 'arbwatch';
 function createArbWatchBot(token) {
     const bot = new telegraf_1.Telegraf(token);
@@ -71,7 +72,8 @@ function createArbWatchBot(token) {
             `Connect your exchange APIs first.`, { parse_mode: 'Markdown' });
     });
     bot.catch((err, ctx) => {
-        console.error(`[ArbWatch] Error:`, err);
+        const error = err instanceof Error ? err : new Error(String(err));
+        logger_1.logger.error({ err: error, chatId: ctx.chat?.id, username: ctx.from?.username }, 'ArbWatch handler error');
         ctx.reply('⚠️ Error occurred.');
     });
     return bot;
