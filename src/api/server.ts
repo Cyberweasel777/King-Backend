@@ -22,6 +22,8 @@ import mcpRouter from './routes/mcp';
 import mcpCatalogRouter from './routes/mcp-catalog';
 import docsRouter from './routes/docs';
 import agorionRouter from './routes/agorion';
+import botindexMemeRouter from './routes/botindex-meme';
+import botindexStablecoinRouter from './routes/botindex-stablecoin';
 import { initDb } from '../shared/payments/database';
 import logger from '../config/logger';
 
@@ -171,6 +173,10 @@ app.use('/api/botindex', optionalApiKey, (req, _res, next) => {
 // MCP Streamable HTTP transport (for Smithery + remote MCP clients)
 import mcpTransportRouter from './routes/mcp-transport';
 app.use('/api/botindex', mcpTransportRouter);
+
+// BotIndex Meme + Stablecoin intelligence routes
+app.use('/api/botindex', botindexMemeRouter);
+app.use('/api/botindex', botindexStablecoinRouter);
 
 // Mount all routes
 app.use('/api', routes);

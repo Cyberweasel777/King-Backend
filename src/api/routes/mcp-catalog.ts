@@ -63,6 +63,26 @@ router.get('/mcp-catalog', (_req, res) => {
         description: 'Token graduation signals from Catapult launchpad to Hyperliquid mainnet via GradSniper. $0.02',
         path: '/crypto/graduating',
       },
+      {
+        name: 'botindex_meme_velocity',
+        description: 'Cross-platform meme token velocity scanner. Detects sudden volume/price spikes across DexScreener, Zora, and Pump.fun. $0.02',
+        path: '/meme/velocity',
+        params: [
+          { name: 'chain', type: 'string', description: 'Filter chain: base, solana, eth', required: false, enum: ['base', 'solana', 'eth'] },
+          { name: 'min_score', type: 'number', description: 'Minimum velocity score filter', required: false },
+          { name: 'limit', type: 'number', description: 'Max results (default 200)', required: false },
+        ],
+      },
+      {
+        name: 'botindex_stablecoin_flows',
+        description: 'Large stablecoin transfer monitor for USDC/USDT on Base and Ethereum with whale/exchange/bridge flow labels. $0.02',
+        path: '/stablecoin/flows',
+        params: [
+          { name: 'chain', type: 'string', description: 'Filter chain: base, ethereum, all', required: false, enum: ['base', 'ethereum', 'all'] },
+          { name: 'min_usd', type: 'number', description: 'Minimum transfer size in USD', required: false },
+          { name: 'limit', type: 'number', description: 'Max results (default 50)', required: false },
+        ],
+      },
 
       // ── Solana ──
       {
