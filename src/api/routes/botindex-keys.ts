@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import express, { Router, Request, Response } from 'express';
 import Stripe from 'stripe';
 import { z } from 'zod';
 import logger from '../../config/logger';
@@ -472,6 +472,28 @@ router.get('/admin/keys', (req: Request, res: Response) => {
       })),
     },
   });
+});
+
+// POST /admin/upgrade — upgrade a key's plan (admin only)
+router.post('/admin/upgrade', express.json(), (req: Request, res: Response) => {
+  const adminId = typeof req.query.adminId === 'string' ? req.query.adminId : '';
+  if (adminId !== ADMIN_ID) {
+    res.status(403).json({ error: 'forbidden' });
+    return;
+  }
+  const { apiKey, plan } = req.body as { apiKey?: string; plan?: string };
+  if (!apiKey || !plan || !['free', 'basic', 'pro'].includes(plan)) {
+    res.status(400).json({ error: 'bad_request', message: 'Provide apiKey and plan (free|basic|pro)' });
+    return;
+  }
+  const entry = getApiKeyEntry(apiKey);
+  if (!entry) {
+    res.status(404).json({ error: 'not_found', message: 'API key not found' });
+    return;
+  }
+  (entry as any).plan = plan;
+  createApiKeyEntry({ apiKey, email: entry.email, plan: plan as any, stripeCustomerId: entry.stripeCustomerId, walletAddress: entry.walletAddress });
+  res.json({ ok: true, apiKey: `${apiKey.slice(0, 16)}...`, plan });
 });
 
 // POST /connect-wallet — link a wallet address to an existing API key
