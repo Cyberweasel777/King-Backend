@@ -147,8 +147,18 @@ app.use('/api/botindex/.well-known', receiptsRouter);
 app.get('/api/botindex/trust', trustLayerHandler);
 
 // Premium Intel endpoints (DeepSeek-powered, $0.05/call)
+// Must run optionalApiKey + pro bypass before intel gates (mounted outside index.ts router)
 import botindexIntelRouter from './routes/botindex-intel';
-app.use('/api/botindex', botindexIntelRouter);
+app.use('/api/botindex', optionalApiKey, (req, _res, next) => {
+  if (req.apiKeyAuth) {
+    const isPaid = req.apiKeyAuth.plan === 'pro' || req.apiKeyAuth.plan === 'basic';
+    if (isPaid) {
+      (req as any).__apiKeyAuthenticated = true;
+      (req as any).__freeTrialAuthenticated = true;
+    }
+  }
+  next();
+}, botindexIntelRouter);
 
 // MCP Streamable HTTP transport (for Smithery + remote MCP clients)
 import mcpTransportRouter from './routes/mcp-transport';
