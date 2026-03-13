@@ -13,6 +13,8 @@ import logger from '../../config/logger';
 
 const router = Router();
 const ACCOUNTS_MONITORED = watchlist.length;
+const STALE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
+let backgroundRefreshRunning = false;
 
 const METADATA = {
   protocol: 'x402',
@@ -22,11 +24,45 @@ const METADATA = {
   accounts_monitored: ACCOUNTS_MONITORED,
 } as const;
 
+// Background auto-refresh when cache is stale (fire-and-forget, non-blocking)
+async function maybeBackgroundRefresh(): Promise<void> {
+  const age = getCacheAge();
+  if (backgroundRefreshRunning) return;
+  if (age !== null && age < STALE_THRESHOLD_MS) return;
+
+  backgroundRefreshRunning = true;
+  const limit = Math.min(50, ACCOUNTS_MONITORED); // lighter refresh for background
+  const handles = watchlist.slice(0, limit).map((a) => a.screen_name);
+
+  try {
+    logger.info({ handles: handles.length }, 'Social auto-refresh: starting background scrape');
+    const tweets = await fetchRecentTweets(handles, 5);
+    const accountsWithTweets = new Set(tweets.map((t) => t.handle)).size;
+    const sentimentResults = await analyzeSentiment(tweets);
+    const convergenceSignals = scoreConvergence(sentimentResults);
+
+    updateCache({
+      convergenceSignals,
+      sentimentResults,
+      tweets,
+      accountsScraped: handles.length,
+      accountsWithTweets,
+      durationMs: 0,
+    });
+    logger.info({ tweets: tweets.length }, 'Social auto-refresh: complete');
+  } catch (err) {
+    logger.warn({ err }, 'Social auto-refresh: failed (will retry on next request)');
+  } finally {
+    backgroundRefreshRunning = false;
+  }
+}
+
 // GET /social/convergence — top convergence signals (scored, ranked)
 router.get(
   '/social/convergence',
   createX402Gate({ price: '$0.02', description: 'Cross-platform convergence signals from crypto Twitter' }),
   (_req: Request, res: Response) => {
+    void maybeBackgroundRefresh();
     const cache = getCache();
     const ageMs = getCacheAge();
 
@@ -46,6 +82,7 @@ router.get(
   '/social/twitter/sentiment',
   createX402Gate({ price: '$0.02', description: 'Per-token Twitter sentiment from crypto watchlist' }),
   (req: Request, res: Response) => {
+    void maybeBackgroundRefresh();
     const token = (req.query.token as string || '').toUpperCase();
     const cache = getCache();
 
@@ -89,6 +126,7 @@ router.get(
   '/social/twitter/narratives',
   createX402Gate({ price: '$0.02', description: 'Trending narrative clusters from crypto Twitter' }),
   (_req: Request, res: Response) => {
+    void maybeBackgroundRefresh();
     const cache = getCache();
 
     // Cluster tokens by co-occurrence
@@ -128,6 +166,7 @@ router.get(
   '/social/twitter/trending',
   createX402Gate({ price: '$0.02', description: 'Trending tokens on crypto Twitter (last 4 hours)' }),
   (_req: Request, res: Response) => {
+    void maybeBackgroundRefresh();
     const cache = getCache();
     const fourHoursAgo = Date.now() - 4 * 60 * 60 * 1000;
 
