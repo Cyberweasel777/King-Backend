@@ -1,9 +1,42 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = require("express");
+const express_1 = __importStar(require("express"));
 const stripe_1 = __importDefault(require("stripe"));
 const zod_1 = require("zod");
 const logger_1 = __importDefault(require("../../config/logger"));
@@ -428,6 +461,54 @@ router.get('/admin/keys', (req, res) => {
             })),
         },
     });
+});
+// POST /admin/upgrade — upgrade a key's plan (admin only)
+router.post('/admin/upgrade', express_1.default.json(), (req, res) => {
+    const adminId = typeof req.query.adminId === 'string' ? req.query.adminId : '';
+    if (adminId !== ADMIN_ID) {
+        res.status(403).json({ error: 'forbidden' });
+        return;
+    }
+    const { apiKey, plan } = req.body;
+    if (!apiKey || !plan || !['free', 'basic', 'pro'].includes(plan)) {
+        res.status(400).json({ error: 'bad_request', message: 'Provide apiKey and plan (free|basic|pro)' });
+        return;
+    }
+    const entry = (0, apiKeyAuth_1.getApiKeyEntry)(apiKey);
+    if (!entry) {
+        res.status(404).json({ error: 'not_found', message: 'API key not found' });
+        return;
+    }
+    entry.plan = plan;
+    (0, apiKeyAuth_1.createApiKeyEntry)({ apiKey, email: entry.email, plan: plan, stripeCustomerId: entry.stripeCustomerId, walletAddress: entry.walletAddress });
+    res.json({ ok: true, apiKey: `${apiKey.slice(0, 16)}...`, plan });
+});
+// POST /admin/daily-limit — set daily request cap on a key (admin only)
+router.post('/admin/daily-limit', express_1.default.json(), (req, res) => {
+    const adminId = typeof req.query.adminId === 'string' ? req.query.adminId : '';
+    if (adminId !== ADMIN_ID) {
+        res.status(403).json({ error: 'forbidden' });
+        return;
+    }
+    const { apiKey, dailyLimit } = req.body;
+    if (!apiKey || dailyLimit === undefined || dailyLimit < 0) {
+        res.status(400).json({ error: 'bad_request', message: 'Provide apiKey and dailyLimit (0 = unlimited)' });
+        return;
+    }
+    const entry = (0, apiKeyAuth_1.getApiKeyEntry)(apiKey);
+    if (!entry) {
+        res.status(404).json({ error: 'not_found', message: 'API key not found' });
+        return;
+    }
+    if (dailyLimit === 0) {
+        delete entry.dailyLimit;
+        delete entry.dailyCount;
+        delete entry.dailyCountDate;
+    }
+    else {
+        entry.dailyLimit = dailyLimit;
+    }
+    res.json({ ok: true, apiKey: `${apiKey.slice(0, 16)}...`, dailyLimit: dailyLimit || 'unlimited' });
 });
 // POST /connect-wallet — link a wallet address to an existing API key
 const connectWalletSchema = zod_1.z.object({

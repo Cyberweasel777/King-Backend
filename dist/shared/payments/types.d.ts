@@ -1,7 +1,7 @@
 /**
  * Payment Module Type Definitions
  */
-export type AppId = 'spreadhunter' | 'deckvault' | 'packpal' | 'dropfarm' | 'dropscout' | 'launchradar' | 'memeradar' | 'memestock' | 'nftpulse' | 'pointtrack' | 'rosterradar' | 'skinsignal' | 'socialindex' | 'botindex' | 'arbwatch';
+export type AppId = 'spreadhunter' | 'deckvault' | 'packpal' | 'dropfarm' | 'dropscout' | 'launchradar' | 'memeradar' | 'memestock' | 'nftpulse' | 'pointtrack' | 'rosterradar' | 'skinsignal' | 'socialindex' | 'botindex' | 'arbwatch' | 'baseradar';
 export type SubscriptionTier = 'free' | 'starter' | 'basic' | 'pro' | 'elite' | 'enterprise';
 export type SubscriptionStatus = 'active' | 'inactive' | 'past_due' | 'canceled' | 'trialing';
 export interface TierConfig {

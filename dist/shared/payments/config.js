@@ -32,6 +32,7 @@ const APP_ENV_PREFIXES = {
     socialindex: 'SOCIALINDEX',
     botindex: 'BOTINDEX',
     arbwatch: 'ARBWATCH',
+    baseradar: 'BASERADAR',
 };
 function getStripeSecretKey(appId) {
     const prefix = APP_ENV_PREFIXES[appId];

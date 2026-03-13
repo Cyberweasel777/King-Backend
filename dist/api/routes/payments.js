@@ -19,7 +19,8 @@ const extractAppId = (req, res, next) => {
     const validApps = [
         'spreadhunter', 'deckvault', 'packpal', 'dropfarm', 'dropscout',
         'launchradar', 'memeradar', 'memestock', 'nftpulse', 'pointtrack',
-        'rosterradar', 'skinsignal', 'socialindex', 'botindex', 'arbwatch'
+        'rosterradar', 'skinsignal', 'socialindex', 'botindex', 'arbwatch',
+        'baseradar'
     ];
     if (!validApps.includes(appId)) {
         return res.status(400).json({ error: 'Invalid app ID' });

@@ -58,6 +58,7 @@ const receiptMiddleware_1 = require("./middleware/receiptMiddleware");
 const mcp_1 = __importDefault(require("./routes/mcp"));
 const mcp_catalog_1 = __importDefault(require("./routes/mcp-catalog"));
 const docs_1 = __importDefault(require("./routes/docs"));
+const agorion_1 = __importDefault(require("./routes/agorion"));
 const database_1 = require("../shared/payments/database");
 const logger_1 = __importDefault(require("../config/logger"));
 const app = (0, express_1.default)();
@@ -76,12 +77,21 @@ app.use(express_1.default.json({ limit: '10mb' }));
 app.use('/.well-known', well_known_1.default);
 // MCP Streamable HTTP transport (no auth — Smithery handles auth)
 app.use('/mcp', mcp_1.default);
+// OpenAPI specs (public, no auth)
+const openapi_json_1 = __importDefault(require("./routes/openapi.json"));
+const openapi_gpt_json_1 = __importDefault(require("./routes/openapi-gpt.json"));
+app.get('/api/botindex/v1/openapi.json', (_req, res) => {
+    res.json(openapi_json_1.default);
+});
+app.get('/api/botindex/v1/openapi-gpt.json', (_req, res) => {
+    res.json(openapi_gpt_json_1.default);
+});
 // Health check
 app.get('/health', async (req, res) => {
     res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
-        canary: ['botindex', 'memeradar', 'arbwatch', 'skinsignal'],
+        canary: ['botindex', 'memeradar', 'arbwatch', 'skinsignal', 'agorion'],
         botindexDomains: ['sports', 'crypto', 'commerce', 'zora', 'hyperliquid', 'genesis', 'signals'],
         x402: {
             enabled: x402Config.enabled,
@@ -95,6 +105,8 @@ app.use(hitCounter_1.hitCounter);
 const BEACON_PIXEL = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
 // MCP Tool Catalog — for dynamic tool discovery by MCP servers (public, no auth)
 app.use('/api/botindex', mcp_catalog_1.default);
+// Agorion auto-discovery crawler and registry API
+app.use('/api/agorion', agorion_1.default);
 // BotIndex beacon
 app.get('/api/botindex/beacon', (req, res) => {
     res.set({
@@ -152,8 +164,18 @@ app.use('/api/botindex/receipts', receipts_1.default);
 app.use('/api/botindex/.well-known', receipts_1.default);
 app.get('/api/botindex/trust', receipts_1.trustLayerHandler);
 // Premium Intel endpoints (DeepSeek-powered, $0.05/call)
+// Must run optionalApiKey + pro bypass before intel gates (mounted outside index.ts router)
 const botindex_intel_1 = __importDefault(require("./routes/botindex-intel"));
-app.use('/api/botindex', botindex_intel_1.default);
+app.use('/api/botindex', apiKeyAuth_1.optionalApiKey, (req, _res, next) => {
+    if (req.apiKeyAuth) {
+        const isPaid = req.apiKeyAuth.plan === 'pro' || req.apiKeyAuth.plan === 'basic';
+        if (isPaid) {
+            req.__apiKeyAuthenticated = true;
+            req.__freeTrialAuthenticated = true;
+        }
+    }
+    next();
+}, botindex_intel_1.default);
 // MCP Streamable HTTP transport (for Smithery + remote MCP clients)
 const mcp_transport_1 = __importDefault(require("./routes/mcp-transport"));
 app.use('/api/botindex', mcp_transport_1.default);
@@ -163,6 +185,36 @@ app.use('/api', index_1.default);
 app.use('/docs', docs_1.default);
 // Error handling
 app.use(errorHandler_1.errorHandler);
+// Privacy policy for GPT Store
+app.get('/privacy', (_req, res) => {
+    res.setHeader('Content-Type', 'text/html');
+    res.send(`<!DOCTYPE html><html><head><title>BotIndex Privacy Policy</title></head><body style="font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#333">
+<h1>BotIndex Privacy Policy</h1>
+<p><strong>Last updated:</strong> March 12, 2026</p>
+<h2>Data We Collect</h2>
+<p>When you use BotIndex through the GPT Store or API, we collect:</p>
+<ul>
+<li>API requests (endpoint, timestamp, IP address hash for rate limiting)</li>
+<li>Email address (only if you register an API key)</li>
+</ul>
+<h2>How We Use Your Data</h2>
+<ul>
+<li>Rate limiting and abuse prevention</li>
+<li>Service improvement and usage analytics</li>
+<li>Account management (API key holders only)</li>
+</ul>
+<h2>Data We Do NOT Collect</h2>
+<ul>
+<li>We do not store your ChatGPT conversations</li>
+<li>We do not sell or share personal data with third parties</li>
+<li>We do not use tracking cookies</li>
+</ul>
+<h2>Data Retention</h2>
+<p>API request logs are retained for 30 days. API key account data is retained until you request deletion.</p>
+<h2>Contact</h2>
+<p>For privacy inquiries: privacy@botindex.dev</p>
+</body></html>`);
+});
 // Root redirect to landing page on Vercel
 app.get('/', (_req, res) => {
     res.redirect(301, 'https://botindex.dev');
@@ -187,4 +239,5 @@ start().catch((error) => {
     logger_1.default.error({ err: error }, 'Failed to start API server');
 });
 exports.default = app;
+// This won't work appended at end, need to insert before 404 handler
 //# sourceMappingURL=server.js.map

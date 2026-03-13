@@ -16,6 +16,8 @@ const twitter_crypto_watchlist_json_1 = __importDefault(require("../../services/
 const logger_1 = __importDefault(require("../../config/logger"));
 const router = (0, express_1.Router)();
 const ACCOUNTS_MONITORED = twitter_crypto_watchlist_json_1.default.length;
+const STALE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
+let backgroundRefreshRunning = false;
 const METADATA = {
     protocol: 'x402',
     version: '1.0',
@@ -23,8 +25,42 @@ const METADATA = {
     source: 'twitter_watchlist',
     accounts_monitored: ACCOUNTS_MONITORED,
 };
+// Background auto-refresh when cache is stale (fire-and-forget, non-blocking)
+async function maybeBackgroundRefresh() {
+    const age = (0, social_cache_1.getCacheAge)();
+    if (backgroundRefreshRunning)
+        return;
+    if (age !== null && age < STALE_THRESHOLD_MS)
+        return;
+    backgroundRefreshRunning = true;
+    const limit = Math.min(50, ACCOUNTS_MONITORED); // lighter refresh for background
+    const handles = twitter_crypto_watchlist_json_1.default.slice(0, limit).map((a) => a.screen_name);
+    try {
+        logger_1.default.info({ handles: handles.length }, 'Social auto-refresh: starting background scrape');
+        const tweets = await (0, twitter_scraper_1.fetchRecentTweets)(handles, 5);
+        const accountsWithTweets = new Set(tweets.map((t) => t.handle)).size;
+        const sentimentResults = await (0, sentiment_analyzer_1.analyzeSentiment)(tweets);
+        const convergenceSignals = (0, convergence_scorer_1.scoreConvergence)(sentimentResults);
+        (0, social_cache_1.updateCache)({
+            convergenceSignals,
+            sentimentResults,
+            tweets,
+            accountsScraped: handles.length,
+            accountsWithTweets,
+            durationMs: 0,
+        });
+        logger_1.default.info({ tweets: tweets.length }, 'Social auto-refresh: complete');
+    }
+    catch (err) {
+        logger_1.default.warn({ err }, 'Social auto-refresh: failed (will retry on next request)');
+    }
+    finally {
+        backgroundRefreshRunning = false;
+    }
+}
 // GET /social/convergence — top convergence signals (scored, ranked)
 router.get('/social/convergence', (0, x402Gate_1.createX402Gate)({ price: '$0.02', description: 'Cross-platform convergence signals from crypto Twitter' }), (_req, res) => {
+    void maybeBackgroundRefresh();
     const cache = (0, social_cache_1.getCache)();
     const ageMs = (0, social_cache_1.getCacheAge)();
     res.json({
@@ -38,6 +74,7 @@ router.get('/social/convergence', (0, x402Gate_1.createX402Gate)({ price: '$0.02
 });
 // GET /social/twitter/sentiment?token=SOL — per-token sentiment
 router.get('/social/twitter/sentiment', (0, x402Gate_1.createX402Gate)({ price: '$0.02', description: 'Per-token Twitter sentiment from crypto watchlist' }), (req, res) => {
+    void maybeBackgroundRefresh();
     const token = (req.query.token || '').toUpperCase();
     const cache = (0, social_cache_1.getCache)();
     if (token) {
@@ -73,6 +110,7 @@ router.get('/social/twitter/sentiment', (0, x402Gate_1.createX402Gate)({ price: 
 });
 // GET /social/twitter/narratives — trending narrative clusters
 router.get('/social/twitter/narratives', (0, x402Gate_1.createX402Gate)({ price: '$0.02', description: 'Trending narrative clusters from crypto Twitter' }), (_req, res) => {
+    void maybeBackgroundRefresh();
     const cache = (0, social_cache_1.getCache)();
     // Cluster tokens by co-occurrence
     const coOccurrence = new Map();
@@ -106,6 +144,7 @@ router.get('/social/twitter/narratives', (0, x402Gate_1.createX402Gate)({ price:
 });
 // GET /social/twitter/trending — most mentioned tokens in last 4 hours
 router.get('/social/twitter/trending', (0, x402Gate_1.createX402Gate)({ price: '$0.02', description: 'Trending tokens on crypto Twitter (last 4 hours)' }), (_req, res) => {
+    void maybeBackgroundRefresh();
     const cache = (0, social_cache_1.getCache)();
     const fourHoursAgo = Date.now() - 4 * 60 * 60 * 1000;
     const recent = cache.sentimentResults.filter((r) => Date.parse(r.timestamp) > fourHoursAgo);

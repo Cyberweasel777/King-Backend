@@ -13,7 +13,7 @@ const express_1 = require("express");
 const stripe_client_1 = require("../../shared/payments/stripe-client");
 const config_1 = require("../../shared/payments/config");
 const router = (0, express_1.Router)();
-const CANARY_APPS = ['botindex', 'memeradar', 'arbwatch', 'spreadhunter', 'rosterradar'];
+const CANARY_APPS = ['botindex', 'memeradar', 'arbwatch', 'spreadhunter', 'rosterradar', 'baseradar'];
 function getExternalUserId(req) {
     const h = req.header('x-external-user-id');
     const q = typeof req.query.user === 'string' ? req.query.user : null;

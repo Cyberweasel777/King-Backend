@@ -38,11 +38,15 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const node_crypto_1 = require("node:crypto");
 const zod_1 = require("zod");
-const logger_1 = require("../../utils/logger");
+const logger_1 = __importDefault(require("../../config/logger"));
+const mcpRateLimit_1 = require("../middleware/mcpRateLimit");
 const MCP_SESSION_HEADER = 'mcp-session-id';
 const BASE_URL = process.env.BOTINDEX_URL || 'https://king-backend.fly.dev/api/botindex/v1';
 const mcpRouter = (0, express_1.Router)();
@@ -63,7 +67,7 @@ async function loadSdk() {
         return true;
     }
     catch (err) {
-        logger_1.logger.error({ err }, 'Failed to load MCP SDK');
+        logger_1.default.error({ err }, 'Failed to load MCP SDK');
         return false;
     }
 }
@@ -198,7 +202,7 @@ function createServer() {
     return server;
 }
 // ── Routes ────────────────────────────────────────────────────────
-mcpRouter.post('/', async (req, res) => {
+mcpRouter.post('/', mcpRateLimit_1.mcpRateLimit, async (req, res) => {
     if (!await loadSdk()) {
         sendErr(res, 503, -32603, 'MCP SDK unavailable');
         return;
@@ -227,7 +231,7 @@ mcpRouter.post('/', async (req, res) => {
             await server.close();
     }
     catch (err) {
-        logger_1.logger.error({ err }, 'MCP POST error');
+        logger_1.default.error({ err }, 'MCP POST error');
         if (!res.headersSent)
             sendErr(res, 500, -32603, 'Internal server error');
     }
@@ -258,7 +262,7 @@ mcpRouter.get('/', async (req, res) => {
         await handleSession(req, res);
     }
     catch (err) {
-        logger_1.logger.error({ err }, 'MCP GET error');
+        logger_1.default.error({ err }, 'MCP GET error');
         if (!res.headersSent)
             sendErr(res, 500, -32603, 'Internal error');
     }
@@ -268,7 +272,7 @@ mcpRouter.delete('/', async (req, res) => {
         await handleSession(req, res);
     }
     catch (err) {
-        logger_1.logger.error({ err }, 'MCP DELETE error');
+        logger_1.default.error({ err }, 'MCP DELETE error');
         if (!res.headersSent)
             sendErr(res, 500, -32603, 'Internal error');
     }

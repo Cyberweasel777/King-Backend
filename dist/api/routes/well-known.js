@@ -265,5 +265,101 @@ router.get('/mcp.json', (_req, res) => {
         ],
     });
 });
+// ============================================================
+// Agorion Agent Services Manifest (agent-to-agent discovery)
+// ============================================================
+router.get('/agent-services.json', (_req, res) => {
+    res.json({
+        schema_version: '1.0',
+        provider: {
+            name: 'BotIndex',
+            description: 'AI-native signal intelligence API. Crypto market data, whale alerts, prediction market edges, Zora trending coins, Hyperliquid funding arb, and regulatory intelligence. Serves both human developers (API keys) and autonomous agents (x402 micropayments).',
+            url: BASE_URL,
+            contact: 'api@botindex.dev',
+        },
+        services: [
+            {
+                id: 'botindex-crypto',
+                name: 'Crypto Intelligence',
+                description: 'Token correlations, graduation signals, Zora trending coins, whale alerts, funding arbitrage.',
+                capabilities: ['crypto-correlations', 'whale-alerts', 'zora-trending', 'funding-arb', 'token-graduation'],
+                endpoints: [
+                    { path: '/api/botindex/zora/trending-coins', method: 'GET', description: 'Trending Zora coins by volume' },
+                    { path: '/api/botindex/hyperliquid/funding-arb', method: 'GET', description: 'Hyperliquid funding rate arbitrage' },
+                    { path: '/api/botindex/hyperliquid/whale-alerts', method: 'GET', description: 'Whale trade alerts >$5k' },
+                    { path: '/api/botindex/hyperliquid/correlation-matrix', method: 'GET', description: 'Token correlation matrix' },
+                    { path: '/api/botindex/v1/crypto/tokens', method: 'GET', description: 'Token universe with prices' },
+                    { path: '/api/botindex/v1/crypto/graduating', method: 'GET', description: 'Catapult→Hyperliquid graduation signals' },
+                ],
+                pricing: { model: 'x402', currency: 'USDC', network: 'Base', perRequest: '$0.02' },
+            },
+            {
+                id: 'botindex-sports',
+                name: 'Sports Intelligence',
+                description: 'Live odds, line movements, player correlations, DFS optimization, arbitrage detection.',
+                capabilities: ['sports-odds', 'line-movements', 'player-correlations', 'dfs-optimizer', 'arbitrage'],
+                endpoints: [
+                    { path: '/api/botindex/v1/sports/odds', method: 'GET', description: 'Live sports odds' },
+                    { path: '/api/botindex/v1/sports/correlations', method: 'GET', description: 'Player correlation matrix' },
+                    { path: '/api/botindex/v1/sports/arb', method: 'GET', description: 'Arbitrage scanner' },
+                ],
+                pricing: { model: 'x402', currency: 'USDC', network: 'Base', perRequest: '$0.02-$0.10' },
+            },
+            {
+                id: 'botindex-signals',
+                name: 'Aggregated Signals',
+                description: 'Premium signal feed combining all intelligence sources into ranked actionable alerts.',
+                capabilities: ['aggregated-signals', 'market-heatmap', 'agent-traces'],
+                endpoints: [
+                    { path: '/api/botindex/v1/signals', method: 'GET', description: 'Aggregated signals feed' },
+                    { path: '/api/botindex/v1/dashboard', method: 'GET', description: 'Full premium dashboard' },
+                ],
+                pricing: { model: 'x402', currency: 'USDC', network: 'Base', perRequest: '$0.10-$0.50' },
+            },
+            {
+                id: 'botindex-mcp',
+                name: 'MCP Server',
+                description: 'Model Context Protocol server with 29 tools for AI agent integration.',
+                capabilities: ['mcp-server', 'tool-calling', 'agent-integration'],
+                endpoints: [
+                    { path: '/mcp', method: 'POST', description: 'MCP Streamable HTTP transport' },
+                    { path: '/api/botindex/mcp-catalog', method: 'GET', description: 'MCP tool catalog' },
+                ],
+                pricing: { model: 'freemium', freeCallsPerDay: 5, paidVia: 'api_key' },
+            },
+            {
+                id: 'agorion-registry',
+                name: 'Agorion Agent Registry',
+                description: 'Auto-discovery registry of 170+ agent service providers with health scores and capability search.',
+                capabilities: ['agent-discovery', 'provider-registry', 'health-monitoring'],
+                endpoints: [
+                    { path: '/api/agorion/discover', method: 'GET', description: 'Search providers by capability' },
+                    { path: '/api/agorion/providers', method: 'GET', description: 'List all providers' },
+                    { path: '/api/agorion/stats', method: 'GET', description: 'Registry statistics' },
+                ],
+                pricing: { model: 'free' },
+            },
+        ],
+        auth: {
+            methods: [
+                { type: 'x402', description: 'Micropayment per request via USDC on Base', wallet: '0x7E6C8EAc1b1b8E628fa6169eEeDf3cF9638b3Cbd' },
+                { type: 'api_key', description: 'API key via X-API-Key header', registrationUrl: `${BASE_URL}/api/botindex/keys/register` },
+                { type: 'anonymous', description: 'Rate-limited free tier (3 calls/day)' },
+            ],
+        },
+        trust: {
+            aar: true,
+            receiptHeader: 'X-BotIndex-Receipt',
+            publicKeyUrl: `${BASE_URL}/.well-known/receipt-pubkey`,
+            spec: 'https://github.com/Cyberweasel777/agent-action-receipt-spec',
+        },
+        discovery: {
+            openapi: `${BASE_URL}/api/botindex/v1/openapi.json`,
+            aiPlugin: `${BASE_URL}/.well-known/ai-plugin.json`,
+            mcp: `${BASE_URL}/.well-known/mcp.json`,
+            mcpTransport: `${BASE_URL}/mcp`,
+        },
+    });
+});
 exports.default = router;
 //# sourceMappingURL=well-known.js.map

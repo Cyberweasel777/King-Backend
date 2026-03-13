@@ -8,6 +8,9 @@ export interface ApiKeyLedgerEntry {
     createdAt: string;
     lastUsed: string;
     requestCount: number;
+    dailyLimit?: number;
+    dailyCount?: number;
+    dailyCountDate?: string;
     status: 'active';
 }
 declare global {
