@@ -21,6 +21,7 @@ import { initReceiptSigning, receiptMiddleware } from './middleware/receiptMiddl
 import mcpRouter from './routes/mcp';
 import mcpCatalogRouter from './routes/mcp-catalog';
 import docsRouter from './routes/docs';
+import agorionRouter from './routes/agorion';
 import { initDb } from '../shared/payments/database';
 import logger from '../config/logger';
 
@@ -62,7 +63,7 @@ app.get('/health', async (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    canary: ['botindex', 'memeradar', 'arbwatch', 'skinsignal'],
+    canary: ['botindex', 'memeradar', 'arbwatch', 'skinsignal', 'agorion'],
     botindexDomains: ['sports', 'crypto', 'commerce', 'zora', 'hyperliquid', 'genesis', 'signals'],
     x402: {
       enabled: x402Config.enabled,
@@ -82,6 +83,9 @@ const BEACON_PIXEL = Buffer.from(
 
 // MCP Tool Catalog — for dynamic tool discovery by MCP servers (public, no auth)
 app.use('/api/botindex', mcpCatalogRouter);
+
+// Agorion auto-discovery crawler and registry API
+app.use('/api/agorion', agorionRouter);
 
 // BotIndex beacon
 app.get('/api/botindex/beacon', (req, res) => {
