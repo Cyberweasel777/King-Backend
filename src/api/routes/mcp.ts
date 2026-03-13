@@ -8,7 +8,8 @@
 import { Router, type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { logger } from '../../utils/logger';
+import logger from '../../config/logger';
+import { mcpRateLimit } from '../middleware/mcpRateLimit';
 
 const MCP_SESSION_HEADER = 'mcp-session-id';
 const BASE_URL = process.env.BOTINDEX_URL || 'https://king-backend.fly.dev/api/botindex/v1';
@@ -150,7 +151,7 @@ function createServer(): any {
 
 // ── Routes ────────────────────────────────────────────────────────
 
-mcpRouter.post('/', async (req: Request, res: Response) => {
+mcpRouter.post('/', mcpRateLimit, async (req: Request, res: Response) => {
   if (!await loadSdk()) { sendErr(res, 503, -32603, 'MCP SDK unavailable'); return; }
   try {
     const sessionId = getSessionId(req);

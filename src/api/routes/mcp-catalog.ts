@@ -11,6 +11,9 @@ router.get('/mcp-catalog', (_req, res) => {
   res.json({
     version: '2.0.0',
     updated: new Date().toISOString(),
+    notes: {
+      mcpFreeTier: 'MCP free tier: 5 tool/resource calls per UTC day per IP. Use X-API-Key for unlimited MCP access.',
+    },
     tools: [
       // ── Sports ──
       {
