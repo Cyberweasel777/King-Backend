@@ -14,6 +14,9 @@ export interface ApiKeyLedgerEntry {
   createdAt: string;
   lastUsed: string;
   requestCount: number;
+  dailyLimit?: number; // if set, cap requests per UTC day
+  dailyCount?: number;
+  dailyCountDate?: string; // YYYY-MM-DD UTC
   status: 'active';
 }
 
@@ -79,9 +82,32 @@ function extractApiKey(req: Request): string | null {
   return firstValue || null;
 }
 
+function todayUTC(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function isDailyLimitExceeded(entry: ApiKeyLedgerEntry): boolean {
+  if (!entry.dailyLimit) return false;
+  const today = todayUTC();
+  if (entry.dailyCountDate !== today) return false; // new day, not exceeded yet
+  return (entry.dailyCount || 0) >= entry.dailyLimit;
+}
+
 function touchValidKey(apiKey: string, entry: ApiKeyLedgerEntry): void {
   entry.requestCount += 1;
   entry.lastUsed = new Date().toISOString();
+
+  // Track daily count if dailyLimit is set
+  if (entry.dailyLimit) {
+    const today = todayUTC();
+    if (entry.dailyCountDate !== today) {
+      entry.dailyCount = 1;
+      entry.dailyCountDate = today;
+    } else {
+      entry.dailyCount = (entry.dailyCount || 0) + 1;
+    }
+  }
+
   apiKeyLedger.set(apiKey, entry);
   scheduleLedgerFlush();
 }
@@ -162,7 +188,7 @@ export const requireApiKey: RequestHandler = (req: Request, res: Response, next:
   next();
 };
 
-export const optionalApiKey: RequestHandler = (req: Request, _res: Response, next: NextFunction) => {
+export const optionalApiKey: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
   const apiKey = extractApiKey(req);
   if (!apiKey) {
     next();
@@ -172,6 +198,19 @@ export const optionalApiKey: RequestHandler = (req: Request, _res: Response, nex
   const entry = resolveActiveEntry(apiKey);
   if (!entry) {
     next();
+    return;
+  }
+
+  // Check daily limit BEFORE touching (so we don't count the rejected request)
+  if (isDailyLimitExceeded(entry)) {
+    res.status(429).json({
+      error: 'daily_limit_exceeded',
+      message: `Daily limit of ${entry.dailyLimit} requests reached. Resets at midnight UTC.`,
+      upgrade: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
+      resetAt: `${todayUTC()}T23:59:59Z`,
+      used: entry.dailyCount,
+      limit: entry.dailyLimit,
+    });
     return;
   }
 

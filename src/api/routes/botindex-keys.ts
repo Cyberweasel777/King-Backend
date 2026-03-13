@@ -496,6 +496,33 @@ router.post('/admin/upgrade', express.json(), (req: Request, res: Response) => {
   res.json({ ok: true, apiKey: `${apiKey.slice(0, 16)}...`, plan });
 });
 
+// POST /admin/daily-limit — set daily request cap on a key (admin only)
+router.post('/admin/daily-limit', express.json(), (req: Request, res: Response) => {
+  const adminId = typeof req.query.adminId === 'string' ? req.query.adminId : '';
+  if (adminId !== ADMIN_ID) {
+    res.status(403).json({ error: 'forbidden' });
+    return;
+  }
+  const { apiKey, dailyLimit } = req.body as { apiKey?: string; dailyLimit?: number };
+  if (!apiKey || dailyLimit === undefined || dailyLimit < 0) {
+    res.status(400).json({ error: 'bad_request', message: 'Provide apiKey and dailyLimit (0 = unlimited)' });
+    return;
+  }
+  const entry = getApiKeyEntry(apiKey);
+  if (!entry) {
+    res.status(404).json({ error: 'not_found', message: 'API key not found' });
+    return;
+  }
+  if (dailyLimit === 0) {
+    delete entry.dailyLimit;
+    delete entry.dailyCount;
+    delete entry.dailyCountDate;
+  } else {
+    entry.dailyLimit = dailyLimit;
+  }
+  res.json({ ok: true, apiKey: `${apiKey.slice(0, 16)}...`, dailyLimit: dailyLimit || 'unlimited' });
+});
+
 // POST /connect-wallet — link a wallet address to an existing API key
 const connectWalletSchema = z.object({
   wallet: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Must be a valid Ethereum address'),
