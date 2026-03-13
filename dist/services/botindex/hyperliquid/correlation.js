@@ -7,6 +7,8 @@ exports.getHLCorrelationMatrix = getHLCorrelationMatrix;
 const logger_1 = __importDefault(require("../../../config/logger"));
 const HL_INFO_URL = 'https://api.hyperliquid.xyz/info';
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const CANDLE_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
+const CORRELATION_COINS = ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP', 'AVAX', 'LINK', 'ARB', 'OP', 'SUI'];
 const correlationCache = new Map();
 function toRecord(value) {
     if (typeof value !== 'object' || value === null)
@@ -21,11 +23,6 @@ function toNumber(value) {
         if (Number.isFinite(parsed))
             return parsed;
     }
-    return null;
-}
-function toStringValue(value) {
-    if (typeof value === 'string' && value.trim().length > 0)
-        return value.trim();
     return null;
 }
 function round(value, decimals) {
@@ -54,38 +51,6 @@ async function postHyperliquidInfo(body) {
         clearTimeout(timeout);
     }
 }
-async function fetchTopSymbols(limit) {
-    const payload = await postHyperliquidInfo({ type: 'metaAndAssetCtxs' });
-    if (!Array.isArray(payload) || payload.length < 2) {
-        throw new Error('Unexpected Hyperliquid metaAndAssetCtxs response');
-    }
-    const meta = toRecord(payload[0]);
-    const contexts = Array.isArray(payload[1]) ? payload[1] : [];
-    const universe = meta && Array.isArray(meta.universe) ? meta.universe : [];
-    const ranked = [];
-    const length = Math.min(universe.length, contexts.length);
-    for (let index = 0; index < length; index += 1) {
-        const universeItem = toRecord(universe[index]);
-        const ctxItem = toRecord(contexts[index]);
-        if (!universeItem || !ctxItem)
-            continue;
-        const symbol = toStringValue(universeItem.name ?? universeItem.coin ?? universeItem.symbol);
-        const openInterest = toNumber(ctxItem.openInterest) ?? 0;
-        if (!symbol)
-            continue;
-        ranked.push({
-            symbol: symbol.toUpperCase(),
-            openInterest,
-            index,
-        });
-    }
-    ranked.sort((a, b) => {
-        if (b.openInterest !== a.openInterest)
-            return b.openInterest - a.openInterest;
-        return a.index - b.index;
-    });
-    return ranked.slice(0, limit).map((asset) => asset.symbol);
-}
 function parseCandles(payload) {
     const directCandles = Array.isArray(payload)
         ? payload
@@ -110,9 +75,9 @@ function parseCandles(payload) {
     }
     return Array.from(dedupedByTimestamp.values()).sort((a, b) => a.timestamp - b.timestamp);
 }
-async function fetchHourlyCloseSeries(symbol, hours) {
+async function fetchHourlyCloseSeries(symbol) {
     const endTime = Date.now();
-    const startTime = endTime - hours * 60 * 60 * 1000;
+    const startTime = endTime - CANDLE_LOOKBACK_MS;
     const payload = await postHyperliquidInfo({
         type: 'candleSnapshot',
         req: {
@@ -124,19 +89,16 @@ async function fetchHourlyCloseSeries(symbol, hours) {
     });
     return parseCandles(payload);
 }
-function buildReturnsMap(series) {
-    const returns = new Map();
-    for (let index = 1; index < series.length; index += 1) {
-        const previous = series[index - 1].close;
-        const current = series[index].close;
-        if (!Number.isFinite(previous) || !Number.isFinite(current) || previous <= 0)
+function buildCloseMap(series) {
+    const closes = new Map();
+    for (const point of series) {
+        if (!Number.isFinite(point.close))
             continue;
-        const ret = (current - previous) / previous;
-        returns.set(series[index].timestamp, ret);
+        closes.set(point.timestamp, point.close);
     }
-    return returns;
+    return closes;
 }
-function alignReturns(left, right) {
+function alignCloseSeries(left, right) {
     const timestamps = [];
     for (const timestamp of left.keys()) {
         if (right.has(timestamp))
@@ -178,7 +140,7 @@ async function getHLCorrelationMatrix() {
         return cached.data;
     }
     try {
-        const symbols = await fetchTopSymbols(8);
+        const symbols = [...CORRELATION_COINS];
         if (symbols.length === 0) {
             const empty = {
                 matrix: {},
@@ -189,7 +151,7 @@ async function getHLCorrelationMatrix() {
         }
         const seriesEntries = await Promise.all(symbols.map(async (symbol) => {
             try {
-                const series = await fetchHourlyCloseSeries(symbol, 48);
+                const series = await fetchHourlyCloseSeries(symbol);
                 return { symbol, series };
             }
             catch (error) {
@@ -197,16 +159,16 @@ async function getHLCorrelationMatrix() {
                 return { symbol, series: [] };
             }
         }));
-        const returnsBySymbol = new Map();
+        const closesBySymbol = new Map();
         for (const entry of seriesEntries) {
             if (entry.series.length < 12)
                 continue;
-            const returns = buildReturnsMap(entry.series);
-            if (returns.size < 8)
+            const closes = buildCloseMap(entry.series);
+            if (closes.size < 24)
                 continue;
-            returnsBySymbol.set(entry.symbol, returns);
+            closesBySymbol.set(entry.symbol, closes);
         }
-        const usableSymbols = Array.from(returnsBySymbol.keys());
+        const usableSymbols = Array.from(closesBySymbol.keys());
         const matrix = {};
         for (const symbol of usableSymbols) {
             matrix[symbol] = {};
@@ -216,12 +178,12 @@ async function getHLCorrelationMatrix() {
             matrix[leftSymbol][leftSymbol] = 1;
             for (let j = i + 1; j < usableSymbols.length; j += 1) {
                 const rightSymbol = usableSymbols[j];
-                const leftReturns = returnsBySymbol.get(leftSymbol);
-                const rightReturns = returnsBySymbol.get(rightSymbol);
-                if (!leftReturns || !rightReturns)
+                const leftCloses = closesBySymbol.get(leftSymbol);
+                const rightCloses = closesBySymbol.get(rightSymbol);
+                if (!leftCloses || !rightCloses)
                     continue;
-                const aligned = alignReturns(leftReturns, rightReturns);
-                const correlation = aligned.leftSeries.length >= 8
+                const aligned = alignCloseSeries(leftCloses, rightCloses);
+                const correlation = aligned.leftSeries.length >= 24
                     ? round(pearson(aligned.leftSeries, aligned.rightSeries), 4)
                     : 0;
                 matrix[leftSymbol][rightSymbol] = correlation;

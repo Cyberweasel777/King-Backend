@@ -22,6 +22,7 @@ export interface DopplerAsset {
     isDerc20: boolean | null;
     sniperProtectionEnabled: boolean;
     source: DataSource;
+    status?: string;
 }
 export declare class DopplerClient {
     private readonly indexerClient;
@@ -45,6 +46,7 @@ export declare class DopplerClient {
     private fetchIndexerAssetDetails;
     private getFallbackAddresses;
     private getRecentLaunchesFromRpc;
+    private buildNoLaunchesMessage;
     private getTrendingFromRpc;
     private inferCreatedAtFromLogs;
     private fetchAssetFromRpc;

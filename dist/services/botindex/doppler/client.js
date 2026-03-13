@@ -43,6 +43,10 @@ function loadViemRuntime() {
     };
     return viemRuntimeCache;
 }
+function resolveDopplerIndexerUrl() {
+    const configured = process.env.DOPPLER_INDEXER_URL?.trim();
+    return configured && configured.length > 0 ? configured : DEFAULT_DOPPLER_INDEXER_URL;
+}
 const RECENT_ASSETS_QUERY = (0, graphql_request_1.gql) `
   query DopplerRecentAssets($limit: Int!) {
     assets(where: { chainId: 8453 }, limit: $limit, orderBy: "createdAt", orderDirection: "desc") {
@@ -212,7 +216,7 @@ class DopplerClient {
     knownAssets = new Map();
     cacheTtlMs;
     constructor() {
-        this.indexerClient = new graphql_request_1.GraphQLClient(process.env.DOPPLER_INDEXER_URL || DEFAULT_DOPPLER_INDEXER_URL);
+        this.indexerClient = new graphql_request_1.GraphQLClient(resolveDopplerIndexerUrl());
         this.cacheTtlMs = toNumber(process.env.DOPPLER_CACHE_TTL_MS, DEFAULT_CACHE_TTL_MS);
         this.viem = loadViemRuntime();
         this.publicClient = this.viem.createPublicClient({
@@ -242,15 +246,23 @@ class DopplerClient {
                 .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
                 .slice(0, safeLimit);
             this.rememberAssets(sample);
-            this.setCache(cacheKey, recent);
-            return recent;
+            if (recent.length > 0) {
+                this.setCache(cacheKey, recent);
+                return recent;
+            }
+            logger_1.default.warn({ hours: safeHours, limit: safeLimit }, 'Doppler indexer returned zero recent mainnet launches, falling back to Base RPC');
         }
         catch (error) {
             logger_1.default.warn({ err: error }, 'Doppler indexer recent launches query failed, falling back to Base RPC');
-            const fallback = await this.getRecentLaunchesFromRpc(safeHours, safeLimit);
+        }
+        const fallback = await this.getRecentLaunchesFromRpc(safeHours, safeLimit);
+        if (fallback.length > 0) {
             this.setCache(cacheKey, fallback);
             return fallback;
         }
+        const noLaunches = this.buildNoLaunchesMessage(safeHours);
+        this.setCache(cacheKey, noLaunches);
+        return noLaunches;
     }
     async getAssetDetails(address) {
         const normalizedAddress = normalizeAddressLower(address);
@@ -462,6 +474,35 @@ class DopplerClient {
             .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
             .slice(0, limit);
         return this.applyIntegratorCounts(recent);
+    }
+    buildNoLaunchesMessage(hours) {
+        return [
+            {
+                address: '0x0000000000000000000000000000000000000000',
+                chainId: BASE_CHAIN_ID,
+                name: 'No recent launches',
+                symbol: 'N/A',
+                decimals: null,
+                marketCapUsd: 0,
+                dayVolumeUsd: 0,
+                liquidityUsd: 0,
+                createdAt: new Date().toISOString(),
+                ageHours: 0,
+                volumeVelocity: 0,
+                holderCount: 0,
+                integrator: null,
+                creatorAddress: null,
+                creatorLaunchCount: 0,
+                numTokensToSell: null,
+                migrated: false,
+                percentDayChange: null,
+                image: null,
+                isDerc20: null,
+                sniperProtectionEnabled: false,
+                source: 'indexer',
+                status: `Doppler indexer returned no mainnet launches in the last ${hours}h. Try increasing the hours parameter.`,
+            },
+        ];
     }
     async getTrendingFromRpc(limit) {
         const fallbackAddresses = this.getFallbackAddresses(Math.max(limit * 5, 40));

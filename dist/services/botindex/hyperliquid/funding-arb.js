@@ -137,6 +137,7 @@ async function getFundingArbOpportunities() {
             logger_1.default.warn({ err: binanceErr }, 'Binance funding fetch failed (likely geo-block); falling back to Hyperliquid-only mode');
         }
         const opportunities = [];
+        const hlOnlyNote = 'Binance unavailable — HL-only funding rates. Arb requires manual Binance/Bybit comparison.';
         if (binanceAvailable) {
             // Full arb mode: compare HL vs Binance
             for (const [symbol, hlFundingRate] of hyperliquidFunding.entries()) {
@@ -158,25 +159,30 @@ async function getFundingArbOpportunities() {
             }
         }
         else {
-            // Hyperliquid-only mode: rank by absolute funding rate (high rates = arb potential)
+            // Hyperliquid-only mode: emit standalone HL funding signals
             for (const [symbol, hlFundingRate] of hyperliquidFunding.entries()) {
-                if (Math.abs(hlFundingRate) < 0.0001)
-                    continue; // skip near-zero rates
-                const annualizedYield = Math.abs(hlFundingRate) * 3 * 365 * 100;
+                const annualizedYield = hlFundingRate * 3 * 365 * 100;
+                if (Math.abs(annualizedYield) <= 10)
+                    continue;
                 opportunities.push({
                     symbol,
                     hlFundingRate: round(hlFundingRate, 8),
                     binanceFundingRate: 0,
                     spread: round(hlFundingRate, 8),
                     annualizedYield: round(annualizedYield, 2),
-                    direction: hlFundingRate > 0 ? 'short_hl_long_binance' : 'long_hl_short_binance',
+                    direction: hlFundingRate < 0 ? 'long_hl_short_binance' : 'short_hl_long_binance',
+                    note: hlOnlyNote,
                 });
             }
+            opportunities.sort((a, b) => Math.abs(b.annualizedYield) - Math.abs(a.annualizedYield));
+            opportunities.splice(20);
         }
-        opportunities.sort((a, b) => Math.abs(b.spread) - Math.abs(a.spread));
+        if (binanceAvailable) {
+            opportunities.sort((a, b) => Math.abs(b.spread) - Math.abs(a.spread));
+        }
         const data = {
             opportunities,
-            ...(binanceAvailable ? {} : { note: 'Binance unavailable (geo-restricted); showing Hyperliquid funding rates only' }),
+            ...(binanceAvailable ? {} : { note: hlOnlyNote }),
         };
         fundingArbCache.set(cacheKey, { data, expiresAt: now + CACHE_TTL_MS });
         return data;
