@@ -169,8 +169,28 @@ const optionalApiKey = (req, res, next) => {
     if (isDailyLimitExceeded(entry)) {
         res.status(429).json({
             error: 'daily_limit_exceeded',
-            message: `Daily limit of ${entry.dailyLimit} requests reached. Resets at midnight UTC.`,
-            upgrade: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
+            message: `You've used all ${entry.dailyLimit} free requests for today. Upgrade to Pro for unlimited access.`,
+            upgrade: {
+                pro: {
+                    url: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
+                    price: '$29/mo',
+                    description: 'Unlimited API calls. Cancel anytime.',
+                    features: ['Unlimited requests', 'All 29 endpoints', 'Priority support', 'Webhook alerts'],
+                },
+                x402: {
+                    url: 'https://api.botindex.dev/api/botindex/keys/connect',
+                    description: 'Pay per call with USDC on Base — no subscription needed.',
+                    price: '$0.01-0.10/call',
+                },
+            },
+            free_channels: {
+                message: 'Get free delayed signals in our channels while you decide:',
+                discord: 'https://discord.gg/polyhacks',
+                telegram: {
+                    whales: 'https://t.me/polyhacks_whales',
+                    bot: 'https://t.me/polybettorbot?start=trial',
+                },
+            },
             resetAt: `${todayUTC()}T23:59:59Z`,
             used: entry.dailyCount,
             limit: entry.dailyLimit,
@@ -183,6 +203,20 @@ const optionalApiKey = (req, res, next) => {
 };
 exports.optionalApiKey = optionalApiKey;
 loadLedger();
+// Backfill: ensure all free-tier keys have the 10/day limit
+(function backfillFreeLimits() {
+    let updated = 0;
+    for (const [, entry] of apiKeyLedger.entries()) {
+        if (entry.plan === 'free' && !entry.dailyLimit) {
+            entry.dailyLimit = 10;
+            updated++;
+        }
+    }
+    if (updated > 0) {
+        logger_1.default.info({ updated }, 'Backfilled free-tier API keys with 10 req/day limit');
+        scheduleLedgerFlush();
+    }
+})();
 function getAllApiKeys() {
     return Array.from(apiKeyLedger.entries()).map(([key, entry]) => ({
         key: `${key.slice(0, 16)}...`,

@@ -200,9 +200,9 @@ router.get('/signals', async (req, res) => {
         source: 'generated',
         truncated: true,
         upgrade: {
-          message: `${merged.length - 3} more signals available. Register a free API key for full access (100 req/day).`,
+          message: `${merged.length - 3} more signals available. Register a free API key for full access (10 req/day).`,
           register: 'https://king-backend.fly.dev/api/botindex/keys/register',
-          limits: { anonymous: '3 req/day', free_api_key: '100 req/day', pro: 'Unlimited ($29/mo)' },
+          limits: { anonymous: '3 req/day', free_api_key: '10 req/day', pro: 'Unlimited ($29/mo)' },
         },
       });
       return;

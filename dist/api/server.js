@@ -129,6 +129,9 @@ app.get('/api/polyhacks/beacon', (req, res) => {
 });
 // Agent Action Receipts for all BotIndex responses
 app.use('/api/botindex', receiptMiddleware_1.receiptMiddleware);
+// Inject _polyhacks CTA into all BotIndex JSON responses
+const ctaInjector_1 = require("./middleware/ctaInjector");
+app.use('/api/botindex', (0, ctaInjector_1.ctaInjector)());
 // Mount admin telemetry first so it bypasses app-level subscription guards
 app.use('/api', admin_hits_1.default);
 // BotIndex API key auth (runs before free-trial/x402 route middleware)

@@ -112,6 +112,10 @@ app.get('/api/polyhacks/beacon', (req, res) => {
 // Agent Action Receipts for all BotIndex responses
 app.use('/api/botindex', receiptMiddleware);
 
+// Inject _polyhacks CTA into all BotIndex JSON responses
+import { ctaInjector } from './middleware/ctaInjector';
+app.use('/api/botindex', ctaInjector());
+
 // Mount admin telemetry first so it bypasses app-level subscription guards
 app.use('/api', adminHitsRouter);
 

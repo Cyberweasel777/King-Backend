@@ -6,7 +6,7 @@
  * API key registration. Authenticated requests (API key or x402) bypass.
  *
  * Default: 3 requests per DAY per IP on gated endpoints.
- * Free API key: 100 req/day (handled in botindex routes).
+ * Free API key: 10 req/day (handled in botindex routes).
  */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -78,7 +78,7 @@ function anonRateLimit(paths, exclude = []) {
             get_key: {
                 url: 'https://api.botindex.dev/api/botindex/keys/register?plan=free',
                 method: 'GET',
-                description: 'Free API key — 100 req/day, instant activation. Copy a curl command from the response and you are live.',
+                description: 'Free API key — 10 req/day, instant activation. Copy a curl command from the response and you are live.',
             },
             upgrade: {
                 pro: {
