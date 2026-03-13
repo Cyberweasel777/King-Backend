@@ -6,7 +6,7 @@
     "description": "Real-time DeFi analytics, whale tracking, funding arbitrage, and market intelligence for AI agents."
   },
   "servers": [
-    { "url": "https://king-backend.fly.dev" }
+    { "url": "https://api.botindex.dev" }
   ],
   "paths": {
     "/api/botindex/hyperliquid/funding-arb": {
