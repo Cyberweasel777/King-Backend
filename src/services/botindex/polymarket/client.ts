@@ -34,7 +34,15 @@ export type PolymarketWhaleTrade = {
 };
 
 const GAMMA_ACTIVE_MARKETS_URL = 'https://gamma-api.polymarket.com/markets?limit=500&active=true&closed=false';
-const GAMMA_FOMC_EVENTS_URL = 'https://gamma-api.polymarket.com/events?limit=10&active=true&closed=false&slug=fed-decision';
+// Known FOMC event slugs — Polymarket creates a new one per meeting
+const FOMC_EVENT_SLUGS = [
+  'fed-decision-in-march-885',
+  'fed-decision-in-may',
+  'fed-decision-in-june',
+  'fed-decision-in-july',
+  'fomc',
+];
+const GAMMA_EVENTS_BASE = 'https://gamma-api.polymarket.com/events';
 const GAMMA_MICRO_MARKETS_URL =
   'https://gamma-api.polymarket.com/markets?limit=100&active=true&closed=false&order=volume24hr&ascending=false';
 const DATA_API_TRADES_URL = 'https://data-api.polymarket.com/trades?limit=500';
@@ -248,28 +256,40 @@ function parseWhaleTrade(record: Record<string, unknown>): ParsedTrade | null {
 }
 
 async function fetchFomcFromEvents(): Promise<PolymarketFomcMarket[]> {
-  try {
-    const payload = await fetchJson(GAMMA_FOMC_EVENTS_URL);
-    if (!Array.isArray(payload)) return [];
+  const markets: PolymarketFomcMarket[] = [];
 
-    const markets: PolymarketFomcMarket[] = [];
-    for (const event of payload) {
-      const record = toRecord(event);
-      if (!record) continue;
-      const eventMarkets = record.markets;
-      if (!Array.isArray(eventMarkets)) continue;
-      for (const mkt of eventMarkets) {
-        const rec = toRecord(mkt);
-        if (!rec) continue;
-        const parsed = parseMarketBase(rec);
-        if (parsed) markets.push(parsed);
+  for (const slug of FOMC_EVENT_SLUGS) {
+    try {
+      const url = `${GAMMA_EVENTS_BASE}?slug=${encodeURIComponent(slug)}`;
+      const payload = await fetchJson(url);
+      if (!Array.isArray(payload)) continue;
+
+      for (const event of payload) {
+        const record = toRecord(event);
+        if (!record) continue;
+        const eventMarkets = record.markets;
+        if (!Array.isArray(eventMarkets)) continue;
+        for (const mkt of eventMarkets) {
+          const rec = toRecord(mkt);
+          if (!rec) continue;
+          const parsed = parseMarketBase(rec);
+          if (parsed) markets.push(parsed);
+        }
       }
+    } catch (err) {
+      logger.warn({ err }, `FOMC events fetch failed for slug=${slug}`);
     }
-    return markets.sort((a, b) => b.volume24hr - a.volume24hr);
-  } catch (err) {
-    logger.warn({ err }, 'FOMC events endpoint failed, falling back to market search');
-    return [];
   }
+
+  // Deduplicate by slug
+  const seen = new Set<string>();
+  const deduped = markets.filter((m) => {
+    if (seen.has(m.slug)) return false;
+    seen.add(m.slug);
+    return true;
+  });
+
+  return deduped.sort((a, b) => b.volume24hr - a.volume24hr);
 }
 
 export async function getPolymarketFomcMarkets(): Promise<PolymarketFomcMarket[]> {
