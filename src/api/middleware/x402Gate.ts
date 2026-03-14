@@ -228,7 +228,7 @@ export function createX402Gate(options: X402GateOptions = {}): RequestHandler {
 
   return async (req, res, next) => {
     // Skip x402 if already authenticated via API key or free trial
-    if ((req as any).__apiKeyAuthenticated || (req as any).__freeTrialAuthenticated) {
+    if ((req as any).__apiKeyAuthenticated || (req as any).__freeTrialAuthenticated || req.apiKeyAuth) {
       next();
       return;
     }

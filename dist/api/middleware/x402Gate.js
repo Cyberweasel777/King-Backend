@@ -169,7 +169,7 @@ function createX402Gate(options = {}) {
     }, getResourceServer(caipNetwork), undefined, undefined, false);
     return async (req, res, next) => {
         // Skip x402 if already authenticated via API key or free trial
-        if (req.__apiKeyAuthenticated || req.__freeTrialAuthenticated) {
+        if (req.__apiKeyAuthenticated || req.__freeTrialAuthenticated || req.apiKeyAuth) {
             next();
             return;
         }
