@@ -33,10 +33,11 @@ export type PolymarketWhaleTrade = {
   transactionHash: string;
 };
 
-const GAMMA_ACTIVE_MARKETS_URL = 'https://gamma-api.polymarket.com/markets?limit=100&active=true&closed=false';
+const GAMMA_ACTIVE_MARKETS_URL = 'https://gamma-api.polymarket.com/markets?limit=500&active=true&closed=false';
+const GAMMA_FOMC_EVENTS_URL = 'https://gamma-api.polymarket.com/events?limit=10&active=true&closed=false&slug=fed-decision';
 const GAMMA_MICRO_MARKETS_URL =
   'https://gamma-api.polymarket.com/markets?limit=100&active=true&closed=false&order=volume24hr&ascending=false';
-const DATA_API_TRADES_URL = 'https://data-api.polymarket.com/trades?limit=100';
+const DATA_API_TRADES_URL = 'https://data-api.polymarket.com/trades?limit=500';
 
 const REQUEST_TIMEOUT_MS = 5_000;
 const FOMC_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -218,7 +219,7 @@ function parseWhaleTrade(record: Record<string, unknown>): ParsedTrade | null {
   const price = toNumber(record.price ?? record.px);
   const notional = size * price;
 
-  if (notional <= 10_000) return null;
+  if (notional <= 500) return null;
 
   const timestampMs = parseTimestampMs(record.timestamp ?? record.time ?? record.createdAt ?? record.created_at);
   if (timestampMs === null) return null;
@@ -246,6 +247,31 @@ function parseWhaleTrade(record: Record<string, unknown>): ParsedTrade | null {
   };
 }
 
+async function fetchFomcFromEvents(): Promise<PolymarketFomcMarket[]> {
+  try {
+    const payload = await fetchJson(GAMMA_FOMC_EVENTS_URL);
+    if (!Array.isArray(payload)) return [];
+
+    const markets: PolymarketFomcMarket[] = [];
+    for (const event of payload) {
+      const record = toRecord(event);
+      if (!record) continue;
+      const eventMarkets = record.markets;
+      if (!Array.isArray(eventMarkets)) continue;
+      for (const mkt of eventMarkets) {
+        const rec = toRecord(mkt);
+        if (!rec) continue;
+        const parsed = parseMarketBase(rec);
+        if (parsed) markets.push(parsed);
+      }
+    }
+    return markets.sort((a, b) => b.volume24hr - a.volume24hr);
+  } catch (err) {
+    logger.warn({ err }, 'FOMC events endpoint failed, falling back to market search');
+    return [];
+  }
+}
+
 export async function getPolymarketFomcMarkets(): Promise<PolymarketFomcMarket[]> {
   const now = Date.now();
 
@@ -254,13 +280,18 @@ export async function getPolymarketFomcMarkets(): Promise<PolymarketFomcMarket[]
   }
 
   try {
-    const markets = await fetchGammaMarkets(GAMMA_ACTIVE_MARKETS_URL);
+    // Primary: fetch from events endpoint (reliable, returns nested markets)
+    let fomcMarkets = await fetchFomcFromEvents();
 
-    const fomcMarkets = markets
-      .map((record) => parseMarketBase(record))
-      .filter((market): market is PolymarketFomcMarket => market !== null)
-      .filter((market) => isFomcQuestion(market.question))
-      .sort((a, b) => b.volume24hr - a.volume24hr);
+    // Fallback: search all active markets if events endpoint returned nothing
+    if (fomcMarkets.length === 0) {
+      const markets = await fetchGammaMarkets(GAMMA_ACTIVE_MARKETS_URL);
+      fomcMarkets = markets
+        .map((record) => parseMarketBase(record))
+        .filter((market): market is PolymarketFomcMarket => market !== null)
+        .filter((market) => isFomcQuestion(market.question))
+        .sort((a, b) => b.volume24hr - a.volume24hr);
+    }
 
     fomcCache = {
       data: fomcMarkets,
