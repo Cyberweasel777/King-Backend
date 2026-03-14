@@ -70,8 +70,9 @@ const REQUEST_TIMEOUT_MS = 12000;
 const MIN_USD_DEFAULT = 50_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const ETHERSCAN_BASE_URL = 'https://api.etherscan.io/api';
-const BASESCAN_BASE_URL = 'https://api.basescan.org/api';
+// Etherscan V2 API — single endpoint with chainid parameter
+// ETH mainnet = chainid 1, Base = chainid 8453
+const ETHERSCAN_V2_URL = 'https://api.etherscan.io/v2/api';
 const BASE_RPC_URL = 'https://mainnet.base.org';
 
 const ETH_USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
@@ -196,8 +197,9 @@ async function fetchJson<T>(url: string): Promise<T> {
   }
 }
 
-async function fetchScanTransfers(baseUrl: string, contractAddress: string, apiKey: string, offset: number = 100): Promise<ScanTransferRow[]> {
-  const url = new URL(baseUrl);
+async function fetchScanTransfers(chainId: number, contractAddress: string, apiKey: string, offset: number = 100): Promise<ScanTransferRow[]> {
+  const url = new URL(ETHERSCAN_V2_URL);
+  url.searchParams.set('chainid', String(chainId));
   url.searchParams.set('module', 'account');
   url.searchParams.set('action', 'tokentx');
   url.searchParams.set('contractaddress', contractAddress);
@@ -251,8 +253,8 @@ function mapScanRowToFlow(row: ScanTransferRow, chain: StablecoinFlow['chain'], 
 
 async function fetchEthereumScanFlows(etherscanApiKey: string): Promise<StablecoinFlow[]> {
   const [usdcRows, usdtRows] = await Promise.all([
-    fetchScanTransfers(ETHERSCAN_BASE_URL, ETH_USDC, etherscanApiKey, 120),
-    fetchScanTransfers(ETHERSCAN_BASE_URL, ETH_USDT, etherscanApiKey, 120),
+    fetchScanTransfers(1, ETH_USDC, etherscanApiKey, 120),
+    fetchScanTransfers(1, ETH_USDT, etherscanApiKey, 120),
   ]);
 
   const flows: StablecoinFlow[] = [];
@@ -269,7 +271,9 @@ async function fetchEthereumScanFlows(etherscanApiKey: string): Promise<Stableco
 }
 
 async function fetchBaseScanFlows(basescanApiKey: string): Promise<StablecoinFlow[]> {
-  const rows = await fetchScanTransfers(BASESCAN_BASE_URL, BASE_USDC, basescanApiKey, 120);
+  // V2 API uses single Etherscan key for all chains
+  const apiKey = basescanApiKey || process.env.ETHERSCAN_API_KEY || '';
+  const rows = await fetchScanTransfers(8453, BASE_USDC, apiKey, 120);
   const flows: StablecoinFlow[] = [];
 
   for (const row of rows) {

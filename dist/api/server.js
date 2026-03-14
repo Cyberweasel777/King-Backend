@@ -59,6 +59,8 @@ const mcp_1 = __importDefault(require("./routes/mcp"));
 const mcp_catalog_1 = __importDefault(require("./routes/mcp-catalog"));
 const docs_1 = __importDefault(require("./routes/docs"));
 const agorion_1 = __importDefault(require("./routes/agorion"));
+const botindex_meme_1 = __importDefault(require("./routes/botindex-meme"));
+const botindex_stablecoin_1 = __importDefault(require("./routes/botindex-stablecoin"));
 const database_1 = require("../shared/payments/database");
 const logger_1 = __importDefault(require("../config/logger"));
 const app = (0, express_1.default)();
@@ -182,6 +184,9 @@ app.use('/api/botindex', apiKeyAuth_1.optionalApiKey, (req, _res, next) => {
 // MCP Streamable HTTP transport (for Smithery + remote MCP clients)
 const mcp_transport_1 = __importDefault(require("./routes/mcp-transport"));
 app.use('/api/botindex', mcp_transport_1.default);
+// BotIndex Meme + Stablecoin intelligence routes
+app.use('/api/botindex', botindex_meme_1.default);
+app.use('/api/botindex', botindex_stablecoin_1.default);
 // Mount all routes
 app.use('/api', index_1.default);
 // API Documentation
