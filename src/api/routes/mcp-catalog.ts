@@ -185,6 +185,23 @@ router.get('/mcp-catalog', (_req, res) => {
         params: [{ name: 'address', type: 'string', description: 'Coin address or symbol (e.g., "BTC", "ETH")', required: true }],
       },
 
+      // ── Polymarket ──
+      {
+        name: 'botindex_polymarket_fomc',
+        description: 'Polymarket FOMC tracker. Live Fed/FOMC/interest rate markets with probabilities and liquidity. FREE.',
+        path: '/polymarket/fomc',
+      },
+      {
+        name: 'botindex_polymarket_micro_markets',
+        description: 'Polymarket micro-markets ending in the next 2 hours (Up or Down format). $0.01',
+        path: '/polymarket/micro-markets',
+      },
+      {
+        name: 'botindex_polymarket_whale_trades',
+        description: 'Polymarket whale trades over $10K notional with side, outcome, and wallet proxy info. $0.02',
+        path: '/polymarket/whale-trades',
+      },
+
       // ── Doppler ──
       {
         name: 'botindex_doppler_launches',
