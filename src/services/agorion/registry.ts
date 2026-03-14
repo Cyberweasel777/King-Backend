@@ -191,6 +191,24 @@ export async function getHealthy(): Promise<AgorionProvider[]> {
     .sort((a, b) => b.healthScore - a.healthScore || a.name.localeCompare(b.name));
 }
 
+export async function purgeUnhealthy(filter: (p: AgorionProvider) => boolean): Promise<number> {
+  await ensureRegistryLoaded();
+
+  let purged = 0;
+  for (const [id, provider] of providers.entries()) {
+    if (filter(provider)) {
+      providers.delete(id);
+      purged++;
+    }
+  }
+
+  if (purged > 0) {
+    await saveRegistry();
+  }
+
+  return purged;
+}
+
 export async function discover(capability: string): Promise<AgorionProvider[]> {
   await ensureRegistryLoaded();
 

@@ -13,7 +13,7 @@ export interface AgorionProvider {
   lastHealthy: string | null;
   responseTimeMs: number | null;
   healthScore: number;
-  source: 'npm' | 'github' | 'smithery' | 'glama' | 'mcp.so' | 'manual';
+  source: 'npm' | 'github' | 'smithery' | 'glama' | 'mcp.so' | 'pypi' | 'manual';
   manifestUrl: string | null;
   openapiUrl: string | null;
   endpoints: Array<{ path: string; method: string; description: string }>;
@@ -45,6 +45,7 @@ type ProbeResult = {
 };
 
 const DOMAIN_MIN_INTERVAL_MS = 500;
+const PYPI_MIN_INTERVAL_MS = 1_000;
 const PROBE_TIMEOUT_MS = 10_000;
 const REQUEST_TIMEOUT_MS = 10_000;
 const PROBE_CONCURRENCY = 8;
@@ -57,6 +58,7 @@ const DEFAULT_HEADERS: Record<string, string> = {
 const domainChains = new Map<string, Promise<void>>();
 const domainLastRequestAt = new Map<string, number>();
 let crawlInFlight: Promise<AgorionProvider[]> | null = null;
+let pypiLastRequestAt = 0;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -212,6 +214,20 @@ async function fetchWithRateLimit(
       clearTimeout(timeout);
     }
   });
+}
+
+async function fetchPyPIWithRateLimit(
+  requestUrl: string,
+  init: RequestInit = {},
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<Response> {
+  const elapsed = Date.now() - pypiLastRequestAt;
+  const waitMs = Math.max(0, PYPI_MIN_INTERVAL_MS - elapsed);
+  if (waitMs > 0) {
+    await sleep(waitMs);
+  }
+  pypiLastRequestAt = Date.now();
+  return fetchWithRateLimit(requestUrl, init, timeoutMs);
 }
 
 function parseJsonSafely(input: string): unknown {
@@ -402,6 +418,34 @@ function parseHtmlLinks(html: string, baseUrl: string): Array<{ name: string; ur
 
 function dedupeCapabilities(capabilities: string[]): string[] {
   return Array.from(new Set(capabilities.map(sanitizeCapability).filter(Boolean)));
+}
+
+function buildGitHubHeaders(): Record<string, string> {
+  const token = process.env.GITHUB_TOKEN;
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
+function parsePyPiPackageNamesFromSearchHtml(html: string): string[] {
+  const names = new Set<string>();
+  const regex = /href=["']\/project\/([^/"'?#]+)\/["']/gi;
+
+  for (const match of html.matchAll(regex)) {
+    const pkgName = decodeURIComponent(match[1] || '').trim();
+    if (!pkgName) continue;
+    if (!/^[a-z0-9][a-z0-9._-]*$/i.test(pkgName)) continue;
+    names.add(pkgName);
+  }
+
+  return Array.from(names);
 }
 
 function buildCandidate(base: Partial<ProviderCandidate> & { source: AgorionProvider['source'] }): ProviderCandidate | null {
@@ -629,15 +673,7 @@ export async function crawlNpmRegistry(): Promise<ProviderCandidate[]> {
 }
 
 export async function crawlGitHubSearch(): Promise<ProviderCandidate[]> {
-  const token = process.env.GITHUB_TOKEN;
-  const headers: Record<string, string> = {
-    Accept: 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-  };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
+  const headers = buildGitHubHeaders();
 
   const searchUrls = [
     'https://api.github.com/search/code?q=agent-services.json+in:path&per_page=100',
@@ -694,6 +730,222 @@ export async function crawlGitHubSearch(): Promise<ProviderCandidate[]> {
   }
 
   return dedupeCandidates(candidates);
+}
+
+export async function crawlGitHubRepos(): Promise<ProviderCandidate[]> {
+  try {
+    const headers = buildGitHubHeaders();
+    const queries = [
+      'mcp-server in:name language:typescript',
+      'mcp-server in:name language:python',
+      'mcp in:topics language:typescript stars:>10',
+    ];
+    const candidates: ProviderCandidate[] = [];
+
+    for (const query of queries) {
+      const searchUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=100`;
+
+      try {
+        const response = await fetchWithRateLimit(searchUrl, { headers }, REQUEST_TIMEOUT_MS);
+        if (!response.ok) {
+          const body = await response.text();
+          logger.warn(
+            { status: response.status, searchUrl, body: body.slice(0, 200) },
+            'GitHub repository search request failed',
+          );
+          continue;
+        }
+
+        const payload = await response.json() as {
+          items?: Array<{
+            name?: string;
+            full_name?: string;
+            html_url?: string;
+            homepage?: string | null;
+            description?: string | null;
+            topics?: string[];
+          }>;
+        };
+
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        for (const repo of items) {
+          const targetUrl = normalizeWebUrl(repo.homepage) || normalizeWebUrl(repo.html_url);
+          if (!targetUrl) continue;
+
+          const topics = Array.isArray(repo.topics) ? repo.topics : [];
+          const description = repo.description || '';
+          const inferred = inferCapabilitiesFromText(`${topics.join(' ')} ${description} ${repo.name || ''}`);
+          const transportText = `${repo.name || ''} ${description} ${topics.join(' ')}`.toLowerCase();
+
+          const candidate = buildCandidate({
+            id: repo.full_name || repo.name || targetUrl,
+            name: repo.full_name || repo.name || targetUrl,
+            url: targetUrl,
+            description,
+            capabilities: [...topics, ...inferred],
+            source: 'github',
+            transport: transportText.includes('mcp') ? 'mcp' : 'unknown',
+          });
+
+          if (candidate) {
+            candidates.push(candidate);
+          }
+        }
+      } catch (error) {
+        logger.warn({ err: error, query }, 'GitHub repository crawl request failed');
+      }
+    }
+
+    return dedupeCandidates(candidates);
+  } catch (error) {
+    logger.warn({ err: error }, 'GitHub repository crawl failed');
+    return [];
+  }
+}
+
+export async function crawlPyPI(): Promise<ProviderCandidate[]> {
+  try {
+    const packageNames = new Set<string>();
+    const searchUrls = [
+      'https://pypi.org/search/?q=mcp+server&o=-created',
+      'https://pypi.org/search/?q=model+context+protocol&o=-created',
+    ];
+
+    for (const searchUrl of searchUrls) {
+      try {
+        const response = await fetchPyPIWithRateLimit(
+          searchUrl,
+          { headers: { Accept: 'text/html,application/xhtml+xml' } },
+          REQUEST_TIMEOUT_MS,
+        );
+        if (!response.ok) {
+          logger.warn({ status: response.status, searchUrl }, 'PyPI search request failed');
+          continue;
+        }
+
+        const html = await response.text();
+        for (const name of parsePyPiPackageNamesFromSearchHtml(html)) {
+          packageNames.add(name);
+        }
+      } catch (error) {
+        logger.warn({ err: error, searchUrl }, 'PyPI search crawl request failed');
+      }
+    }
+
+    for (const known of ['mcp-server', 'model-context-protocol', 'mcp']) {
+      packageNames.add(known);
+    }
+
+    const candidates: ProviderCandidate[] = [];
+    for (const packageName of Array.from(packageNames).slice(0, 60)) {
+      const metadataUrl = `https://pypi.org/pypi/${encodeURIComponent(packageName)}/json`;
+
+      try {
+        const response = await fetchPyPIWithRateLimit(metadataUrl, {}, REQUEST_TIMEOUT_MS);
+        if (!response.ok) {
+          logger.warn({ status: response.status, metadataUrl }, 'PyPI metadata request failed');
+          continue;
+        }
+
+        const payload = await response.json() as { info?: Record<string, unknown> };
+        const info = isRecord(payload.info) ? payload.info : {};
+
+        const projectUrls = isRecord(info.project_urls)
+          ? Object.values(info.project_urls)
+            .map((value) => asString(value))
+            .filter((value): value is string => Boolean(value))
+          : [];
+
+        const summary = asString(info.summary) || '';
+        const description = asString(info.description) || '';
+        const name = asString(info.name) || packageName;
+        const keywordsRaw = asString(info.keywords) || '';
+        const keywords = keywordsRaw
+          .split(/[\s,]+/)
+          .map((entry) => entry.trim())
+          .filter(Boolean);
+
+        const targetUrl =
+          normalizeWebUrl(asString(info.home_page)) ||
+          normalizeWebUrl(asString(info.project_url)) ||
+          projectUrls
+            .map((value) => normalizeWebUrl(value))
+            .find((value): value is string => Boolean(value)) ||
+          normalizeWebUrl(`https://pypi.org/project/${name}`);
+
+        if (!targetUrl) {
+          continue;
+        }
+
+        const combinedText = `${name} ${summary} ${description}`;
+        const candidate = buildCandidate({
+          id: `pypi-${name}`,
+          name,
+          url: targetUrl,
+          description: summary || description.slice(0, 280),
+          capabilities: [...keywords, ...inferCapabilitiesFromText(combinedText)],
+          source: 'pypi',
+          transport: combinedText.toLowerCase().includes('mcp') ? 'mcp' : 'unknown',
+        });
+
+        if (candidate) {
+          candidates.push(candidate);
+        }
+      } catch (error) {
+        logger.warn({ err: error, packageName }, 'PyPI package metadata crawl failed');
+      }
+    }
+
+    return dedupeCandidates(candidates);
+  } catch (error) {
+    logger.warn({ err: error }, 'PyPI crawl failed');
+    return [];
+  }
+}
+
+export async function crawlAwesomeMcpServers(): Promise<ProviderCandidate[]> {
+  try {
+    const sourceUrl = 'https://raw.githubusercontent.com/punkpeye/awesome-mcp-servers/main/README.md';
+    const response = await fetchWithRateLimit(sourceUrl, {}, REQUEST_TIMEOUT_MS);
+    if (!response.ok) {
+      logger.warn({ status: response.status, sourceUrl }, 'awesome-mcp-servers fetch failed');
+      return [];
+    }
+
+    const markdown = await response.text();
+    const lineRegex = /^\s*[-*]\s+\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)\s*-\s*(.+)$/gim;
+    const candidates: ProviderCandidate[] = [];
+
+    for (const match of markdown.matchAll(lineRegex)) {
+      const name = (match[1] || '').trim();
+      const url = (match[2] || '').trim();
+      const description = (match[3] || '')
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '$1')
+        .trim();
+
+      if (!name || !url) continue;
+
+      const combined = `${name} ${description}`;
+      const candidate = buildCandidate({
+        id: `awesome-${name}`,
+        name,
+        url,
+        description,
+        capabilities: inferCapabilitiesFromText(combined),
+        source: 'github',
+        transport: combined.toLowerCase().includes('mcp') ? 'mcp' : 'unknown',
+      });
+
+      if (candidate) {
+        candidates.push(candidate);
+      }
+    }
+
+    return dedupeCandidates(candidates);
+  } catch (error) {
+    logger.warn({ err: error }, 'awesome-mcp-servers crawl failed');
+    return [];
+  }
 }
 
 export async function crawlDirectories(): Promise<ProviderCandidate[]> {
@@ -928,6 +1180,9 @@ async function runDiscoveryPass(): Promise<ProviderCandidate[]> {
   const results = await Promise.allSettled([
     crawlNpmRegistry(),
     crawlGitHubSearch(),
+    crawlGitHubRepos(),
+    crawlPyPI(),
+    crawlAwesomeMcpServers(),
     crawlDirectories(),
   ]);
 

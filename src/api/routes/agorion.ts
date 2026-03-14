@@ -1,10 +1,36 @@
 import { Router, type Request, type Response } from 'express';
 import logger from '../../config/logger';
 import { runCrawlCycle } from '../../services/agorion/crawler';
-import { discover, getAll, getHealthy, search } from '../../services/agorion/registry';
+import { discover, getAll, getHealthy, purgeUnhealthy, search } from '../../services/agorion/registry';
 
 const router = Router();
 const ADMIN_ID = process.env.ADMIN_ID || '8063432083';
+const COMMON_ARTIFACT_NAMES = new Set([
+  'privacy',
+  'terms',
+  'blog',
+  'discord',
+  'support',
+  'settings',
+  'submit',
+  'partners',
+  'explore',
+  'pricing',
+  'cases',
+  'connectors',
+  'vdp',
+  'models',
+  'gateway',
+  'clients',
+  'reddit 216 members',
+  'create a free account',
+  'terms of service',
+  'privacy policy',
+  'view all',
+  'playground',
+  'all systems online',
+  'dxt',
+]);
 
 function extractAdminId(value: unknown): string | null {
   return typeof value === 'string' ? value.trim() : null;
@@ -16,6 +42,33 @@ function sourceBreakdown(providers: Awaited<ReturnType<typeof getAll>>): Record<
     breakdown[provider.source] = (breakdown[provider.source] || 0) + 1;
   }
   return breakdown;
+}
+
+function isScrapedArtifactName(name: string): boolean {
+  const trimmed = name.trim();
+  const normalized = trimmed.toLowerCase();
+  if (!normalized) return true;
+  if (COMMON_ARTIFACT_NAMES.has(normalized)) return true;
+
+  // Matches mcp.so-style artifacts like "A AgentQL MCP Server Model Context Protocol ..."
+  if (/^[a-z]\s+.+/i.test(trimmed) && trimmed.length >= 45 && /(mcp|model context protocol)/i.test(trimmed)) {
+    return true;
+  }
+
+  return false;
+}
+
+function hasInvalidProviderUrl(url: string): boolean {
+  const trimmed = (url || '').trim();
+  if (!trimmed) return true;
+  return !/^https?:\/\//i.test(trimmed);
+}
+
+function shouldPurgeProvider(provider: Awaited<ReturnType<typeof getAll>>[number]): boolean {
+  if (provider.healthScore < 15 && provider.lastHealthy === null) return true;
+  if (isScrapedArtifactName(provider.name)) return true;
+  if (hasInvalidProviderUrl(provider.url)) return true;
+  return false;
 }
 
 router.get('/discover', async (req: Request, res: Response) => {
@@ -111,6 +164,25 @@ router.post('/crawl', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error({ err: error }, 'Agorion crawl endpoint failed');
     res.status(500).json({ error: 'crawl_failed' });
+  }
+});
+
+router.post('/purge', async (req: Request, res: Response) => {
+  const adminId = extractAdminId(req.query.adminId);
+  if (adminId !== ADMIN_ID) {
+    res.status(403).json({ error: 'unauthorized' });
+    return;
+  }
+
+  try {
+    await getAll();
+    const purged = await purgeUnhealthy((provider) => shouldPurgeProvider(provider));
+    const remaining = (await getAll()).length;
+
+    res.json({ purged, remaining });
+  } catch (error) {
+    logger.error({ err: error }, 'Agorion purge endpoint failed');
+    res.status(500).json({ error: 'purge_failed' });
   }
 });
 
