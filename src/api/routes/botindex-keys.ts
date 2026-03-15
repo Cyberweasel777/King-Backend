@@ -88,8 +88,8 @@ router.get('/register', async (req: Request, res: Response) => {
         email: 'free-tier@botindex.dev',
         plan: 'free',
       });
-      // Free tier: 10 req/day
-      entry.dailyLimit = 10;
+      // Free tier: 3 req/day — tight enough to taste, not enough to live on
+      entry.dailyLimit = 3;
       trackFunnelEvent('api_key_issued', 'free');
 
       const acceptsHtml = (req.headers.accept || '').includes('text/html');
@@ -180,7 +180,7 @@ router.get('/register', async (req: Request, res: Response) => {
       res.json({
         key: apiKey,
         plan: 'free',
-        rateLimit: '10 req/day (upgrade to Pro for unlimited: $29/mo)',
+        rateLimit: '3 req/day (upgrade to Pro for unlimited: $29/mo)',
         message: "Your API key is ready. Copy a command below and paste it in your terminal — you'll get live data in 2 seconds.",
         quickstart: {
           step_1: 'Copy any curl command below and paste it in your terminal',
