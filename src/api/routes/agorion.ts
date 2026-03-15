@@ -71,6 +71,55 @@ function shouldPurgeProvider(provider: Awaited<ReturnType<typeof getAll>>[number
   return false;
 }
 
+router.get('/', (_req: Request, res: Response) => {
+  res.json({
+    name: 'Agorion Agent Registry',
+    description: 'Discover AI agent services, MCP servers, and API providers',
+    version: '1.0.0',
+    endpoints: {
+      discover: {
+        path: '/api/agorion/discover',
+        method: 'GET',
+        description: 'Find healthy providers. ?q=crypto to search.',
+      },
+      providers: {
+        path: '/api/agorion/providers',
+        method: 'GET',
+        description: 'List all indexed providers. ?q=search to filter.',
+      },
+      provider_detail: {
+        path: '/api/agorion/providers/:id',
+        method: 'GET',
+        description: 'Get a single provider by ID.',
+      },
+      stats: {
+        path: '/api/agorion/stats',
+        method: 'GET',
+        description: 'Registry statistics and health summary.',
+      },
+    },
+    links: {
+      botindex: 'https://king-backend.fly.dev/api/botindex/v1/',
+      spec: 'https://github.com/Cyberweasel777/agorion',
+    },
+  });
+});
+
+router.get('/health', async (_req: Request, res: Response) => {
+  try {
+    const providers = await getAll();
+    const healthy = providers.filter((p) => p.healthScore > 50);
+    res.json({
+      status: 'ok',
+      totalProviders: providers.length,
+      healthyProviders: healthy.length,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: 'Registry unavailable' });
+  }
+});
+
 router.get('/discover', async (req: Request, res: Response) => {
   const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
 
