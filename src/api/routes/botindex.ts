@@ -26,6 +26,51 @@ const BASIC_API_KEY_DAILY_LIMIT = 100;
 const BASIC_API_KEY_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 const basicApiKeyQuota = new Map<string, { windowStartMs: number; count: number }>();
 
+const INTELLIGENCE_ENDPOINTS = [
+  {
+    path: '/api/botindex/alpha-scan',
+    market: 'cross-market',
+    description: 'Flagship convergence scan across whales, funding, Zora, correlations, and meme velocity.',
+    pricing: '$0.10/call (x402) or subscription bypass',
+    flagship: true,
+  },
+  {
+    path: '/api/botindex/zora/intel',
+    market: 'zora',
+    description: 'Zora AI intel with creator/token risk grading and opportunity ranking.',
+    pricing: 'FREE teaser, full for paid API keys',
+  },
+  {
+    path: '/api/botindex/hyperliquid/intel',
+    market: 'hyperliquid',
+    description: 'Funding market intelligence with risk-scored opportunities.',
+    pricing: 'FREE teaser, full for paid API keys',
+  },
+  {
+    path: '/api/botindex/crypto/intel',
+    market: 'crypto',
+    description: 'Correlation-driven crypto intelligence with actionable setups.',
+    pricing: 'FREE teaser, full for paid API keys',
+  },
+  {
+    path: '/api/botindex/doppler/intel',
+    market: 'doppler',
+    description: 'Doppler launch intelligence with quality/risk analysis.',
+    pricing: 'FREE teaser, full for paid API keys',
+  },
+] as const;
+
+function buildIntelligenceSection() {
+  return {
+    flagship: INTELLIGENCE_ENDPOINTS[0],
+    endpoints: INTELLIGENCE_ENDPOINTS,
+    notes: {
+      teaser: 'Domain intel endpoints return truncated teaser output for anonymous/free users.',
+      fullAccess: 'Use a paid API key for full domain intel. Use x402 on /alpha-scan for premium cross-market scan.',
+    },
+  };
+}
+
 function consumeBasicApiKeyQuota(apiKey: string): { allowed: boolean; remaining: number; retryAfterSeconds: number } {
   const now = Date.now();
   const current = basicApiKeyQuota.get(apiKey);
@@ -132,6 +177,32 @@ function dedupeCorrelationPairs<T extends { tokenA: string; tokenB: string }>(pa
 
   return out;
 }
+
+router.get('/', (_req, res) => {
+  res.json({
+    service: 'BotIndex API',
+    status: 'ok',
+    docs: '/api/botindex/v1/',
+    intelligence: buildIntelligenceSection(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+router.get(['/v1', '/v1/'], (_req, res) => {
+  res.json({
+    service: 'BotIndex v1 API',
+    basePath: '/api/botindex/v1',
+    discovery: {
+      premiumSignals: '/api/botindex/v1/signals',
+      sports: '/api/botindex/v1/sports',
+      crypto: '/api/botindex/v1/crypto',
+      solana: '/api/botindex/v1/solana',
+      commerce: '/api/botindex/v1/commerce',
+    },
+    intelligence: buildIntelligenceSection(),
+    timestamp: new Date().toISOString(),
+  });
+});
 
 router.get('/health', (_req, res) => {
   res.json({

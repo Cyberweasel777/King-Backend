@@ -1,12 +1,10 @@
 /**
- * BotIndex Intel Routes — DeepSeek-powered premium analysis.
+ * BotIndex Intel Routes — DeepSeek-powered intelligence.
  *
- * Each domain gets a /intel endpoint that:
- * 1. Fetches fresh raw data from existing endpoints
- * 2. Feeds it to DeepSeek for AI analysis
- * 3. Returns structured intelligence (signals, risk scores, grades)
+ * Domain intel endpoints are free-to-call with teaser responses for anonymous/free users.
+ * Paid API keys receive full reports.
  *
- * All intel endpoints are premium: $0.05/call via x402 or API key.
+ * Alpha Scan is the premium flagship endpoint ($0.10/call via x402 or paid API key bypass).
  */
 declare const router: import("express-serve-static-core").Router;
 export default router;

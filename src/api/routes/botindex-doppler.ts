@@ -1,5 +1,4 @@
 import { Request, Response, Router } from 'express';
-import { createX402Gate } from '../middleware/x402Gate';
 import logger from '../../config/logger';
 import { dopplerClient } from '../../services/botindex/doppler/client';
 import { enhanceWithNarrative, formatScoreCard, scoreLaunch } from '../../services/botindex/doppler/scorer';
@@ -34,7 +33,6 @@ function parseNumberParam(value: unknown, fallback: number, min = 0, max = Numbe
 
 router.get(
   '/doppler/launches',
-  createX402Gate({ price: '$0.01', description: 'Recent Doppler token launches with risk scores' }),
   async (req: Request, res: Response) => {
     const hours = parseIntegerParam(req.query.hours, 24, 1, 168);
     if (hours === null) {
@@ -123,7 +121,6 @@ router.get(
 
 router.get(
   '/doppler/score/:address',
-  createX402Gate({ price: '$0.02', description: 'Deep risk score for a Doppler-launched token' }),
   async (req: Request, res: Response) => {
     const address = String(req.params.address || '').trim();
     if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
@@ -173,7 +170,6 @@ router.get(
 
 router.get(
   '/doppler/trending',
-  createX402Gate({ price: '$0.01', description: 'Trending Doppler launches by volume velocity' }),
   async (req: Request, res: Response) => {
     const limit = parseIntegerParam(req.query.limit, 10, 1, 100);
     if (limit === null) {

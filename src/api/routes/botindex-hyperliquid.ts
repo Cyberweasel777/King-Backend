@@ -18,7 +18,6 @@ const METADATA = {
 
 router.get(
   '/hyperliquid/funding-arb',
-  createX402Gate({ price: '$0.01', description: 'Hyperliquid vs Binance funding arbitrage (0.01 USDC)' }),
   async (_req: Request, res: Response) => {
     try {
       const data = await getFundingArbOpportunities();
@@ -29,7 +28,7 @@ router.get(
         metadata: {
           ...METADATA,
           endpoint: '/botindex/hyperliquid/funding-arb',
-          price: '$0.01',
+          price: 'FREE',
         },
       });
     } catch (error) {
@@ -45,7 +44,6 @@ router.get(
 
 router.get(
   '/hyperliquid/correlation-matrix',
-  createX402Gate({ price: '$0.01', description: 'Hyperliquid perp cross-market correlation matrix (0.01 USDC)' }),
   async (_req: Request, res: Response) => {
     try {
       const data = await getHLCorrelationMatrix();
@@ -54,7 +52,7 @@ router.get(
         metadata: {
           ...METADATA,
           endpoint: '/botindex/hyperliquid/correlation-matrix',
-          price: '$0.01',
+          price: 'FREE',
         },
       });
     } catch (error) {
@@ -70,7 +68,6 @@ router.get(
 
 router.get(
   '/hyperliquid/liquidation-heatmap',
-  createX402Gate({ price: '$0.01', description: 'Hyperliquid liquidation heatmap (0.01 USDC)' }),
   async (_req: Request, res: Response) => {
     try {
       const data = await getLiquidationHeatmap();
@@ -81,7 +78,7 @@ router.get(
         metadata: {
           ...METADATA,
           endpoint: '/botindex/hyperliquid/liquidation-heatmap',
-          price: '$0.01',
+          price: 'FREE',
         },
       });
     } catch (error) {
@@ -207,7 +204,7 @@ router.get('/hyperliquid/whale-alerts', async (_req: Request, res: Response) => 
         })),
         recentTradeCount: data.recentLargeTrades.length,
       },
-      upgrade: 'Full whale data requires API key or x402 payment. GET /api/botindex/hyperliquid/whale-alerts/full',
+      upgrade: 'Full whale data is now free. GET /api/botindex/hyperliquid/whale-alerts/full',
       timestamp: data.timestamp,
       metadata: {
         ...METADATA,
@@ -227,7 +224,6 @@ router.get('/hyperliquid/whale-alerts', async (_req: Request, res: Response) => 
 
 router.get(
   '/hyperliquid/whale-alerts/full',
-  createX402Gate({ price: '$0.05', description: 'Full Hyperliquid whale positions + recent large trades (0.05 USDC)' }),
   async (_req: Request, res: Response) => {
     try {
       const data = await getHyperliquidWhaleAlerts();
@@ -236,7 +232,7 @@ router.get(
         metadata: {
           ...METADATA,
           endpoint: '/botindex/hyperliquid/whale-alerts/full',
-          price: '$0.05',
+          price: 'FREE',
         },
       });
     } catch (error) {

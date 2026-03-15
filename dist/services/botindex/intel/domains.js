@@ -7,7 +7,7 @@
  * 2. A data formatter that converts raw API data to analysis-ready text
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.dopplerIntelConfig = exports.cryptoIntelConfig = exports.hyperliquidIntelConfig = exports.zoraIntelConfig = void 0;
+exports.alphaScanConfig = exports.dopplerIntelConfig = exports.cryptoIntelConfig = exports.hyperliquidIntelConfig = exports.zoraIntelConfig = void 0;
 // ─── Shared output schema instruction ──────────────────────────────────────
 const OUTPUT_SCHEMA = `
 OUTPUT FORMAT (JSON only, no markdown fences):
@@ -218,6 +218,92 @@ ${OUTPUT_SCHEMA}`,
             for (const t of trending.slice(0, 10)) {
                 text += `- ${t.symbol || t.name}: score=${t.score || 'unknown'}, vol=$${t.volume || 'unknown'}\n`;
             }
+        }
+        return text;
+    },
+};
+// ─── Alpha Scan Intel ───────────────────────────────────────────────────────
+exports.alphaScanConfig = {
+    domain: 'alpha-scan',
+    systemPrompt: `You are BotIndex Alpha Scan, a cross-market convergence analyst.
+
+MISSION:
+- Synthesize signals from whale positioning, funding arbitrage, Zora trending coins, Hyperliquid correlation structure, and meme velocity.
+- Rank the most actionable opportunities across all markets (not just one vertical).
+- Prioritize asymmetric setups with clear catalysts and manageable downside.
+
+ANALYSIS PRIORITIES:
+1. Cross-signal convergence: strongest ideas have agreement across multiple datasets.
+2. Opportunity ranking: highest risk-adjusted expected value first.
+3. Confidence discipline: confidence should reflect data quality and signal agreement.
+4. Execution clarity: reasoning must be plain English and immediately actionable.
+5. Risk realism: call out invalidation conditions and fragility.
+
+RISK FACTORS:
+- High leverage whale crowding with one-sided positioning.
+- Correlation spikes indicating concentrated market regime risk.
+- Funding extremes likely to mean-revert.
+- Meme velocity bursts without holder/liquidity support.
+
+${OUTPUT_SCHEMA}
+
+EXTRA INSTRUCTIONS:
+- Return a ranked list in assets array (best first).
+- Confidence must map to convergence strength across sources.
+- Use plain English in reasoning with no jargon overload.`,
+    formatData: (data) => {
+        const whales = data.whales || {};
+        const topPositions = whales.topPositions || [];
+        const recentTrades = whales.recentLargeTrades || [];
+        const funding = data.funding || {};
+        const opportunities = funding.opportunities || [];
+        const zora = data.zora || {};
+        const coins = zora.coins || [];
+        const correlation = data.correlation || {};
+        const matrix = correlation.matrix || {};
+        const memeVelocity = data.memeVelocity || {};
+        const velocityTokens = memeVelocity.tokens || [];
+        let text = 'ALPHA SCAN MULTI-MARKET DATA:\n\n';
+        text += '## Hyperliquid Whale Positioning\n';
+        text += `- whalesTracked=${whales.whalesTracked || 0}, totalTrackedValue=$${Number(whales.totalTrackedValue || 0).toLocaleString()}\n`;
+        for (const p of topPositions.slice(0, 12)) {
+            text += `- ${p.coin} ${p.side}: value=$${Number(p.positionValue || 0).toLocaleString()}, leverage=${p.leverage || 0}x, pnl=$${Number(p.unrealizedPnl || 0).toLocaleString()}, whale=${p.address}\n`;
+        }
+        for (const t of recentTrades.slice(0, 8)) {
+            text += `- TRADE ${t.coin} ${t.side}: notional=$${Number(t.usdValue || 0).toLocaleString()}, dir=${t.dir || 'unknown'}, time=${t.time}\n`;
+        }
+        text += '\n## Funding Arbitrage\n';
+        for (const o of opportunities.slice(0, 15)) {
+            text += `- ${o.symbol}: hl=${o.hlFundingRate}, binance=${o.binanceFundingRate}, spread=${o.spread}, annualized=${o.annualizedYield}%, direction=${o.direction}\n`;
+        }
+        if (funding.note) {
+            text += `- note=${funding.note}\n`;
+        }
+        text += '\n## Zora Trending Coins\n';
+        for (const c of coins.slice(0, 15)) {
+            text += `- ${c.symbol} (${c.name}): mcap=$${Number(c.marketCap || 0).toLocaleString()}, vol24h=$${Number(c.volume24h || 0).toLocaleString()}, holders=${c.uniqueHolders || c.holders || 0}, delta24h=$${Number(c.marketCapDelta24h || 0).toLocaleString()}, creator=${c.creatorHandle || 'anonymous'}\n`;
+        }
+        const symbols = Object.keys(matrix);
+        const correlations = [];
+        for (let i = 0; i < symbols.length; i += 1) {
+            const left = symbols[i];
+            const row = matrix[left] || {};
+            for (let j = i + 1; j < symbols.length; j += 1) {
+                const right = symbols[j];
+                const value = Number(row[right]);
+                if (!Number.isFinite(value))
+                    continue;
+                correlations.push({ tokenA: left, tokenB: right, value });
+            }
+        }
+        correlations.sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+        text += '\n## Hyperliquid Correlation Structure\n';
+        for (const pair of correlations.slice(0, 12)) {
+            text += `- ${pair.tokenA}/${pair.tokenB}: corr=${pair.value}\n`;
+        }
+        text += '\n## Meme Velocity\n';
+        for (const token of velocityTokens.slice(0, 20)) {
+            text += `- ${token.symbol} (${token.chain}/${token.platform}): score=${token.velocityScore}, signal=${token.signal}, vol24h=$${Number(token.volume24h || 0).toLocaleString()}, volChange1h=${token.volumeChange1h}%, mcap=$${Number(token.marketCap || 0).toLocaleString()}, holders=${token.holders || 0}\n`;
         }
         return text;
     },

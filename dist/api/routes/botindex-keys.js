@@ -101,17 +101,74 @@ router.get('/register', async (req, res) => {
         const plan = (planParam === 'free') ? 'free' : (planParam === 'pro') ? 'pro' : 'basic';
         if (plan === 'free') {
             (0, conversion_funnel_1.trackFunnelEvent)('register_page_hit', 'free');
+            const emailParam = typeof req.query.email === 'string' ? req.query.email.trim().toLowerCase() : '';
+            const acceptsHtml = (req.headers.accept || '').includes('text/html');
+            // If no email provided, show email capture form (browser) or return error (API)
+            if (!emailParam || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailParam)) {
+                if (acceptsHtml) {
+                    res.setHeader('Content-Type', 'text/html');
+                    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BotIndex — Free API Key</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #e5e5e5; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 24px; }
+    .card { max-width: 440px; width: 100%; border: 1px solid #27272a; border-radius: 16px; background: #18181b; padding: 32px; }
+    h1 { font-size: 24px; color: #fff; margin-bottom: 8px; }
+    .subtitle { color: #a1a1aa; font-size: 14px; margin-bottom: 24px; }
+    label { display: block; font-size: 13px; color: #a1a1aa; margin-bottom: 6px; }
+    input { width: 100%; padding: 12px 14px; background: #0a0a0a; border: 1px solid #3f3f46; border-radius: 8px; color: #e5e5e5; font-size: 14px; outline: none; }
+    input:focus { border-color: #22d3ee; }
+    .btn { display: block; width: 100%; padding: 12px; margin-top: 16px; background: #22d3ee20; color: #22d3ee; border: 1px solid #22d3ee40; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn:hover { background: #22d3ee30; }
+    .badge { display: inline-block; background: #22d3ee15; color: #22d3ee; border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 500; margin-bottom: 20px; }
+    .fine { color: #71717a; font-size: 11px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Get Your Free API Key</h1>
+    <p class="subtitle">3 requests/day — instant activation, no credit card.</p>
+    <span class="badge">FREE TIER</span>
+    <form action="/api/botindex/keys/register" method="GET">
+      <input type="hidden" name="plan" value="free">
+      <label for="email">Email address</label>
+      <input type="email" id="email" name="email" placeholder="you@example.com" required autofocus>
+      <button type="submit" class="btn">Get API Key →</button>
+    </form>
+    <p class="fine">We'll send your key to this email as backup. No spam, ever.</p>
+  </div>
+</body>
+</html>`);
+                    return;
+                }
+                res.status(400).json({
+                    error: 'email_required',
+                    message: 'Email is required for free API key. Add ?email=you@example.com to the request.',
+                    example: 'GET /api/botindex/keys/register?plan=free&email=you@example.com',
+                });
+                return;
+            }
             (0, conversion_funnel_1.trackFunnelEvent)('checkout_completed', 'free');
             const apiKey = (0, apiKeyAuth_1.generateApiKey)();
             const entry = (0, apiKeyAuth_1.createApiKeyEntry)({
                 apiKey,
-                email: 'free-tier@botindex.dev',
+                email: emailParam,
                 plan: 'free',
             });
-            // Free tier: 10 req/day
-            entry.dailyLimit = 10;
+            // Free tier: 3 req/day — tight enough to taste, not enough to live on
+            entry.dailyLimit = 3;
             (0, conversion_funnel_1.trackFunnelEvent)('api_key_issued', 'free');
-            const acceptsHtml = (req.headers.accept || '').includes('text/html');
+            // Send key to email as backup
+            try {
+                await (0, key_delivery_email_1.sendApiKeyEmail)({ to: emailParam, apiKey, plan: 'free' });
+            }
+            catch (emailError) {
+                logger_1.default.warn({ err: emailError, email: emailParam }, 'Failed to send free-tier API key email');
+            }
             if (acceptsHtml) {
                 res.setHeader('Content-Type', 'text/html');
                 res.send(`<!DOCTYPE html>
@@ -198,7 +255,7 @@ router.get('/register', async (req, res) => {
             res.json({
                 key: apiKey,
                 plan: 'free',
-                rateLimit: '10 req/day (upgrade to Pro for unlimited: $29/mo)',
+                rateLimit: '3 req/day (upgrade to Pro for unlimited: $29/mo)',
                 message: "Your API key is ready. Copy a command below and paste it in your terminal — you'll get live data in 2 seconds.",
                 quickstart: {
                     step_1: 'Copy any curl command below and paste it in your terminal',

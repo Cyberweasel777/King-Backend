@@ -4,7 +4,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const x402Gate_1 = require("../middleware/x402Gate");
 const logger_1 = __importDefault(require("../../config/logger"));
 const client_1 = require("../../services/botindex/doppler/client");
 const scorer_1 = require("../../services/botindex/doppler/scorer");
@@ -29,7 +28,7 @@ function parseNumberParam(value, fallback, min = 0, max = Number.POSITIVE_INFINI
     }
     return parsed;
 }
-router.get('/doppler/launches', (0, x402Gate_1.createX402Gate)({ price: '$0.01', description: 'Recent Doppler token launches with risk scores' }), async (req, res) => {
+router.get('/doppler/launches', async (req, res) => {
     const hours = parseIntegerParam(req.query.hours, 24, 1, 168);
     if (hours === null) {
         res.status(400).json({
@@ -107,7 +106,7 @@ router.get('/doppler/launches', (0, x402Gate_1.createX402Gate)({ price: '$0.01',
         });
     }
 });
-router.get('/doppler/score/:address', (0, x402Gate_1.createX402Gate)({ price: '$0.02', description: 'Deep risk score for a Doppler-launched token' }), async (req, res) => {
+router.get('/doppler/score/:address', async (req, res) => {
     const address = String(req.params.address || '').trim();
     if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
         res.status(400).json({
@@ -151,7 +150,7 @@ router.get('/doppler/score/:address', (0, x402Gate_1.createX402Gate)({ price: '$
         });
     }
 });
-router.get('/doppler/trending', (0, x402Gate_1.createX402Gate)({ price: '$0.01', description: 'Trending Doppler launches by volume velocity' }), async (req, res) => {
+router.get('/doppler/trending', async (req, res) => {
     const limit = parseIntegerParam(req.query.limit, 10, 1, 100);
     if (limit === null) {
         res.status(400).json({

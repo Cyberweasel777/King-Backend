@@ -5,7 +5,7 @@
  * API key registration. Authenticated requests (API key or x402) bypass.
  *
  * Default: 3 requests per DAY per IP on gated endpoints.
- * Free API key: 10 req/day (handled in botindex routes).
+ * Free API key: 3 req/day (handled in botindex routes).
  */
 import type { RequestHandler } from 'express';
 /**

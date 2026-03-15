@@ -167,9 +167,16 @@ const optionalApiKey = (req, res, next) => {
     }
     // Check daily limit BEFORE touching (so we don't count the rejected request)
     if (isDailyLimitExceeded(entry)) {
+        // Add x402 payment-required header for agent auto-negotiation
+        const { buildX402UpgradePayload } = require('./x402Gate');
+        const requestUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+        const x402Upgrade = buildX402UpgradePayload(requestUrl);
+        if (x402Upgrade) {
+            res.setHeader('payment-required', x402Upgrade.header);
+        }
         res.status(429).json({
             error: 'daily_limit_exceeded',
-            message: `You've used all ${entry.dailyLimit} free requests for today. Upgrade to Pro for unlimited access.`,
+            message: `You've used all ${entry.dailyLimit} free requests for today. Upgrade to Pro for unlimited access, or pay per call with x402.`,
             upgrade: {
                 pro: {
                     url: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
@@ -177,11 +184,7 @@ const optionalApiKey = (req, res, next) => {
                     description: 'Unlimited API calls. Cancel anytime.',
                     features: ['Unlimited requests', 'All 29 endpoints', 'Priority support', 'Webhook alerts'],
                 },
-                x402: {
-                    url: 'https://api.botindex.dev/api/botindex/keys/connect',
-                    description: 'Pay per call with USDC on Base — no subscription needed.',
-                    price: '$0.01-0.10/call',
-                },
+                ...(x402Upgrade?.body || {}),
             },
             free_channels: {
                 message: 'Get free delayed signals in our channels while you decide:',
@@ -199,6 +202,17 @@ const optionalApiKey = (req, res, next) => {
     }
     touchValidKey(apiKey, entry);
     attachAuth(req, apiKey, entry);
+    // Set usage headers on every response so users see remaining quota
+    if (entry.dailyLimit) {
+        const used = entry.dailyCount || 0;
+        const remaining = Math.max(0, entry.dailyLimit - used);
+        res.setHeader('X-BotIndex-Daily-Used', String(used));
+        res.setHeader('X-BotIndex-Daily-Limit', String(entry.dailyLimit));
+        res.setHeader('X-BotIndex-Daily-Remaining', String(remaining));
+        if (remaining <= 1) {
+            res.setHeader('X-BotIndex-Upgrade', 'https://api.botindex.dev/api/botindex/keys/register?plan=pro');
+        }
+    }
     next();
 };
 exports.optionalApiKey = optionalApiKey;
@@ -208,12 +222,12 @@ loadLedger();
     let updated = 0;
     for (const [, entry] of apiKeyLedger.entries()) {
         if (entry.plan === 'free' && !entry.dailyLimit) {
-            entry.dailyLimit = 10;
+            entry.dailyLimit = 3;
             updated++;
         }
     }
     if (updated > 0) {
-        logger_1.default.info({ updated }, 'Backfilled free-tier API keys with 10 req/day limit');
+        logger_1.default.info({ updated }, 'Backfilled free-tier API keys with 3 req/day limit');
         scheduleLedgerFlush();
     }
 })();

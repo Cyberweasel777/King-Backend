@@ -10,4 +10,5 @@ export declare const zoraIntelConfig: DomainConfig;
 export declare const hyperliquidIntelConfig: DomainConfig;
 export declare const cryptoIntelConfig: DomainConfig;
 export declare const dopplerIntelConfig: DomainConfig;
+export declare const alphaScanConfig: DomainConfig;
 //# sourceMappingURL=domains.d.ts.map

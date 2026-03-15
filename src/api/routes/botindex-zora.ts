@@ -1,5 +1,4 @@
 import { Request, Response, Router } from 'express';
-import { createX402Gate } from '../middleware/x402Gate';
 import logger from '../../config/logger';
 import { getZoraTrendingCoins } from '../../services/botindex/zora/trending';
 import { getZoraCreatorScores } from '../../services/botindex/zora/creator-scores';
@@ -60,7 +59,6 @@ router.get('/zora/trending-coins', async (req: Request, res: Response) => {
 
 router.get(
   '/zora/creator-scores',
-  createX402Gate({ price: '$0.01', description: 'Zora creator scores (0.01 USDC)' }),
   async (req: Request, res: Response) => {
     const limit = parseLimit(req.query.limit);
     if (limit === null) {
@@ -81,7 +79,7 @@ router.get(
         metadata: {
           ...METADATA,
           endpoint: '/botindex/zora/creator-scores',
-          price: '$0.01',
+          price: 'FREE',
         },
       });
     } catch (error) {
@@ -97,7 +95,6 @@ router.get(
 
 router.get(
   '/zora/attention-momentum',
-  createX402Gate({ price: '$0.01', description: 'Zora attention momentum (0.01 USDC)' }),
   async (req: Request, res: Response) => {
     const limit = parseLimit(req.query.limit);
     if (limit === null) {
@@ -118,7 +115,7 @@ router.get(
         metadata: {
           ...METADATA,
           endpoint: '/botindex/zora/attention-momentum',
-          price: '$0.01',
+          price: 'FREE',
         },
       });
     } catch (error) {

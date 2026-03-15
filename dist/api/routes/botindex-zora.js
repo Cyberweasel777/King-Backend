@@ -4,7 +4,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const x402Gate_1 = require("../middleware/x402Gate");
 const logger_1 = __importDefault(require("../../config/logger"));
 const trending_1 = require("../../services/botindex/zora/trending");
 const creator_scores_1 = require("../../services/botindex/zora/creator-scores");
@@ -57,7 +56,7 @@ router.get('/zora/trending-coins', async (req, res) => {
         });
     }
 });
-router.get('/zora/creator-scores', (0, x402Gate_1.createX402Gate)({ price: '$0.01', description: 'Zora creator scores (0.01 USDC)' }), async (req, res) => {
+router.get('/zora/creator-scores', async (req, res) => {
     const limit = parseLimit(req.query.limit);
     if (limit === null) {
         res.status(400).json({
@@ -76,7 +75,7 @@ router.get('/zora/creator-scores', (0, x402Gate_1.createX402Gate)({ price: '$0.0
             metadata: {
                 ...METADATA,
                 endpoint: '/botindex/zora/creator-scores',
-                price: '$0.01',
+                price: 'FREE',
             },
         });
     }
@@ -89,7 +88,7 @@ router.get('/zora/creator-scores', (0, x402Gate_1.createX402Gate)({ price: '$0.0
         });
     }
 });
-router.get('/zora/attention-momentum', (0, x402Gate_1.createX402Gate)({ price: '$0.01', description: 'Zora attention momentum (0.01 USDC)' }), async (req, res) => {
+router.get('/zora/attention-momentum', async (req, res) => {
     const limit = parseLimit(req.query.limit);
     if (limit === null) {
         res.status(400).json({
@@ -108,7 +107,7 @@ router.get('/zora/attention-momentum', (0, x402Gate_1.createX402Gate)({ price: '
             metadata: {
                 ...METADATA,
                 endpoint: '/botindex/zora/attention-momentum',
-                price: '$0.01',
+                price: 'FREE',
             },
         });
     }

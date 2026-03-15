@@ -1,13 +1,11 @@
 "use strict";
 /**
- * BotIndex Intel Routes — DeepSeek-powered premium analysis.
+ * BotIndex Intel Routes — DeepSeek-powered intelligence.
  *
- * Each domain gets a /intel endpoint that:
- * 1. Fetches fresh raw data from existing endpoints
- * 2. Feeds it to DeepSeek for AI analysis
- * 3. Returns structured intelligence (signals, risk scores, grades)
+ * Domain intel endpoints are free-to-call with teaser responses for anonymous/free users.
+ * Paid API keys receive full reports.
  *
- * All intel endpoints are premium: $0.05/call via x402 or API key.
+ * Alpha Scan is the premium flagship endpoint ($0.10/call via x402 or paid API key bypass).
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -56,20 +54,145 @@ const trending_1 = require("../../services/botindex/zora/trending");
 const attention_1 = require("../../services/botindex/zora/attention");
 const creator_scores_1 = require("../../services/botindex/zora/creator-scores");
 const funding_arb_1 = require("../../services/botindex/hyperliquid/funding-arb");
+const correlation_1 = require("../../services/botindex/hyperliquid/correlation");
+const whale_alerts_1 = require("../../services/botindex/hyperliquid/whale-alerts");
+const velocityScanner_1 = require("../../services/botindex/meme/velocityScanner");
 const router = (0, express_1.Router)();
-const METADATA = {
+const BASE_METADATA = {
     protocol: 'x402',
     version: '1.0',
     provider: 'Renaldo Corp / BotIndex',
-    tier: 'premium',
-    price: '$0.05',
 };
-const intelGate = (0, x402Gate_1.createX402Gate)({
-    price: '$0.05',
-    description: 'BotIndex AI Intelligence Report (0.05 USDC)',
+const TEASER_REASONING_SUFFIX = '... [upgrade for full analysis]';
+const ALPHA_SCAN_CACHE_TTL_MS = 5 * 60 * 1000;
+const INTEL_UPGRADE = {
+    message: 'Upgrade to unlock full multi-asset intel and complete reasoning.',
+    pro: {
+        register: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
+        pricing: '$29/mo',
+        description: 'Unlimited full intel reports via API key subscription',
+    },
+    x402: {
+        endpoint: '/api/botindex/alpha-scan',
+        pricing: '$0.10/call',
+        description: 'Premium cross-market Alpha Scan via x402 pay-per-call',
+        docs: 'https://www.x402.org',
+    },
+};
+const alphaScanGate = (0, x402Gate_1.createX402Gate)({
+    price: '$0.10',
+    description: 'BotIndex Alpha Scan convergence intelligence (0.10 USDC)',
 });
+let alphaScanCache = null;
+let alphaScanInFlight = null;
+function isPaidApiKey(req) {
+    return req.apiKeyAuth?.plan === 'pro' || req.apiKeyAuth?.plan === 'basic';
+}
+function hasFullIntelAccess(req) {
+    if (isPaidApiKey(req))
+        return true;
+    return Boolean(req.__apiKeyAuthenticated ||
+        req.__billingMode === 'subscription' ||
+        req.__freeTrialAuthenticated);
+}
+function truncateReasoning(reasoning) {
+    const normalized = String(reasoning || '').trim();
+    const clipped = normalized.slice(0, 50).trimEnd();
+    return `${clipped}${TEASER_REASONING_SUFFIX}`;
+}
+function truncateMarketSummary(summary) {
+    const normalized = String(summary || '').trim();
+    if (normalized.length <= 100) {
+        return normalized;
+    }
+    return `${normalized.slice(0, 100).trimEnd()}...`;
+}
+function buildTeaserReport(report) {
+    const topAsset = report.assets[0];
+    return {
+        ...report,
+        assets: topAsset
+            ? [{
+                    ...topAsset,
+                    reasoning: truncateReasoning(topAsset.reasoning),
+                }]
+            : [],
+        marketSummary: truncateMarketSummary(report.marketSummary),
+        topPick: null,
+        upgrade: INTEL_UPGRADE,
+        isTruncated: true,
+    };
+}
+function sendIntelResponse(req, res, report, metadata) {
+    if (hasFullIntelAccess(req)) {
+        res.json({
+            ...report,
+            isTruncated: false,
+            metadata: {
+                ...metadata,
+                tier: 'full',
+                access: 'subscription',
+            },
+        });
+        return;
+    }
+    res.json({
+        ...buildTeaserReport(report),
+        metadata: {
+            ...metadata,
+            tier: 'teaser',
+            access: 'free',
+        },
+    });
+}
+function preventFreeApiKeyBypass(req, _res, next) {
+    // createX402Gate currently bypasses for any req.apiKeyAuth object.
+    // For premium-only endpoints, free keys must still pay via x402.
+    if (req.apiKeyAuth?.plan === 'free') {
+        delete req.apiKeyAuth;
+    }
+    next();
+}
+async function generateAlphaScanReport() {
+    const [whales, funding, zora, correlation, memeVelocity] = await Promise.all([
+        (0, whale_alerts_1.getHyperliquidWhaleAlerts)(),
+        (0, funding_arb_1.getFundingArbOpportunities)(),
+        (0, trending_1.getZoraTrendingCoins)(20),
+        (0, correlation_1.getHLCorrelationMatrix)(),
+        (0, velocityScanner_1.scanMemeTokenVelocity)(),
+    ]);
+    // Engine-level cache key is domain-only. Use 5-min buckets to enforce 5-min refresh.
+    const cacheBucket = Math.floor(Date.now() / ALPHA_SCAN_CACHE_TTL_MS);
+    const report = await (0, engine_1.generateIntelReport)({ ...domains_1.alphaScanConfig, domain: `alpha-scan-${cacheBucket}` }, { whales, funding, zora, correlation, memeVelocity });
+    return {
+        ...report,
+        domain: 'alpha-scan',
+    };
+}
+async function getAlphaScanReportWithCache() {
+    const now = Date.now();
+    if (alphaScanCache && alphaScanCache.expiresAt > now) {
+        return { report: alphaScanCache.report, cached: true };
+    }
+    if (alphaScanInFlight) {
+        const report = await alphaScanInFlight;
+        return { report, cached: true };
+    }
+    alphaScanInFlight = (async () => {
+        const report = await generateAlphaScanReport();
+        alphaScanCache = {
+            report,
+            expiresAt: Date.now() + ALPHA_SCAN_CACHE_TTL_MS,
+        };
+        return report;
+    })().finally(() => {
+        alphaScanInFlight = null;
+    });
+    const report = await alphaScanInFlight;
+    return { report, cached: false };
+}
 // ─── Zora Intel ─────────────────────────────────────────────────────────────
-router.get('/zora/intel', intelGate, async (_req, res) => {
+router.get('/zora/intel', async (req, res) => {
     try {
         // Fetch all raw Zora data in parallel
         const [trending, momentum, creators] = await Promise.all([
@@ -82,9 +205,10 @@ router.get('/zora/intel', intelGate, async (_req, res) => {
             momentum,
             creators,
         });
-        res.json({
-            ...report,
-            metadata: { ...METADATA, endpoint: '/botindex/zora/intel', market: 'zora' },
+        sendIntelResponse(req, res, report, {
+            ...BASE_METADATA,
+            endpoint: '/botindex/zora/intel',
+            market: 'zora',
         });
     }
     catch (error) {
@@ -92,18 +216,19 @@ router.get('/zora/intel', intelGate, async (_req, res) => {
         res.status(500).json({
             error: 'intel_generation_failed',
             message: error instanceof Error ? error.message : 'Unknown error',
-            metadata: METADATA,
+            metadata: BASE_METADATA,
         });
     }
 });
 // ─── Hyperliquid Intel ──────────────────────────────────────────────────────
-router.get('/hyperliquid/intel', intelGate, async (_req, res) => {
+router.get('/hyperliquid/intel', async (req, res) => {
     try {
         const fundingData = await (0, funding_arb_1.getFundingArbOpportunities)();
         const report = await (0, engine_1.generateIntelReport)(domains_1.hyperliquidIntelConfig, fundingData);
-        res.json({
-            ...report,
-            metadata: { ...METADATA, endpoint: '/botindex/hyperliquid/intel', market: 'hyperliquid' },
+        sendIntelResponse(req, res, report, {
+            ...BASE_METADATA,
+            endpoint: '/botindex/hyperliquid/intel',
+            market: 'hyperliquid',
         });
     }
     catch (error) {
@@ -111,12 +236,12 @@ router.get('/hyperliquid/intel', intelGate, async (_req, res) => {
         res.status(500).json({
             error: 'intel_generation_failed',
             message: error instanceof Error ? error.message : 'Unknown error',
-            metadata: METADATA,
+            metadata: BASE_METADATA,
         });
     }
 });
 // ─── Crypto Intel ───────────────────────────────────────────────────────────
-router.get('/crypto/intel', intelGate, async (req, res) => {
+router.get('/crypto/intel', async (req, res) => {
     try {
         // Fetch signals from the existing /signals endpoint handler logic
         const { getBotindexTokenUniverse } = await Promise.resolve().then(() => __importStar(require('../../services/botindex/engine/universe')));
@@ -141,9 +266,10 @@ router.get('/crypto/intel', intelGate, async (req, res) => {
             signals,
             tokens: tokenUniverse.slice(0, 20),
         });
-        res.json({
-            ...report,
-            metadata: { ...METADATA, endpoint: '/botindex/crypto/intel', market: 'crypto' },
+        sendIntelResponse(req, res, report, {
+            ...BASE_METADATA,
+            endpoint: '/botindex/crypto/intel',
+            market: 'crypto',
         });
     }
     catch (error) {
@@ -151,12 +277,12 @@ router.get('/crypto/intel', intelGate, async (req, res) => {
         res.status(500).json({
             error: 'intel_generation_failed',
             message: error instanceof Error ? error.message : 'Unknown error',
-            metadata: METADATA,
+            metadata: BASE_METADATA,
         });
     }
 });
 // ─── Doppler Intel ──────────────────────────────────────────────────────────
-router.get('/doppler/intel', intelGate, async (_req, res) => {
+router.get('/doppler/intel', async (req, res) => {
     try {
         // Fetch Doppler launches from Zora explore (NEW_CREATORS list)
         const url = 'https://api-sdk.zora.engineering/explore?listType=NEW_CREATORS&count=15';
@@ -190,9 +316,10 @@ router.get('/doppler/intel', intelGate, async (_req, res) => {
             clearTimeout(timeout);
         }
         const report = await (0, engine_1.generateIntelReport)(domains_1.dopplerIntelConfig, { launches });
-        res.json({
-            ...report,
-            metadata: { ...METADATA, endpoint: '/botindex/doppler/intel', market: 'doppler' },
+        sendIntelResponse(req, res, report, {
+            ...BASE_METADATA,
+            endpoint: '/botindex/doppler/intel',
+            market: 'doppler',
         });
     }
     catch (error) {
@@ -200,7 +327,39 @@ router.get('/doppler/intel', intelGate, async (_req, res) => {
         res.status(500).json({
             error: 'intel_generation_failed',
             message: error instanceof Error ? error.message : 'Unknown error',
-            metadata: METADATA,
+            metadata: BASE_METADATA,
+        });
+    }
+});
+// ─── Alpha Scan (Premium) ───────────────────────────────────────────────────
+router.get('/alpha-scan', preventFreeApiKeyBypass, alphaScanGate, async (_req, res) => {
+    try {
+        const { report, cached } = await getAlphaScanReportWithCache();
+        res.json({
+            ...report,
+            isTruncated: false,
+            cached,
+            metadata: {
+                ...BASE_METADATA,
+                endpoint: '/botindex/alpha-scan',
+                market: 'cross-market',
+                tier: 'premium',
+                price: '$0.10',
+                cacheTtlSeconds: 300,
+            },
+        });
+    }
+    catch (error) {
+        logger_1.default.error({ err: error }, 'Alpha Scan generation failed');
+        res.status(500).json({
+            error: 'alpha_scan_generation_failed',
+            message: error instanceof Error ? error.message : 'Unknown error',
+            metadata: {
+                ...BASE_METADATA,
+                endpoint: '/botindex/alpha-scan',
+                tier: 'premium',
+                price: '$0.10',
+            },
         });
     }
 });
