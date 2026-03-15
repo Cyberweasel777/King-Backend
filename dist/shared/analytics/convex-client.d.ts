@@ -9,6 +9,8 @@ export interface ApiRequestLog {
     x402Paid: boolean;
     responseTimeMs?: number;
     timestamp: number;
+    apiKeyHash?: string;
+    apiKeyPlan?: string;
 }
 export interface EndpointAnalyticsRow {
     endpoint: string;
@@ -47,6 +49,26 @@ export interface WalletCRMRow {
     totalPaidUsd: number;
     endpoints: string[];
 }
+export interface ApiKeyFunnelEntry {
+    apiKeyHash: string;
+    plan: string;
+    firstRequest: number;
+    lastRequest: number;
+    totalRequests: number;
+    uniqueEndpoints: number;
+    endpointList: string[];
+    statusCodes: Record<string, number>;
+    daysSinceFirst: number;
+    daysSinceLast: number;
+}
+export interface ApiKeyFunnelSummary {
+    totalTrackedKeys: number;
+    activeKeys: number;
+    dormantKeys: number;
+    deadKeys: number;
+    noKeyRequests: number;
+    keys: ApiKeyFunnelEntry[];
+}
 export interface ConvexAnalyticsStore {
     logRequest(request: ApiRequestLog): Promise<void>;
     getAnalytics(args?: {
@@ -56,6 +78,9 @@ export interface ConvexAnalyticsStore {
     getWalletCRM(args?: {
         limit?: number;
     }): Promise<WalletCRMRow[]>;
+    getApiKeyFunnel(args?: {
+        sinceTimestamp?: number;
+    }): Promise<ApiKeyFunnelSummary>;
 }
 export declare function getOptionalConvexAnalyticsStore(): ConvexAnalyticsStore | null;
 export declare function getConvexAnalyticsStore(): ConvexAnalyticsStore;

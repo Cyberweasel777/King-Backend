@@ -15,6 +15,8 @@ export interface ApiRequestLog {
   x402Paid: boolean;
   responseTimeMs?: number;
   timestamp: number;
+  apiKeyHash?: string;
+  apiKeyPlan?: string;
 }
 
 export interface EndpointAnalyticsRow {
@@ -58,10 +60,33 @@ export interface WalletCRMRow {
   endpoints: string[];
 }
 
+export interface ApiKeyFunnelEntry {
+  apiKeyHash: string;
+  plan: string;
+  firstRequest: number;
+  lastRequest: number;
+  totalRequests: number;
+  uniqueEndpoints: number;
+  endpointList: string[];
+  statusCodes: Record<string, number>;
+  daysSinceFirst: number;
+  daysSinceLast: number;
+}
+
+export interface ApiKeyFunnelSummary {
+  totalTrackedKeys: number;
+  activeKeys: number;
+  dormantKeys: number;
+  deadKeys: number;
+  noKeyRequests: number;
+  keys: ApiKeyFunnelEntry[];
+}
+
 export interface ConvexAnalyticsStore {
   logRequest(request: ApiRequestLog): Promise<void>;
   getAnalytics(args?: { sinceTimestamp?: number; bucketMs?: number }): Promise<AnalyticsSummary>;
   getWalletCRM(args?: { limit?: number }): Promise<WalletCRMRow[]>;
+  getApiKeyFunnel(args?: { sinceTimestamp?: number }): Promise<ApiKeyFunnelSummary>;
 }
 
 class ConvexHttpAnalyticsStore implements ConvexAnalyticsStore {
@@ -100,6 +125,10 @@ class ConvexHttpAnalyticsStore implements ConvexAnalyticsStore {
 
   async getWalletCRM(args: { limit?: number } = {}): Promise<WalletCRMRow[]> {
     return this.request<WalletCRMRow[]>('query', 'analytics:getWalletCRM', args);
+  }
+
+  async getApiKeyFunnel(args: { sinceTimestamp?: number } = {}): Promise<ApiKeyFunnelSummary> {
+    return this.request<ApiKeyFunnelSummary>('query', 'analytics:getApiKeyFunnel', args);
   }
 }
 

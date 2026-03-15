@@ -39,6 +39,7 @@ import signalsRouter from './signals';
 import arbRouter from './arb';
 import botindexKeysRouter from './botindex-keys';
 import adminDashboardRouter from './admin-dashboard';
+import adminAnalyticsRouter from './admin-analytics';
 import botindexBeaconRouter from './botindex-beacon';
 import { optionalApiKey } from '../middleware/apiKeyAuth';
 
@@ -119,6 +120,9 @@ router.use('/', shellRouter);
 
 // Admin dashboard (traffic, conversions, funnel)
 router.use('/admin/dashboard', adminDashboardRouter);
+
+// Admin analytics (Convex-powered persistent analytics)
+router.use('/admin', adminAnalyticsRouter);
 
 // (beacon mounted above auth layer)
 

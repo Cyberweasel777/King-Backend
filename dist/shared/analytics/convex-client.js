@@ -37,6 +37,9 @@ class ConvexHttpAnalyticsStore {
     async getWalletCRM(args = {}) {
         return this.request('query', 'analytics:getWalletCRM', args);
     }
+    async getApiKeyFunnel(args = {}) {
+        return this.request('query', 'analytics:getApiKeyFunnel', args);
+    }
 }
 let cachedStore;
 function getOptionalConvexAnalyticsStore() {

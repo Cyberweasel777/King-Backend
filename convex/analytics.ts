@@ -40,6 +40,8 @@ export const logRequest = mutation({
     x402Paid: v.boolean(),
     responseTimeMs: v.optional(v.number()),
     timestamp: v.number(),
+    apiKeyHash: v.optional(v.string()),
+    apiKeyPlan: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert('apiRequests', args);
@@ -205,5 +207,89 @@ export const getWalletCRM = query({
     const limit = Math.max(1, Math.min(args.limit ?? 1_000, 5_000));
     const rows = await ctx.db.query('wallets').withIndex('by_firstSeen').collect();
     return rows.sort((a, b) => b.lastSeen - a.lastSeen).slice(0, limit);
+  },
+});
+
+export const getApiKeyFunnel = query({
+  args: {
+    sinceTimestamp: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const sinceTimestamp = args.sinceTimestamp;
+    const rows =
+      typeof sinceTimestamp === 'number'
+        ? await ctx.db
+            .query('apiRequests')
+            .withIndex('by_timestamp', (q) => q.gte('timestamp', sinceTimestamp))
+            .collect()
+        : await ctx.db.query('apiRequests').withIndex('by_timestamp').collect();
+
+    // Group by API key hash
+    const keyMap = new Map<string, {
+      apiKeyHash: string;
+      plan: string;
+      firstRequest: number;
+      lastRequest: number;
+      totalRequests: number;
+      uniqueEndpoints: Set<string>;
+      statusCodes: Record<string, number>;
+    }>();
+
+    let noKeyRequests = 0;
+
+    for (const row of rows) {
+      if (!row.apiKeyHash) {
+        noKeyRequests += 1;
+        continue;
+      }
+
+      let entry = keyMap.get(row.apiKeyHash);
+      if (!entry) {
+        entry = {
+          apiKeyHash: row.apiKeyHash,
+          plan: row.apiKeyPlan || 'unknown',
+          firstRequest: row.timestamp,
+          lastRequest: row.timestamp,
+          totalRequests: 0,
+          uniqueEndpoints: new Set<string>(),
+          statusCodes: {},
+        };
+        keyMap.set(row.apiKeyHash, entry);
+      }
+
+      entry.totalRequests += 1;
+      entry.firstRequest = Math.min(entry.firstRequest, row.timestamp);
+      entry.lastRequest = Math.max(entry.lastRequest, row.timestamp);
+      entry.uniqueEndpoints.add(row.endpoint);
+      entry.statusCodes[String(row.statusCode)] = (entry.statusCodes[String(row.statusCode)] ?? 0) + 1;
+    }
+
+    const keys = Array.from(keyMap.values())
+      .map((k) => ({
+        apiKeyHash: k.apiKeyHash,
+        plan: k.plan,
+        firstRequest: k.firstRequest,
+        lastRequest: k.lastRequest,
+        totalRequests: k.totalRequests,
+        uniqueEndpoints: k.uniqueEndpoints.size,
+        endpointList: Array.from(k.uniqueEndpoints),
+        statusCodes: k.statusCodes,
+        daysSinceFirst: Math.floor((Date.now() - k.firstRequest) / 86_400_000),
+        daysSinceLast: Math.floor((Date.now() - k.lastRequest) / 86_400_000),
+      }))
+      .sort((a, b) => b.totalRequests - a.totalRequests);
+
+    const activeKeys = keys.filter((k) => k.daysSinceLast <= 1);
+    const dormantKeys = keys.filter((k) => k.daysSinceLast > 1 && k.daysSinceLast <= 7);
+    const deadKeys = keys.filter((k) => k.daysSinceLast > 7);
+
+    return {
+      totalTrackedKeys: keys.length,
+      activeKeys: activeKeys.length,
+      dormantKeys: dormantKeys.length,
+      deadKeys: deadKeys.length,
+      noKeyRequests,
+      keys,
+    };
   },
 });

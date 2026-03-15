@@ -42,6 +42,7 @@ const signals_1 = __importDefault(require("./signals"));
 const arb_1 = __importDefault(require("./arb"));
 const botindex_keys_1 = __importDefault(require("./botindex-keys"));
 const admin_dashboard_1 = __importDefault(require("./admin-dashboard"));
+const admin_analytics_1 = __importDefault(require("./admin-analytics"));
 const botindex_beacon_1 = __importDefault(require("./botindex-beacon"));
 const apiKeyAuth_1 = require("../middleware/apiKeyAuth");
 const router = (0, express_1.Router)();
@@ -108,6 +109,8 @@ router.use('/contracts', contracts_1.default);
 router.use('/', shell_1.default);
 // Admin dashboard (traffic, conversions, funnel)
 router.use('/admin/dashboard', admin_dashboard_1.default);
+// Admin analytics (Convex-powered persistent analytics)
+router.use('/admin', admin_analytics_1.default);
 // (beacon mounted above auth layer)
 // TODO: Add remaining 12 apps here
 // router.use('/spreadhunter', spreadhunterRouter);

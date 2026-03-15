@@ -76,11 +76,14 @@ export default defineSchema({
     x402Paid: v.boolean(),
     responseTimeMs: v.optional(v.number()),
     timestamp: v.number(),
+    apiKeyHash: v.optional(v.string()),
+    apiKeyPlan: v.optional(v.string()),
   })
     .index('by_endpoint_timestamp', ['endpoint', 'timestamp'])
     .index('by_visitor', ['visitorHash'])
     .index('by_wallet', ['walletAddress'])
-    .index('by_timestamp', ['timestamp']),
+    .index('by_timestamp', ['timestamp'])
+    .index('by_apiKey', ['apiKeyHash', 'timestamp']),
 
   wallets: defineTable({
     address: v.string(),

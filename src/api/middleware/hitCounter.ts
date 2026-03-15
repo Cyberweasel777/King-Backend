@@ -178,6 +178,8 @@ export function hitCounter(req: Request, res: Response, next: NextFunction): voi
     const userAgent = optionalHeader(req, 'User-Agent');
     const referrer = optionalHeader(req, 'Referer') || optionalHeader(req, 'Referrer');
     const hasXPaymentHeader = Boolean(optionalHeader(req, 'X-Payment'));
+    const apiKeyPlan = req.apiKeyAuth?.plan;
+    const apiKeyHash = req.apiKeyAuth?.apiKey ? hashIp(req.apiKeyAuth.apiKey) : undefined;
 
     if (!entry.visitorHashes.includes(visitorHash)) {
       entry.visitorHashes.push(visitorHash);
@@ -202,6 +204,8 @@ export function hitCounter(req: Request, res: Response, next: NextFunction): voi
           x402Paid: hasXPaymentHeader && res.statusCode !== 402,
           responseTimeMs: Date.now() - requestStartedAt,
           timestamp: Date.now(),
+          apiKeyHash,
+          apiKeyPlan,
         })
         .catch(reportConvexLogError);
     });
