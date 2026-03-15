@@ -13,6 +13,7 @@ import botindexGenesisRouter from './botindex-genesis';
 import botindexCommerceRouter from './botindex-commerce';
 import botindexZoraRouter from './botindex-zora';
 import botindexZoraRelayRouter from './botindex-zora-relay';
+import botindexZoraBotRouter from './botindex-zora-bot';
 import botindexHyperliquidRouter from './botindex-hyperliquid';
 import botindexPolymarketRouter from './botindex-polymarket';
 import botindexAztecRouter from './botindex-aztec';
@@ -68,6 +69,7 @@ router.use('/botindex/keys', botindexKeysRouter);
 // Domain-centric BotIndex routes (canonical)
 router.use('/botindex', botindexZoraRouter);
 router.use('/botindex', botindexZoraRelayRouter);
+router.use('/botindex', botindexZoraBotRouter);
 router.use('/botindex', botindexHyperliquidRouter);
 router.use('/botindex', botindexPolymarketRouter);
 router.use('/botindex', botindexAztecRouter);

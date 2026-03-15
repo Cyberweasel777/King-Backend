@@ -2,10 +2,15 @@ import fs from 'fs';
 import path from 'path';
 import logger from '../../../config/logger';
 import { ZoraTrendingCoin, getZoraTrendingCoins } from './trending';
+import { relayToPremiumSubscribers } from './premium-relay';
 
 export type ZoraTelegramRelayResult = {
   posted: number;
   skipped: number;
+  premium: {
+    sent: number;
+    failed: number;
+  };
   errors: string[];
 };
 
@@ -159,6 +164,10 @@ export async function relayZoraAlphaToTelegram(): Promise<ZoraTelegramRelayResul
   const result: ZoraTelegramRelayResult = {
     posted: 0,
     skipped: 0,
+    premium: {
+      sent: 0,
+      failed: 0,
+    },
     errors: [],
   };
 
@@ -226,8 +235,29 @@ export async function relayZoraAlphaToTelegram(): Promise<ZoraTelegramRelayResul
     result.errors.push(error instanceof Error ? error.message : 'Failed to persist posted ledger');
   }
 
+  try {
+    result.premium = await relayToPremiumSubscribers(topCoins);
+    logger.info(
+      {
+        premiumSent: result.premium.sent,
+        premiumFailed: result.premium.failed,
+      },
+      'Zora alpha premium relay completed'
+    );
+  } catch (error) {
+    const message = `Premium relay failed: ${error instanceof Error ? error.message : 'unknown error'}`;
+    logger.error({ err: error }, message);
+    result.errors.push(message);
+  }
+
   logger.info(
-    { posted: result.posted, skipped: result.skipped, errors: result.errors.length },
+    {
+      posted: result.posted,
+      skipped: result.skipped,
+      premiumSent: result.premium.sent,
+      premiumFailed: result.premium.failed,
+      errors: result.errors.length,
+    },
     'Zora alpha Telegram relay completed'
   );
 

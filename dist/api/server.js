@@ -73,6 +73,7 @@ app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)());
 // Stripe webhook needs raw body
 app.use('/api/:app/payments/webhook', express_1.default.raw({ type: 'application/json' }));
+app.use('/api/botindex/zora/bot/stripe-webhook', express_1.default.raw({ type: 'application/json' }));
 // JSON parser for other routes
 app.use(express_1.default.json({ limit: '10mb' }));
 // Agent discovery endpoints (no auth, no middleware)
@@ -256,6 +257,11 @@ async function start() {
 start().catch((error) => {
     logger_1.default.error({ err: error }, 'Failed to start API server');
 });
+if (process.env.ZORA_ALPHA_BOT_TOKEN) {
+    Promise.resolve().then(() => __importStar(require('../services/botindex/zora/alpha-bot'))).catch((error) => {
+        logger_1.default.error({ err: error }, 'Failed to start Zora Alpha bot polling service');
+    });
+}
 exports.default = app;
 // This won't work appended at end, need to insert before 404 handler
 //# sourceMappingURL=server.js.map

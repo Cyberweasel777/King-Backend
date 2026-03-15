@@ -40,6 +40,7 @@ app.use(cors());
 
 // Stripe webhook needs raw body
 app.use('/api/:app/payments/webhook', express.raw({ type: 'application/json' }));
+app.use('/api/botindex/zora/bot/stripe-webhook', express.raw({ type: 'application/json' }));
 
 // JSON parser for other routes
 app.use(express.json({ limit: '10mb' }));
@@ -258,6 +259,12 @@ async function start() {
 start().catch((error) => {
   logger.error({ err: error }, 'Failed to start API server');
 });
+
+if (process.env.ZORA_ALPHA_BOT_TOKEN) {
+  import('../services/botindex/zora/alpha-bot').catch((error) => {
+    logger.error({ err: error }, 'Failed to start Zora Alpha bot polling service');
+  });
+}
 
 export default app;
 // This won't work appended at end, need to insert before 404 handler
