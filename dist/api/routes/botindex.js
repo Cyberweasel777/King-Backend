@@ -58,6 +58,34 @@ const INTELLIGENCE_ENDPOINTS = [
         pricing: 'FREE teaser, full for paid API keys',
     },
 ];
+const COMPLIANCE_ENDPOINTS = [
+    {
+        path: '/api/botindex/compliance/overview',
+        description: 'Lightweight compliance snapshot for MCP/agent discovery (cached data only).',
+        pricing: 'FREE',
+        flagship: true,
+    },
+    {
+        path: '/api/botindex/compliance/signal-desk',
+        description: 'Headline analysis desk with COPY/IGNORE/COUNTER verdicts.',
+        pricing: 'FREE teaser, full for paid API keys',
+    },
+    {
+        path: '/api/botindex/compliance/threat-radar',
+        description: 'Regulatory threat intelligence radar with jurisdiction risk scoring.',
+        pricing: 'FREE teaser, full for paid API keys',
+    },
+    {
+        path: '/api/botindex/compliance/exposure?project=uniswap',
+        description: 'Project-level regulatory exposure scanner.',
+        pricing: 'FREE teaser, full for paid API keys',
+    },
+    {
+        path: '/api/botindex/compliance/headlines',
+        description: 'Raw compliance headlines feed from live scan cache.',
+        pricing: 'FREE',
+    },
+];
 function buildIntelligenceSection() {
     return {
         flagship: INTELLIGENCE_ENDPOINTS[0],
@@ -65,6 +93,17 @@ function buildIntelligenceSection() {
         notes: {
             teaser: 'Domain intel endpoints return truncated teaser output for anonymous/free users.',
             fullAccess: 'Use a paid API key for full domain intel. Use x402 on /alpha-scan for premium cross-market scan.',
+        },
+    };
+}
+function buildComplianceSection() {
+    return {
+        flagship: COMPLIANCE_ENDPOINTS[0],
+        endpoints: COMPLIANCE_ENDPOINTS,
+        notes: {
+            teaser: 'Threat radar and exposure endpoints return truncated teaser output for anonymous/free users.',
+            fullAccess: 'Use a paid API key (Basic or Pro) for full compliance and OSINT intelligence.',
+            mcpDiscovery: 'Agents should call /api/botindex/compliance/overview first for lightweight capability discovery.',
         },
     };
 }
@@ -157,6 +196,7 @@ router.get('/', (_req, res) => {
         status: 'ok',
         docs: '/api/botindex/v1/',
         intelligence: buildIntelligenceSection(),
+        compliance: buildComplianceSection(),
         timestamp: new Date().toISOString(),
     });
 });
@@ -170,8 +210,10 @@ router.get(['/v1', '/v1/'], (_req, res) => {
             crypto: '/api/botindex/v1/crypto',
             solana: '/api/botindex/v1/solana',
             commerce: '/api/botindex/v1/commerce',
+            compliance: '/api/botindex/compliance/overview',
         },
         intelligence: buildIntelligenceSection(),
+        compliance: buildComplianceSection(),
         timestamp: new Date().toISOString(),
     });
 });

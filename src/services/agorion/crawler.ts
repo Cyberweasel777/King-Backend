@@ -49,6 +49,42 @@ const PYPI_MIN_INTERVAL_MS = 1_000;
 const PROBE_TIMEOUT_MS = 10_000;
 const REQUEST_TIMEOUT_MS = 10_000;
 const PROBE_CONCURRENCY = 8;
+const BOTINDEX_COMPLIANCE_CAPABILITIES = [
+  'compliance',
+  'osint',
+  'regulatory',
+  'threat-intelligence',
+  'defi-compliance',
+  'crypto-regulation',
+  'mcp',
+] as const;
+const BOTINDEX_COMPLIANCE_ENDPOINTS: Array<{ path: string; method: string; description: string }> = [
+  {
+    path: '/api/botindex/compliance/overview',
+    method: 'GET',
+    description: 'Lightweight compliance snapshot for MCP and agent discovery.',
+  },
+  {
+    path: '/api/botindex/compliance/signal-desk',
+    method: 'GET',
+    description: 'Compliance signal desk with verdict-style analysis.',
+  },
+  {
+    path: '/api/botindex/compliance/threat-radar',
+    method: 'GET',
+    description: 'Regulatory threat intelligence radar with jurisdiction risk scoring.',
+  },
+  {
+    path: '/api/botindex/compliance/exposure',
+    method: 'GET',
+    description: 'Project-level regulatory exposure scan.',
+  },
+  {
+    path: '/api/botindex/compliance/headlines',
+    method: 'GET',
+    description: 'Live compliance headlines feed.',
+  },
+];
 
 const DEFAULT_HEADERS: Record<string, string> = {
   Accept: 'application/json, text/html;q=0.9, */*;q=0.8',
@@ -1171,9 +1207,31 @@ function buildSeedCandidates(existingProviders: AgorionProvider[]): ProviderCand
     if (localSeed) {
       seeds.push(localSeed);
     }
+
+    const complianceSeed = buildCandidate({
+      id: 'botindex-compliance',
+      name: 'BotIndex Compliance OSINT',
+      url: `${baseUrl}/api/botindex/compliance/overview`,
+      description: 'BotIndex compliance and OSINT threat intelligence vertical',
+      capabilities: [...BOTINDEX_COMPLIANCE_CAPABILITIES],
+      source: 'manual',
+      pricingModel: 'api_key',
+      transport: 'rest',
+    });
+
+    if (complianceSeed) {
+      seeds.push(complianceSeed);
+    }
   }
 
   return dedupeCandidates(seeds);
+}
+
+function getManualSeedEndpoints(seedId: string): Array<{ path: string; method: string; description: string }> {
+  if (seedId === 'botindex-compliance') {
+    return BOTINDEX_COMPLIANCE_ENDPOINTS;
+  }
+  return [];
 }
 
 async function runDiscoveryPass(): Promise<ProviderCandidate[]> {
@@ -1246,7 +1304,9 @@ async function runCrawlCycleInternal(): Promise<AgorionProvider[]> {
       source: selectSource(existingProvider, candidate),
       manifestUrl: probe.manifestUrl || existingProvider?.manifestUrl || null,
       openapiUrl: probe.openapiUrl || existingProvider?.openapiUrl || null,
-      endpoints: probe.endpoints.length > 0 ? probe.endpoints : (existingProvider?.endpoints || []),
+      endpoints: probe.endpoints.length > 0
+        ? probe.endpoints
+        : (existingProvider?.endpoints || getManualSeedEndpoints(candidate.id)),
     };
 
     await upsert(provider);
