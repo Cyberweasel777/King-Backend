@@ -161,8 +161,17 @@ app.use('/api/botindex', (0, anonRateLimit_1.anonRateLimit)([
     '/hyperliquid/funding-arb',
     '/hyperliquid/correlation-matrix',
     '/hyperliquid/liquidation-heatmap',
-    '/hyperliquid/hip6/launch-candidates',
-    '/hyperliquid/whale-alerts/full',
+    '/hyperliquid/whale-alerts',
+    '/hyperliquid/hip6',
+    '/zora/trending-coins',
+    '/zora/new-coins',
+    '/zora/creator-scores',
+    '/zora/attention-momentum',
+    '/doppler/launches',
+    '/doppler/trending',
+    '/compliance/headlines',
+    '/compliance/signal-desk',
+    '/alpha-scan',
 ]));
 // Receipt and trust-layer endpoints
 app.use('/api/botindex/receipts', receipts_1.default);
