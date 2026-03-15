@@ -78,6 +78,7 @@ export default defineSchema({
     timestamp: v.number(),
     apiKeyHash: v.optional(v.string()),
     apiKeyPlan: v.optional(v.string()),
+    isMcpClient: v.optional(v.boolean()),
   })
     .index('by_endpoint_timestamp', ['endpoint', 'timestamp'])
     .index('by_visitor', ['visitorHash'])

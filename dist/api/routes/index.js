@@ -15,6 +15,7 @@ const botindex_crypto_1 = __importDefault(require("./botindex-crypto"));
 const botindex_genesis_1 = __importDefault(require("./botindex-genesis"));
 const botindex_commerce_1 = __importDefault(require("./botindex-commerce"));
 const botindex_zora_1 = __importDefault(require("./botindex-zora"));
+const botindex_zora_relay_1 = __importDefault(require("./botindex-zora-relay"));
 const botindex_hyperliquid_1 = __importDefault(require("./botindex-hyperliquid"));
 const botindex_polymarket_1 = __importDefault(require("./botindex-polymarket"));
 const botindex_aztec_1 = __importDefault(require("./botindex-aztec"));
@@ -64,6 +65,7 @@ router.use(apiKeyAuth_1.optionalApiKey, (req, _res, next) => {
 router.use('/botindex/keys', botindex_keys_1.default);
 // Domain-centric BotIndex routes (canonical)
 router.use('/botindex', botindex_zora_1.default);
+router.use('/botindex', botindex_zora_relay_1.default);
 router.use('/botindex', botindex_hyperliquid_1.default);
 router.use('/botindex', botindex_polymarket_1.default);
 router.use('/botindex', botindex_aztec_1.default);
