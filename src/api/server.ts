@@ -158,6 +158,7 @@ app.use('/api/botindex', anonRateLimit([
   '/compliance/headlines',
   '/compliance/signal-desk',
   '/alpha-scan',
+  '/zora/relay',
 ]));
 
 // Receipt and trust-layer endpoints
