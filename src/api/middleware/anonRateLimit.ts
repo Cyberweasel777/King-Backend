@@ -10,6 +10,7 @@
 
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import logger from '../../config/logger';
+import { buildX402UpgradePayload } from './x402Gate';
 
 const ANON_DAILY_LIMIT = parseInt(process.env.ANON_RATE_LIMIT || '3', 10);
 const WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -84,23 +85,26 @@ export function anonRateLimit(paths: string[], exclude: string[] = []): RequestH
 
     logger.info({ ip, path: req.path, isAnon: true }, 'Anonymous request blocked — API key required');
 
+    const requestUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+    const x402Upgrade = buildX402UpgradePayload(requestUrl);
+    if (x402Upgrade) {
+      res.setHeader('payment-required', x402Upgrade.header);
+    }
+
     res.status(401).json({
       error: 'api_key_required',
-      message: 'An API key is required to access BotIndex endpoints. Get one free in 10 seconds — no credit card needed.',
+      message: 'An API key is required to access BotIndex endpoints. Get one free in 10 seconds, or pay per call with x402 (no key needed).',
       get_key: {
         url: 'https://api.botindex.dev/api/botindex/keys/register?plan=free',
         method: 'GET',
-        description: 'Free API key — 10 req/day, instant activation. Copy a curl command from the response and you are live.',
+        description: 'Free API key — 10 req/day, instant activation.',
       },
       upgrade: {
         pro: {
           url: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
           description: 'Pro plan — unlimited requests, $29/mo via Stripe',
         },
-        x402: {
-          url: 'https://api.botindex.dev/api/botindex/keys/connect',
-          description: 'Pay per call with crypto — no subscription, no key needed',
-        },
+        ...(x402Upgrade?.body || {}),
       },
       header: 'X-API-Key: <your-key>',
     });

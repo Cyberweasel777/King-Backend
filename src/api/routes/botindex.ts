@@ -3,6 +3,7 @@ import { logger } from '../../utils/logger';
 
 import correlationRoutes from '../../services/botindex/api/correlation.routes';
 import { withSubscriptionHttp, withFreeLimit, getFreeLimitKey } from '../../shared/payments';
+import { buildX402UpgradePayload } from '../middleware/x402Gate';
 import x402TestRouter from './x402-test';
 import x402PremiumRouter from './x402-premium';
 import botindexSportsRouter from './botindex-sports';
@@ -69,10 +70,25 @@ export function mountBotindexX402TestRoute(): void {
       const quota = consumeBasicApiKeyQuota(req.apiKeyAuth.apiKey);
       if (!quota.allowed) {
         res.setHeader('Retry-After', String(quota.retryAfterSeconds));
+
+        const requestUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+        const x402Upgrade = buildX402UpgradePayload(requestUrl);
+        if (x402Upgrade) {
+          res.setHeader('payment-required', x402Upgrade.header);
+        }
+
         res.status(429).json({
           error: 'api_key_rate_limited',
-          message: `Free API key limit reached (${BASIC_API_KEY_DAILY_LIMIT}/day). Upgrade to Pro for unlimited access.`,
-          upgrade: { pricing: { pro: '$29/mo (unlimited)' } },
+          message: `Free API key limit reached (${BASIC_API_KEY_DAILY_LIMIT}/day). Upgrade to Pro for unlimited access, or pay per call with x402.`,
+          upgrade: {
+            pro: {
+              url: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
+              price: '$29/mo',
+              description: 'Unlimited API access via Stripe subscription',
+            },
+            ...(x402Upgrade?.body || {}),
+          },
+          retryAfterSeconds: quota.retryAfterSeconds,
         });
         return;
       }

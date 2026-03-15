@@ -188,6 +188,81 @@ export function isX402Enabled(): boolean {
   return parseEnabledFlag(process.env.X402_ENABLED);
 }
 
+/**
+ * Build a machine-readable x402 payment-required payload for embedding in
+ * 429/401 responses. Allows agents with x402 clients to detect the upgrade
+ * path and auto-pay instead of hitting a dead end at the rate limit wall.
+ *
+ * Returns null if x402 is not enabled or wallet is not configured.
+ */
+export function buildX402UpgradePayload(requestUrl: string, price = '$0.01'): {
+  header: string;
+  body: Record<string, unknown>;
+} | null {
+  if (!isX402Enabled()) return null;
+
+  const payTo = resolveWalletAddress();
+  if (!payTo) return null;
+
+  const network = resolveNetwork();
+  const caipNetwork = toCaipNetwork(network);
+
+  // USDC contract addresses per network
+  const usdcAsset: Record<string, string> = {
+    'eip155:8453': '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    'eip155:84532': '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+  };
+
+  const asset = usdcAsset[caipNetwork] || usdcAsset['eip155:8453'];
+
+  // Parse price string like "$0.01" to micro-units (USDC has 6 decimals)
+  const priceNum = parseFloat(price.replace('$', ''));
+  const amount = String(Math.round(priceNum * 1_000_000));
+
+  const paymentInfo = {
+    x402Version: 2,
+    error: 'Payment required',
+    resource: {
+      url: requestUrl,
+      description: `Pay-per-call access to this endpoint (${price} USDC)`,
+      mimeType: '',
+    },
+    accepts: [
+      {
+        scheme: 'exact',
+        network: caipNetwork,
+        amount,
+        asset,
+        payTo,
+        maxTimeoutSeconds: 300,
+        extra: { name: 'USD Coin', version: '2' },
+      },
+    ],
+  };
+
+  const headerValue = Buffer.from(JSON.stringify(paymentInfo)).toString('base64');
+
+  return {
+    header: headerValue,
+    body: {
+      x402: {
+        version: 2,
+        network: caipNetwork,
+        price,
+        asset,
+        payTo,
+        description:
+          'This endpoint supports x402 pay-per-call. Send a payment header to bypass rate limits. See https://www.x402.org for client SDKs.',
+        sdks: {
+          typescript: 'npm install @x402/client',
+          python: 'pip install x402',
+          go: 'go get github.com/coinbase/x402/go',
+        },
+      },
+    },
+  };
+}
+
 export function getX402RuntimeConfig(): X402RuntimeConfig {
   return {
     enabled: isX402Enabled(),
