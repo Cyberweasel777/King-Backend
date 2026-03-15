@@ -6,7 +6,7 @@ const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
 const MODEL = 'deepseek-chat';
 const TEMPERATURE = 0.2;
 const MAX_TOKENS = 4096;
-const REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 60_000;
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
 const RISK_LEVELS = ['low', 'medium', 'high', 'critical'] as const;
@@ -306,7 +306,7 @@ async function callDeepSeek(headlines: ComplianceHeadline[]): Promise<string> {
               'Schema:',
               '{"signals":[{"id":"string","headline":"string","url":"string","source":"string","publishedAt":"string","verdict":"COPY|IGNORE|COUNTER","regulatoryRiskScore":0,"riskLevel":"low|medium|high|critical","sector":"prediction_markets|stablecoins|ai_agents|defi|creator_economy|general_crypto","jurisdictions":["US"],"actionItem":"string","reasoning":"string","timeHorizon":"immediate|this_week|this_month|watch","confidence":0}],"marketBrief":"string","topAction":"string","overallRiskLevel":"low|medium|high|critical","analyzedAt":"string","signalCount":0}',
               'Headlines:',
-              JSON.stringify(headlines.slice(0, 30)),
+              JSON.stringify(headlines.slice(0, 15)),
             ].join('\n'),
           },
         ],
@@ -343,7 +343,7 @@ function buildCacheKey(headlines: ComplianceHeadline[]): string {
 }
 
 export async function analyzeComplianceHeadlines(headlines: ComplianceHeadline[]): Promise<ComplianceAnalysis> {
-  const preparedHeadlines = headlines.slice(0, 30);
+  const preparedHeadlines = headlines.slice(0, 15);
   const cacheKey = buildCacheKey(preparedHeadlines);
   const now = Date.now();
   const cached = analysisCache.get(cacheKey);
