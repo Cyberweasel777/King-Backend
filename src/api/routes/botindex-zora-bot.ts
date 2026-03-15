@@ -18,9 +18,9 @@ function getStripeClient(): Stripe {
 }
 
 function getWebhookSecret(): string {
-  const secret = process.env.BOTINDEX_STRIPE_WEBHOOK_SECRET;
+  const secret = process.env.ZORA_ALPHA_STRIPE_WEBHOOK_SECRET || process.env.BOTINDEX_STRIPE_WEBHOOK_SECRET;
   if (!secret) {
-    throw new Error('BOTINDEX_STRIPE_WEBHOOK_SECRET is not configured');
+    throw new Error('ZORA_ALPHA_STRIPE_WEBHOOK_SECRET is not configured');
   }
   return secret;
 }
