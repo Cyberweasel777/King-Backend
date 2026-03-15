@@ -118,9 +118,23 @@ router.get('/compliance/threat-radar', async (req: Request, res: Response) => {
       return;
     }
 
+    // Build a teaser preview from the paid data
+    const enforcementCount = radar.activeEnforcements?.length ?? 0;
+    const topJurisdiction = radar.jurisdictionRisk
+      ? Object.entries(radar.jurisdictionRisk).sort((a, b) => (b[1] as number) - (a[1] as number))[0]
+      : null;
+    const previewParts: string[] = [];
+    if (enforcementCount > 0) previewParts.push(`${enforcementCount} active enforcement action${enforcementCount > 1 ? 's' : ''} detected`);
+    if (topJurisdiction) previewParts.push(`highest risk: ${topJurisdiction[0]} (${topJurisdiction[1]}/100)`);
+    if (radar.safeHarbors?.length) previewParts.push(`${radar.safeHarbors.length} safe harbor${radar.safeHarbors.length > 1 ? 's' : ''} identified`);
+    const preview = previewParts.length > 0
+      ? `${previewParts.join(' · ')} — upgrade for full details`
+      : 'Regulatory intelligence available — upgrade for full details';
+
     res.json({
       overallThreatLevel: radar.overallThreatLevel,
       threatTrend: radar.threatTrend,
+      preview,
       isTruncated: true,
       upgrade: {
         message: 'Upgrade to Pro or Basic for full threat radar intelligence.',
@@ -157,10 +171,22 @@ router.get('/compliance/exposure', async (req: Request, res: Response) => {
       return;
     }
 
+    // Build a teaser preview from the paid data
+    const actionCount = exposure.activeActions?.length ?? 0;
+    const riskCount = exposure.riskFactors?.length ?? 0;
+    const exposureParts: string[] = [];
+    if (actionCount > 0) exposureParts.push(`${actionCount} active regulatory action${actionCount > 1 ? 's' : ''}`);
+    if (riskCount > 0) exposureParts.push(`${riskCount} risk factor${riskCount > 1 ? 's' : ''} identified`);
+    if (exposure.recommendation) exposureParts.push(`recommendation available`);
+    const exposurePreview = exposureParts.length > 0
+      ? `${exposureParts.join(' · ')} — upgrade for full report`
+      : `Exposure analysis complete — upgrade for full report`;
+
     res.json({
       project: exposure.project,
       exposureLevel: exposure.exposureLevel,
       exposureScore: exposure.exposureScore,
+      preview: exposurePreview,
       isTruncated: true,
       upgrade: {
         message: 'Upgrade to Pro or Basic for full project exposure details.',
