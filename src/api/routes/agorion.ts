@@ -1,10 +1,30 @@
 import { Router, type Request, type Response } from 'express';
+import * as crypto from 'crypto';
 import logger from '../../config/logger';
 import { runCrawlCycle } from '../../services/agorion/crawler';
 import { discover, getAll, getHealthy, purgeUnhealthy, search } from '../../services/agorion/registry';
 
 const router = Router();
 const ADMIN_ID = process.env.ADMIN_ID || '8063432083';
+type CrawlJobStatus = 'running' | 'completed' | 'failed';
+type CrawlJobResult = {
+  totalProviders: number;
+  healthyProviders: number;
+};
+
+type CrawlJob = {
+  jobId: string;
+  status: CrawlJobStatus;
+  startedAt: string;
+  completedAt: string | null;
+  result: CrawlJobResult | null;
+  error: string | null;
+};
+
+const crawlJobs = new Map<string, CrawlJob>();
+let latestCrawlJobId: string | null = null;
+let runningCrawlJobId: string | null = null;
+
 const COMMON_ARTIFACT_NAMES = new Set([
   'privacy',
   'terms',
@@ -200,20 +220,103 @@ router.post('/crawl', async (req: Request, res: Response) => {
     return;
   }
 
-  try {
-    const providers = await runCrawlCycle();
-    const healthy = providers.filter((provider) => provider.healthScore > 50).length;
-
+  if (runningCrawlJobId) {
     res.json({
-      ok: true,
-      totalProviders: providers.length,
-      healthyProviders: healthy,
-      updatedAt: new Date().toISOString(),
+      ok: false,
+      error: 'crawl_in_progress',
+      jobId: runningCrawlJobId,
     });
-  } catch (error) {
-    logger.error({ err: error }, 'Agorion crawl endpoint failed');
-    res.status(500).json({ error: 'crawl_failed' });
+    return;
   }
+
+  const jobId = crypto.randomUUID();
+  const startedAt = new Date().toISOString();
+  const job: CrawlJob = {
+    jobId,
+    status: 'running',
+    startedAt,
+    completedAt: null,
+    result: null,
+    error: null,
+  };
+
+  crawlJobs.set(jobId, job);
+  latestCrawlJobId = jobId;
+  runningCrawlJobId = jobId;
+
+  logger.info({ jobId, startedAt }, 'Agorion crawl started');
+
+  void (async () => {
+    try {
+      const providers = await runCrawlCycle();
+      const healthyProviders = providers.filter((provider) => provider.healthScore > 50).length;
+      const completedAt = new Date().toISOString();
+      const current = crawlJobs.get(jobId);
+
+      if (current) {
+        current.status = 'completed';
+        current.completedAt = completedAt;
+        current.result = {
+          totalProviders: providers.length,
+          healthyProviders,
+        };
+      }
+
+      logger.info(
+        { jobId, completedAt, totalProviders: providers.length, healthyProviders },
+        'Agorion crawl completed',
+      );
+    } catch (error) {
+      const completedAt = new Date().toISOString();
+      const current = crawlJobs.get(jobId);
+
+      if (current) {
+        current.status = 'failed';
+        current.completedAt = completedAt;
+        current.error = error instanceof Error ? error.message : 'crawl_failed';
+      }
+
+      logger.error({ err: error, jobId, completedAt }, 'Agorion crawl failed');
+    } finally {
+      if (runningCrawlJobId === jobId) {
+        runningCrawlJobId = null;
+      }
+    }
+  })();
+
+  res.json({
+    ok: true,
+    jobId,
+    status: 'running',
+    message: 'Crawl started',
+  });
+});
+
+router.get('/crawl/status', (req: Request, res: Response) => {
+  const adminId = extractAdminId(req.query.adminId);
+  if (adminId !== ADMIN_ID) {
+    res.status(403).json({ error: 'unauthorized' });
+    return;
+  }
+
+  const requestedJobId = extractAdminId(req.query.jobId);
+  const targetJobId = requestedJobId || latestCrawlJobId;
+
+  if (!targetJobId) {
+    res.status(404).json({ ok: false, error: 'crawl_not_found' });
+    return;
+  }
+
+  const job = crawlJobs.get(targetJobId);
+  if (!job) {
+    res.status(404).json({ ok: false, error: 'crawl_not_found', jobId: targetJobId });
+    return;
+  }
+
+  res.json({
+    ok: true,
+    ...job,
+  });
 });
 
 router.post('/purge', async (req: Request, res: Response) => {
