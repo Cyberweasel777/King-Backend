@@ -69,7 +69,7 @@ function formatTelegramMessage(coin: ZoraTrendingCoin): string {
     '---',
     '',
     '🔥 Want AI-scored signals before everyone else?',
-    '👉 /start @PolybettorBot for real-time alerts',
+    '👉 /start @ZoraAlphaDev_Bot for real-time alerts',
   ].join('\n');
 }
 

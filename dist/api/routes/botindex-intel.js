@@ -57,6 +57,10 @@ const funding_arb_1 = require("../../services/botindex/hyperliquid/funding-arb")
 const correlation_1 = require("../../services/botindex/hyperliquid/correlation");
 const whale_alerts_1 = require("../../services/botindex/hyperliquid/whale-alerts");
 const velocityScanner_1 = require("../../services/botindex/meme/velocityScanner");
+const trade_signals_1 = require("../../services/botindex/intelligence/trade-signals");
+const portfolio_risk_1 = require("../../services/botindex/intelligence/portfolio-risk");
+const convergence_detector_1 = require("../../services/botindex/intelligence/convergence-detector");
+const launch_alpha_1 = require("../../services/botindex/intelligence/launch-alpha");
 const router = (0, express_1.Router)();
 const BASE_METADATA = {
     protocol: 'x402',
@@ -95,10 +99,49 @@ function hasFullIntelAccess(req) {
         req.__billingMode === 'subscription' ||
         req.__freeTrialAuthenticated);
 }
+function hasFullAccess(req) {
+    const hasPaidPlan = req.apiKeyAuth?.plan === 'pro' || req.apiKeyAuth?.plan === 'basic';
+    const hasBypass = Boolean(req.__apiKeyAuthenticated);
+    return hasPaidPlan || hasBypass;
+}
 function truncateReasoning(reasoning) {
     const normalized = String(reasoning || '').trim();
     const clipped = normalized.slice(0, 50).trimEnd();
     return `${clipped}${TEASER_REASONING_SUFFIX}`;
+}
+function truncateTeaserReasoning(reasoning, maxLength = 96) {
+    const normalized = String(reasoning || '').trim();
+    if (normalized.length <= maxLength)
+        return normalized;
+    return `${normalized.slice(0, maxLength).trimEnd()}...`;
+}
+function normalizePortfolioDirection(value) {
+    if (typeof value !== 'string')
+        return null;
+    const direction = value.trim().toLowerCase();
+    return direction === 'long' || direction === 'short' ? direction : null;
+}
+function normalizePositionsInput(value) {
+    if (!Array.isArray(value) || value.length === 0)
+        return null;
+    const positions = [];
+    for (const row of value) {
+        if (typeof row !== 'object' || row === null)
+            return null;
+        const input = row;
+        const asset = typeof input.asset === 'string' ? input.asset.trim().toUpperCase() : '';
+        const direction = normalizePortfolioDirection(input.direction);
+        const sizePct = Number(input.size_pct);
+        if (!asset || !direction || !Number.isFinite(sizePct) || sizePct <= 0) {
+            return null;
+        }
+        positions.push({
+            asset,
+            direction,
+            size_pct: sizePct,
+        });
+    }
+    return positions;
 }
 function truncateMarketSummary(summary) {
     const normalized = String(summary || '').trim();
@@ -328,6 +371,159 @@ router.get('/doppler/intel', async (req, res) => {
             error: 'intel_generation_failed',
             message: error instanceof Error ? error.message : 'Unknown error',
             metadata: BASE_METADATA,
+        });
+    }
+});
+// ─── BotIndex Intelligence Layer ────────────────────────────────────────────
+router.get('/intel/trade-signals', async (req, res) => {
+    try {
+        const analysis = await (0, trade_signals_1.getTradeSignals)();
+        if (hasFullAccess(req)) {
+            res.json({
+                ...analysis,
+                isTruncated: false,
+            });
+            return;
+        }
+        const topSignal = analysis.signals[0];
+        const preview = topSignal
+            ? `${analysis.signals.length} signals detected. Top: ${topSignal.asset} ${topSignal.direction}, confidence ${topSignal.confidence}% — upgrade for full analysis`
+            : '0 signals detected. Upgrade for full analysis.';
+        res.json({
+            signals: topSignal
+                ? [{
+                        asset: topSignal.asset,
+                        direction: topSignal.direction,
+                        confidence: topSignal.confidence,
+                        reasoning: truncateTeaserReasoning(topSignal.reasoning),
+                    }]
+                : [],
+            analyzedAt: analysis.analyzedAt,
+            degraded: analysis.degraded,
+            preview,
+            isTruncated: true,
+            upgrade: {
+                message: 'Upgrade to Pro or Basic for full trade signal intelligence.',
+                register: 'https://king-backend.fly.dev/api/botindex/keys/register?plan=pro',
+            },
+        });
+    }
+    catch (error) {
+        logger_1.default.error({ err: error }, '[intel.trade-signals] failed');
+        res.status(500).json({
+            error: 'intel_trade_signals_failed',
+            message: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
+});
+router.post('/intel/portfolio-risk', async (req, res) => {
+    const positions = normalizePositionsInput(req.body?.positions);
+    if (!positions) {
+        res.status(400).json({
+            error: 'invalid_positions',
+            message: 'Body must include positions: [{ asset: string, direction: \"long\"|\"short\", size_pct: number > 0 }].',
+        });
+        return;
+    }
+    try {
+        const analysis = await (0, portfolio_risk_1.scanPortfolioRisk)(positions);
+        if (hasFullAccess(req)) {
+            res.json({
+                ...analysis,
+                isTruncated: false,
+            });
+            return;
+        }
+        const preview = `Risk score: ${analysis.overall_risk_score}/100 ${analysis.risk_level}. ${analysis.correlated_pairs.length} correlated pairs detected, ${analysis.hedge_recommendations.length} hedge recommended — upgrade for details`;
+        res.json({
+            overall_risk_score: analysis.overall_risk_score,
+            risk_level: analysis.risk_level,
+            analyzedAt: analysis.analyzedAt,
+            degraded: analysis.degraded,
+            preview,
+            isTruncated: true,
+            upgrade: {
+                message: 'Upgrade to Pro or Basic for full portfolio risk analysis.',
+                register: 'https://king-backend.fly.dev/api/botindex/keys/register?plan=pro',
+            },
+        });
+    }
+    catch (error) {
+        logger_1.default.error({ err: error }, '[intel.portfolio-risk] failed');
+        res.status(500).json({
+            error: 'intel_portfolio_risk_failed',
+            message: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
+});
+router.get('/intel/convergence', async (req, res) => {
+    try {
+        const analysis = await (0, convergence_detector_1.detectSignalConvergence)();
+        if (hasFullAccess(req)) {
+            res.json({
+                ...analysis,
+                isTruncated: false,
+            });
+            return;
+        }
+        const top = analysis.convergences[0];
+        const preview = top
+            ? `${analysis.convergences.length} convergences detected. Strongest: ${top.asset} (${top.signal_count} signals, ${top.direction}) — upgrade for full report`
+            : '0 convergences detected. Upgrade for full report.';
+        res.json({
+            convergence_count: analysis.convergences.length,
+            top_asset: top?.asset ?? null,
+            analyzedAt: analysis.analyzedAt,
+            degraded: analysis.degraded,
+            preview,
+            isTruncated: true,
+            upgrade: {
+                message: 'Upgrade to Pro or Basic for full convergence intelligence.',
+                register: 'https://king-backend.fly.dev/api/botindex/keys/register?plan=pro',
+            },
+        });
+    }
+    catch (error) {
+        logger_1.default.error({ err: error }, '[intel.convergence] failed');
+        res.status(500).json({
+            error: 'intel_convergence_failed',
+            message: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
+});
+router.get('/intel/launch-alpha', async (req, res) => {
+    try {
+        const analysis = await (0, launch_alpha_1.analyzeLaunchAlpha)();
+        if (hasFullAccess(req)) {
+            res.json({
+                ...analysis,
+                isTruncated: false,
+            });
+            return;
+        }
+        const top = analysis.launches[0];
+        const preview = top
+            ? `${analysis.launches.length} launches scored. Top: ${top.token}, confidence ${top.entry_confidence} — upgrade for full rankings`
+            : '0 launches scored. Upgrade for full rankings.';
+        res.json({
+            launches: top
+                ? [{ token: top.token, entry_confidence: top.entry_confidence }]
+                : [],
+            analyzedAt: analysis.analyzedAt,
+            degraded: analysis.degraded,
+            preview,
+            isTruncated: true,
+            upgrade: {
+                message: 'Upgrade to Pro or Basic for full launch alpha intelligence.',
+                register: 'https://king-backend.fly.dev/api/botindex/keys/register?plan=pro',
+            },
+        });
+    }
+    catch (error) {
+        logger_1.default.error({ err: error }, '[intel.launch-alpha] failed');
+        res.status(500).json({
+            error: 'intel_launch_alpha_failed',
+            message: error instanceof Error ? error.message : 'Unknown error',
         });
     }
 });

@@ -28,6 +28,31 @@ const basicApiKeyQuota = new Map<string, { windowStartMs: number; count: number 
 
 const INTELLIGENCE_ENDPOINTS = [
   {
+    path: '/api/botindex/intel/trade-signals',
+    market: 'hyperliquid',
+    description: 'AI trade signal engine combining funding rates and whale positioning.',
+    pricing: 'FREE teaser, full for paid API keys',
+    flagship: true,
+  },
+  {
+    path: '/api/botindex/intel/portfolio-risk',
+    market: 'portfolio',
+    description: 'POST portfolio risk scanner with correlated pair and hedge analysis.',
+    pricing: 'FREE teaser, full for paid API keys',
+  },
+  {
+    path: '/api/botindex/intel/convergence',
+    market: 'cross-signal',
+    description: 'Convergence detector across funding anomalies, whale activity, and compliance catalysts.',
+    pricing: 'FREE teaser, full for paid API keys',
+  },
+  {
+    path: '/api/botindex/intel/launch-alpha',
+    market: 'zora',
+    description: 'Launch alpha scoring for Zora token launches with confidence ranking.',
+    pricing: 'FREE teaser, full for paid API keys',
+  },
+  {
     path: '/api/botindex/alpha-scan',
     market: 'cross-market',
     description: 'Flagship convergence scan across whales, funding, Zora, correlations, and meme velocity.',
@@ -94,8 +119,8 @@ function buildIntelligenceSection() {
     flagship: INTELLIGENCE_ENDPOINTS[0],
     endpoints: INTELLIGENCE_ENDPOINTS,
     notes: {
-      teaser: 'Domain intel endpoints return truncated teaser output for anonymous/free users.',
-      fullAccess: 'Use a paid API key for full domain intel. Use x402 on /alpha-scan for premium cross-market scan.',
+      teaser: 'Intelligence endpoints return truncated teaser output for anonymous/free users.',
+      fullAccess: 'Use a paid API key for full intelligence reports. Alpha Scan also supports x402 pay-per-call.',
     },
   };
 }
