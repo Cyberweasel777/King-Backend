@@ -1191,7 +1191,7 @@ function buildSeedCandidates(existingProviders: AgorionProvider[]): ProviderCand
     }
   }
 
-  const baseUrl = normalizeWebUrl(process.env.BASE_URL || process.env.BOTINDEX_URL || '');
+  const baseUrl = normalizeWebUrl(process.env.API_BASE_URL || process.env.BASE_URL || process.env.BOTINDEX_URL || 'https://king-backend.fly.dev');
   if (baseUrl) {
     const localSeed = buildCandidate({
       id: 'king-backend',
@@ -1208,11 +1208,26 @@ function buildSeedCandidates(existingProviders: AgorionProvider[]): ProviderCand
       seeds.push(localSeed);
     }
 
+    const botindexSeed = buildCandidate({
+      id: 'botindex',
+      name: 'BotIndex',
+      url: `${baseUrl}/api/botindex/v1/`,
+      description: 'Crypto intelligence API for AI agents — trade signals, portfolio risk, compliance OSINT, whale alerts, funding arb, Zora token analytics. Free tier + paid intelligence layer.',
+      capabilities: ['crypto', 'defi', 'compliance', 'osint', 'regulatory', 'threat-intelligence', 'whale-tracking', 'prediction-markets', 'trading-signals', 'portfolio-risk', 'mcp', 'x402', 'agent-services', 'api'],
+      source: 'manual',
+      pricingModel: 'api_key',
+      transport: 'rest',
+    });
+
+    if (botindexSeed) {
+      seeds.push(botindexSeed);
+    }
+
     const complianceSeed = buildCandidate({
       id: 'botindex-compliance',
       name: 'BotIndex Compliance OSINT',
       url: `${baseUrl}/api/botindex/compliance/overview`,
-      description: 'BotIndex compliance and OSINT threat intelligence vertical',
+      description: 'Regulatory compliance intelligence — threat radar, exposure scanner, signal desk, headlines from 24+ sources. DeepSeek-powered verdicts.',
       capabilities: [...BOTINDEX_COMPLIANCE_CAPABILITIES],
       source: 'manual',
       pricingModel: 'api_key',
@@ -1221,6 +1236,21 @@ function buildSeedCandidates(existingProviders: AgorionProvider[]): ProviderCand
 
     if (complianceSeed) {
       seeds.push(complianceSeed);
+    }
+
+    const intelSeed = buildCandidate({
+      id: 'botindex-intelligence',
+      name: 'BotIndex Intelligence',
+      url: `${baseUrl}/api/botindex/intel/trade-signals`,
+      description: 'AI-powered trading intelligence — trade signals, convergence detection, portfolio risk analysis, launch alpha scoring. DeepSeek synthesis of multi-source data.',
+      capabilities: ['trading-signals', 'portfolio-risk', 'convergence-detection', 'crypto', 'defi', 'ai', 'mcp', 'agent-services'],
+      source: 'manual',
+      pricingModel: 'api_key',
+      transport: 'rest',
+    });
+
+    if (intelSeed) {
+      seeds.push(intelSeed);
     }
   }
 
