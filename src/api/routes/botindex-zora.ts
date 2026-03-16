@@ -13,6 +13,15 @@ const METADATA = {
   market: 'zora',
 } as const;
 
+function buildTrendingSummary(coins: Array<{ name: string; volume24h: number }>): string {
+  const top = coins[0];
+  if (!top) {
+    return '0 trending tokens. Top mover: none with 0 volume attention score.';
+  }
+
+  return `${coins.length} trending tokens. Top mover: ${top.name} with ${top.volume24h.toFixed(2)} volume attention score.`;
+}
+
 function parseLimit(value: unknown, defaultValue: number = 10, maxValue: number = 50): number | null {
   if (value === undefined) return defaultValue;
 
@@ -39,6 +48,7 @@ router.get('/zora/trending-coins', async (req: Request, res: Response) => {
     const data = await getZoraTrendingCoins(limit);
     res.json({
       ...data,
+      summary: buildTrendingSummary(data.coins),
       count: data.coins.length,
       timestamp: new Date().toISOString(),
       metadata: {

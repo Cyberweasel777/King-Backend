@@ -18,11 +18,57 @@ const METADATA = {
     provider: 'Renaldo Corp / BotIndex',
     market: 'hyperliquid',
 };
+function formatUsdMillions(value) {
+    return (value / 1_000_000).toFixed(1);
+}
+function formatPercent(value, decimals = 3) {
+    return (value * 100).toFixed(decimals);
+}
+function buildFundingSummary(opportunities) {
+    if (!opportunities.length) {
+        return '0 funding rate divergences detected. Best opportunity: none.';
+    }
+    const top = opportunities[0];
+    const averageRate = (top.hlFundingRate + top.binanceFundingRate) / 2;
+    return `${opportunities.length} funding rate divergences detected. Best opportunity: ${top.symbol} at ${formatPercent(top.hlFundingRate)}% (exchange avg: ${formatPercent(averageRate)}%).`;
+}
+function buildCorrelationSummary(matrix) {
+    const assets = Object.keys(matrix);
+    if (assets.length < 2) {
+        return `${assets.length} assets in matrix. Strongest pair unavailable.`;
+    }
+    let strongestPair = null;
+    for (let i = 0; i < assets.length; i += 1) {
+        for (let j = i + 1; j < assets.length; j += 1) {
+            const left = assets[i];
+            const right = assets[j];
+            const correlation = matrix[left]?.[right] ?? matrix[right]?.[left];
+            if (typeof correlation !== 'number')
+                continue;
+            if (!strongestPair || Math.abs(correlation) > Math.abs(strongestPair.correlation)) {
+                strongestPair = { left, right, correlation };
+            }
+        }
+    }
+    if (!strongestPair) {
+        return `${assets.length} assets in matrix. Strongest pair unavailable.`;
+    }
+    return `${assets.length} assets in matrix. Strongest pair: ${strongestPair.left}/${strongestPair.right} (${strongestPair.correlation.toFixed(2)}).`;
+}
+function buildWhaleSummaryLine(data) {
+    const largest = data.topPositions[0];
+    if (!largest) {
+        return '0 whale positions worth $0.0m detected. Largest: N/A.';
+    }
+    return `${data.topPositions.length} whale positions worth $${formatUsdMillions(data.totalTrackedValue)}m detected. Largest: ${largest.coin} ${largest.side} $${formatUsdMillions(largest.positionValue)}m.`;
+}
 router.get('/hyperliquid/funding-arb', async (_req, res) => {
     try {
         const data = await (0, funding_arb_1.getFundingArbOpportunities)();
+        const summary = buildFundingSummary(data.opportunities);
         res.json({
             ...data,
+            summary,
             count: data.opportunities.length,
             timestamp: new Date().toISOString(),
             metadata: {
@@ -46,6 +92,7 @@ router.get('/hyperliquid/correlation-matrix', async (_req, res) => {
         const data = await (0, correlation_1.getHLCorrelationMatrix)();
         res.json({
             ...data,
+            summary: buildCorrelationSummary(data.matrix),
             metadata: {
                 ...METADATA,
                 endpoint: '/botindex/hyperliquid/correlation-matrix',
@@ -178,8 +225,10 @@ router.get('/hyperliquid/hip6/launch-candidates', (0, x402Gate_1.createX402Gate)
 router.get('/hyperliquid/whale-alerts', async (_req, res) => {
     try {
         const data = await (0, whale_alerts_1.getHyperliquidWhaleAlerts)();
+        const whaleSummaryLine = buildWhaleSummaryLine(data);
         res.json({
             summary: {
+                oneLiner: whaleSummaryLine,
                 totalTrackedValue: data.totalTrackedValue,
                 whalesTracked: data.whalesTracked,
                 topPositions: data.topPositions.slice(0, 3).map(p => ({
@@ -190,6 +239,7 @@ router.get('/hyperliquid/whale-alerts', async (_req, res) => {
                 })),
                 recentTradeCount: data.recentLargeTrades.length,
             },
+            summaryText: whaleSummaryLine,
             upgrade: 'Full whale data is now free. GET /api/botindex/hyperliquid/whale-alerts/full',
             timestamp: data.timestamp,
             metadata: {
@@ -213,6 +263,7 @@ router.get('/hyperliquid/whale-alerts/full', async (_req, res) => {
         const data = await (0, whale_alerts_1.getHyperliquidWhaleAlerts)();
         res.json({
             ...data,
+            summary: data.summary ?? buildWhaleSummaryLine(data),
             metadata: {
                 ...METADATA,
                 endpoint: '/botindex/hyperliquid/whale-alerts/full',

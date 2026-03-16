@@ -16,13 +16,76 @@ const METADATA = {
   market: 'hyperliquid',
 } as const;
 
+function formatUsdMillions(value: number): string {
+  return (value / 1_000_000).toFixed(1);
+}
+
+function formatPercent(value: number, decimals: number = 3): string {
+  return (value * 100).toFixed(decimals);
+}
+
+function buildFundingSummary(opportunities: Array<{
+  symbol: string;
+  hlFundingRate: number;
+  binanceFundingRate: number;
+}>): string {
+  if (!opportunities.length) {
+    return '0 funding rate divergences detected. Best opportunity: none.';
+  }
+
+  const top = opportunities[0];
+  const averageRate = (top.hlFundingRate + top.binanceFundingRate) / 2;
+  return `${opportunities.length} funding rate divergences detected. Best opportunity: ${top.symbol} at ${formatPercent(top.hlFundingRate)}% (exchange avg: ${formatPercent(averageRate)}%).`;
+}
+
+function buildCorrelationSummary(matrix: Record<string, Record<string, number>>): string {
+  const assets = Object.keys(matrix);
+  if (assets.length < 2) {
+    return `${assets.length} assets in matrix. Strongest pair unavailable.`;
+  }
+
+  let strongestPair: { left: string; right: string; correlation: number } | null = null;
+  for (let i = 0; i < assets.length; i += 1) {
+    for (let j = i + 1; j < assets.length; j += 1) {
+      const left = assets[i];
+      const right = assets[j];
+      const correlation = matrix[left]?.[right] ?? matrix[right]?.[left];
+      if (typeof correlation !== 'number') continue;
+
+      if (!strongestPair || Math.abs(correlation) > Math.abs(strongestPair.correlation)) {
+        strongestPair = { left, right, correlation };
+      }
+    }
+  }
+
+  if (!strongestPair) {
+    return `${assets.length} assets in matrix. Strongest pair unavailable.`;
+  }
+
+  return `${assets.length} assets in matrix. Strongest pair: ${strongestPair.left}/${strongestPair.right} (${strongestPair.correlation.toFixed(2)}).`;
+}
+
+function buildWhaleSummaryLine(data: {
+  topPositions: Array<{ coin: string; side: string; positionValue: number }>;
+  totalTrackedValue: number;
+}): string {
+  const largest = data.topPositions[0];
+  if (!largest) {
+    return '0 whale positions worth $0.0m detected. Largest: N/A.';
+  }
+
+  return `${data.topPositions.length} whale positions worth $${formatUsdMillions(data.totalTrackedValue)}m detected. Largest: ${largest.coin} ${largest.side} $${formatUsdMillions(largest.positionValue)}m.`;
+}
+
 router.get(
   '/hyperliquid/funding-arb',
   async (_req: Request, res: Response) => {
     try {
       const data = await getFundingArbOpportunities();
+      const summary = buildFundingSummary(data.opportunities);
       res.json({
         ...data,
+        summary,
         count: data.opportunities.length,
         timestamp: new Date().toISOString(),
         metadata: {
@@ -49,6 +112,7 @@ router.get(
       const data = await getHLCorrelationMatrix();
       res.json({
         ...data,
+        summary: buildCorrelationSummary(data.matrix),
         metadata: {
           ...METADATA,
           endpoint: '/botindex/hyperliquid/correlation-matrix',
@@ -192,8 +256,10 @@ router.get(
 router.get('/hyperliquid/whale-alerts', async (_req: Request, res: Response) => {
   try {
     const data = await getHyperliquidWhaleAlerts();
+    const whaleSummaryLine = buildWhaleSummaryLine(data);
     res.json({
       summary: {
+        oneLiner: whaleSummaryLine,
         totalTrackedValue: data.totalTrackedValue,
         whalesTracked: data.whalesTracked,
         topPositions: data.topPositions.slice(0, 3).map(p => ({
@@ -204,6 +270,7 @@ router.get('/hyperliquid/whale-alerts', async (_req: Request, res: Response) => 
         })),
         recentTradeCount: data.recentLargeTrades.length,
       },
+      summaryText: whaleSummaryLine,
       upgrade: 'Full whale data is now free. GET /api/botindex/hyperliquid/whale-alerts/full',
       timestamp: data.timestamp,
       metadata: {
@@ -229,6 +296,7 @@ router.get(
       const data = await getHyperliquidWhaleAlerts();
       res.json({
         ...data,
+        summary: data.summary ?? buildWhaleSummaryLine(data),
         metadata: {
           ...METADATA,
           endpoint: '/botindex/hyperliquid/whale-alerts/full',

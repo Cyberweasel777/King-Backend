@@ -50,6 +50,7 @@ interface WhaleAlertResult {
   recentLargeTrades: WhaleTrade[];
   totalTrackedValue: number;
   whalesTracked: number;
+  summary: string;
   timestamp: string;
 }
 
@@ -179,11 +180,16 @@ export async function getHyperliquidWhaleAlerts(): Promise<WhaleAlertResult> {
   allTrades.sort((a, b) => b.time - a.time);
 
   const totalTrackedValue = allPositions.reduce((sum, p) => sum + p.positionValue, 0);
+  const largestPosition = allPositions[0];
+  const summary = largestPosition
+    ? `${allPositions.length} whale positions worth $${(totalTrackedValue / 1_000_000).toFixed(1)}m detected. Largest: ${largestPosition.coin} ${largestPosition.side} $${(largestPosition.positionValue / 1_000_000).toFixed(1)}m.`
+    : '0 whale positions worth $0.0m detected. Largest: N/A.';
   const result: WhaleAlertResult = {
     topPositions: allPositions.slice(0, 50),
     recentLargeTrades: allTrades.slice(0, 50),
     totalTrackedValue: Math.round(totalTrackedValue),
     whalesTracked: addresses.length,
+    summary,
     timestamp: new Date().toISOString(),
   };
   cache = { data: result, expiry: now + CACHE_TTL_MS };

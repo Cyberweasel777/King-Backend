@@ -70,6 +70,7 @@ const BASE_METADATA = {
 };
 const TEASER_REASONING_SUFFIX = '... [upgrade for full analysis]';
 const ALPHA_SCAN_CACHE_TTL_MS = 5 * 60 * 1000;
+const BASIC_REGISTRATION_LINK = 'https://king-backend.fly.dev/api/botindex/keys/register?plan=basic';
 const INTEL_UPGRADE = {
     message: 'Upgrade to unlock full multi-asset intel and complete reasoning.',
     pro: {
@@ -150,6 +151,142 @@ function truncateMarketSummary(summary) {
         return normalized;
     }
     return `${normalized.slice(0, 100).trimEnd()}...`;
+}
+function directionToTradeAction(direction, confidence) {
+    const normalizedDirection = direction.toUpperCase();
+    if (normalizedDirection === 'LONG' || normalizedDirection === 'SHORT') {
+        return confidence >= 40 ? 'TRADE' : 'AVOID';
+    }
+    return confidence >= 40 ? 'HOLD' : 'AVOID';
+}
+function buildTradeSignalsVerdict(analysis) {
+    const topSignal = analysis.signals[0];
+    if (!topSignal) {
+        return {
+            action: 'HOLD',
+            confidence: 0,
+            one_liner: 'No actionable signal detected in the current scan window.',
+        };
+    }
+    return {
+        action: directionToTradeAction(topSignal.direction, topSignal.confidence),
+        confidence: topSignal.confidence,
+        one_liner: `Top signal: ${topSignal.asset} ${topSignal.direction}, ${topSignal.confidence}% confidence. ${topSignal.timeframe}.`,
+    };
+}
+function buildTradeSignalsMissed(analysis) {
+    const hiddenSignals = analysis.signals.slice(1);
+    const hiddenHighConfidence = hiddenSignals.filter((signal) => signal.confidence > 80);
+    const highestHiddenConfidence = hiddenSignals.reduce((max, signal) => Math.max(max, signal.confidence), 0);
+    return {
+        count: hiddenSignals.length,
+        description: hiddenHighConfidence.length > 0
+            ? `${hiddenHighConfidence.length} signals with confidence >80% are hidden`
+            : `${hiddenSignals.length} additional signals are hidden`,
+        highest_hidden_confidence: highestHiddenConfidence,
+    };
+}
+function buildConvergenceVerdict(analysis) {
+    const topConvergence = analysis.convergences[0];
+    if (!topConvergence) {
+        return {
+            action: 'MONITOR',
+            confidence: 0,
+            one_liner: 'No convergence setup is currently strong enough for action.',
+        };
+    }
+    const action = topConvergence.direction === 'NEUTRAL'
+        ? 'MONITOR'
+        : topConvergence.confidence >= 60
+            ? 'TRADE'
+            : 'MONITOR';
+    return {
+        action,
+        confidence: topConvergence.confidence,
+        one_liner: `${topConvergence.signal_count} signals converging on ${topConvergence.asset}. Direction: ${topConvergence.direction}. Expected: ${topConvergence.expected_move}.`,
+    };
+}
+function buildConvergenceMissed(analysis) {
+    const hiddenConvergences = analysis.convergences.slice(1);
+    const strongestHiddenSignalCount = hiddenConvergences.reduce((max, row) => Math.max(max, row.signal_count), 0);
+    const highestHiddenConfidence = hiddenConvergences.reduce((max, row) => Math.max(max, row.confidence), 0);
+    return {
+        count: hiddenConvergences.length,
+        description: `${hiddenConvergences.length} convergence setups are hidden. Strongest hidden setup combines ${strongestHiddenSignalCount} signals.`,
+        highest_hidden_confidence: highestHiddenConfidence,
+        strongest_hidden_signal_count: strongestHiddenSignalCount,
+    };
+}
+function entryConfidenceToScore(entryConfidence) {
+    const normalized = entryConfidence.toUpperCase();
+    if (normalized === 'HIGH')
+        return 92;
+    if (normalized === 'MEDIUM')
+        return 72;
+    if (normalized === 'LOW')
+        return 45;
+    if (normalized === 'AVOID')
+        return 20;
+    return 40;
+}
+function launchConfidenceToAction(entryConfidence) {
+    const normalized = entryConfidence.toUpperCase();
+    if (normalized === 'HIGH' || normalized === 'MEDIUM')
+        return 'TRADE';
+    if (normalized === 'LOW')
+        return 'MONITOR';
+    return 'AVOID';
+}
+function buildLaunchAlphaVerdict(analysis) {
+    const topLaunch = analysis.launches[0];
+    if (!topLaunch) {
+        return {
+            action: 'MONITOR',
+            confidence: 0,
+            one_liner: 'No launch candidate currently meets minimum entry criteria.',
+        };
+    }
+    return {
+        action: launchConfidenceToAction(topLaunch.entry_confidence),
+        confidence: entryConfidenceToScore(topLaunch.entry_confidence),
+        one_liner: `Top launch: ${topLaunch.token}, entry confidence ${topLaunch.entry_confidence}. ${truncateTeaserReasoning(topLaunch.reasoning, 72)}.`,
+    };
+}
+function buildLaunchAlphaMissed(analysis) {
+    const hiddenLaunches = analysis.launches.slice(1);
+    const highestHiddenConfidence = hiddenLaunches.reduce((max, row) => Math.max(max, entryConfidenceToScore(row.entry_confidence)), 0);
+    return {
+        count: hiddenLaunches.length,
+        description: `${hiddenLaunches.length} launch candidates are hidden. Highest hidden entry confidence is ${highestHiddenConfidence}/100.`,
+        highest_hidden_confidence: highestHiddenConfidence,
+    };
+}
+function buildPortfolioRiskVerdict(analysis) {
+    let action = 'HOLD';
+    if (analysis.risk_level === 'CRITICAL' || analysis.risk_level === 'HIGH') {
+        action = 'HEDGE';
+    }
+    else if (analysis.risk_level === 'MEDIUM') {
+        action = 'MONITOR';
+    }
+    const firstHedge = analysis.hedge_recommendations[0];
+    const hedgeSnippet = firstHedge
+        ? `${firstHedge.action} (${firstHedge.size}).`
+        : 'Reduce concentration before adding risk.';
+    return {
+        action,
+        confidence: analysis.overall_risk_score,
+        one_liner: `Portfolio risk ${analysis.overall_risk_score}/100 (${analysis.risk_level}). ${hedgeSnippet}`,
+    };
+}
+function buildPortfolioRiskMissed(analysis) {
+    const hiddenCorrelatedPairs = analysis.correlated_pairs.length;
+    const hiddenHedges = analysis.hedge_recommendations.length;
+    return {
+        count: hiddenCorrelatedPairs + hiddenHedges,
+        description: `${hiddenCorrelatedPairs} correlated pair details and ${hiddenHedges} hedge recommendations are hidden`,
+        highest_hidden_confidence: analysis.overall_risk_score,
+    };
 }
 function buildTeaserReport(report) {
     const topAsset = report.assets[0];
@@ -381,14 +518,20 @@ router.get('/doppler/intel', async (req, res) => {
 router.get('/intel/trade-signals', async (req, res) => {
     try {
         const analysis = await (0, trade_signals_1.getTradeSignals)();
+        const verdict = buildTradeSignalsVerdict(analysis);
         if (hasFullAccess(req)) {
             res.json({
                 ...analysis,
+                verdict,
                 isTruncated: false,
             });
             return;
         }
         const topSignal = analysis.signals[0];
+        const missed = buildTradeSignalsMissed(analysis);
+        const hiddenHighConfidenceCount = analysis.signals.slice(1).filter((signal) => signal.confidence > 80).length;
+        const upgradeMissedCount = hiddenHighConfidenceCount > 0 ? hiddenHighConfidenceCount : missed.count;
+        const upgradeQualifier = hiddenHighConfidenceCount > 0 ? 'high-confidence ' : '';
         const preview = topSignal
             ? `${analysis.signals.length} signals detected. Top: ${topSignal.asset} ${topSignal.direction}, confidence ${topSignal.confidence}% — upgrade for full analysis`
             : '0 signals detected. Upgrade for full analysis.';
@@ -405,11 +548,13 @@ router.get('/intel/trade-signals', async (req, res) => {
                 : [],
             analyzedAt: analysis.analyzedAt,
             degraded: analysis.degraded,
+            verdict,
             preview,
             isTruncated: true,
+            missed,
             upgrade: {
-                message: 'Upgrade to Pro or Basic for full trade signal intelligence.',
-                register: 'https://king-backend.fly.dev/api/botindex/keys/register?plan=pro',
+                message: `You are missing ${upgradeMissedCount} ${upgradeQualifier}signal${upgradeMissedCount === 1 ? '' : 's'}. Upgrade to see all.`,
+                register: BASIC_REGISTRATION_LINK,
             },
         });
     }
@@ -432,13 +577,16 @@ router.post('/intel/portfolio-risk', async (req, res) => {
     }
     try {
         const analysis = await (0, portfolio_risk_1.scanPortfolioRisk)(positions);
+        const verdict = buildPortfolioRiskVerdict(analysis);
         if (hasFullAccess(req)) {
             res.json({
                 ...analysis,
+                verdict,
                 isTruncated: false,
             });
             return;
         }
+        const missed = buildPortfolioRiskMissed(analysis);
         const preview = `Risk score: ${analysis.overall_risk_score}/100 ${analysis.risk_level}. ${analysis.correlated_pairs.length} correlated pairs detected, ${analysis.hedge_recommendations.length} hedge recommended — upgrade for details`;
         (0, funnel_tracker_1.trackFunnelEvent)('paywall_hit', { endpoint: req.path, plan: 'free' });
         (0, funnel_tracker_1.trackFunnelEvent)('upgrade_cta_shown', { endpoint: req.path });
@@ -447,11 +595,13 @@ router.post('/intel/portfolio-risk', async (req, res) => {
             risk_level: analysis.risk_level,
             analyzedAt: analysis.analyzedAt,
             degraded: analysis.degraded,
+            verdict,
             preview,
             isTruncated: true,
+            missed,
             upgrade: {
-                message: 'Upgrade to Pro or Basic for full portfolio risk analysis.',
-                register: 'https://king-backend.fly.dev/api/botindex/keys/register?plan=pro',
+                message: `You are missing ${missed.count} portfolio risk details. Upgrade to see all.`,
+                register: BASIC_REGISTRATION_LINK,
             },
         });
     }
@@ -466,14 +616,17 @@ router.post('/intel/portfolio-risk', async (req, res) => {
 router.get('/intel/convergence', async (req, res) => {
     try {
         const analysis = await (0, convergence_detector_1.detectSignalConvergence)();
+        const verdict = buildConvergenceVerdict(analysis);
         if (hasFullAccess(req)) {
             res.json({
                 ...analysis,
+                verdict,
                 isTruncated: false,
             });
             return;
         }
         const top = analysis.convergences[0];
+        const missed = buildConvergenceMissed(analysis);
         const preview = top
             ? `${analysis.convergences.length} convergences detected. Strongest: ${top.asset} (${top.signal_count} signals, ${top.direction}) — upgrade for full report`
             : '0 convergences detected. Upgrade for full report.';
@@ -484,11 +637,13 @@ router.get('/intel/convergence', async (req, res) => {
             top_asset: top?.asset ?? null,
             analyzedAt: analysis.analyzedAt,
             degraded: analysis.degraded,
+            verdict,
             preview,
             isTruncated: true,
+            missed,
             upgrade: {
-                message: 'Upgrade to Pro or Basic for full convergence intelligence.',
-                register: 'https://king-backend.fly.dev/api/botindex/keys/register?plan=pro',
+                message: `You are missing ${missed.count} convergence setups. Upgrade to see all.`,
+                register: BASIC_REGISTRATION_LINK,
             },
         });
     }
@@ -503,14 +658,17 @@ router.get('/intel/convergence', async (req, res) => {
 router.get('/intel/launch-alpha', async (req, res) => {
     try {
         const analysis = await (0, launch_alpha_1.analyzeLaunchAlpha)();
+        const verdict = buildLaunchAlphaVerdict(analysis);
         if (hasFullAccess(req)) {
             res.json({
                 ...analysis,
+                verdict,
                 isTruncated: false,
             });
             return;
         }
         const top = analysis.launches[0];
+        const missed = buildLaunchAlphaMissed(analysis);
         const preview = top
             ? `${analysis.launches.length} launches scored. Top: ${top.token}, confidence ${top.entry_confidence} — upgrade for full rankings`
             : '0 launches scored. Upgrade for full rankings.';
@@ -522,11 +680,13 @@ router.get('/intel/launch-alpha', async (req, res) => {
                 : [],
             analyzedAt: analysis.analyzedAt,
             degraded: analysis.degraded,
+            verdict,
             preview,
             isTruncated: true,
+            missed,
             upgrade: {
-                message: 'Upgrade to Pro or Basic for full launch alpha intelligence.',
-                register: 'https://king-backend.fly.dev/api/botindex/keys/register?plan=pro',
+                message: `You are missing ${missed.count} launch candidates. Upgrade to see all.`,
+                register: BASIC_REGISTRATION_LINK,
             },
         });
     }

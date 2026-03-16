@@ -9,6 +9,15 @@ import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
 const router = Router();
 
 const PRO_REGISTRATION_LINK = 'https://king-backend.fly.dev/api/botindex/keys/register?plan=pro';
+const BASIC_REGISTRATION_LINK = 'https://king-backend.fly.dev/api/botindex/keys/register?plan=basic';
+
+type VerdictAction = 'TRADE' | 'HOLD' | 'AVOID' | 'MONITOR' | 'HEDGE' | 'CLEAR';
+
+type EndpointVerdict = {
+  action: VerdictAction;
+  confidence: number;
+  one_liner: string;
+};
 
 function truncateReasoning(reasoning: string): string {
   const base = reasoning.slice(0, 80);
@@ -42,14 +51,64 @@ function getTopJurisdictions(
     .map(([jurisdiction, risk]) => ({ jurisdiction, risk }));
 }
 
+function getTopJurisdictionLabel(
+  jurisdictionRisk: { US: number; EU: number; APAC: number; LATAM: number } | null | undefined,
+): string {
+  const top = getTopJurisdictions(jurisdictionRisk)[0];
+  if (!top) return 'N/A';
+  return `${top.jurisdiction} (${top.risk}/100)`;
+}
+
+function firstSentence(input: string): string {
+  const normalized = String(input || '').trim();
+  if (!normalized) return '';
+  const match = normalized.match(/^(.+?[.!?])(\s|$)/);
+  return match?.[1] ? match[1].trim() : normalized.slice(0, 110);
+}
+
+function buildThreatRadarVerdict(radar: Awaited<ReturnType<typeof getThreatRadar>>): EndpointVerdict {
+  const threatLevel = radar?.overallThreatLevel ?? 0;
+  const trend = radar?.threatTrend ?? 'stable';
+  const topJurisdiction = getTopJurisdictionLabel(radar?.jurisdictionRisk);
+  const action: VerdictAction = threatLevel > 60 ? 'AVOID' : threatLevel > 30 ? 'MONITOR' : 'CLEAR';
+
+  return {
+    action,
+    confidence: threatLevel,
+    one_liner: `Regulatory environment: ${trend}. Threat level ${threatLevel}/100. ${topJurisdiction} highest risk.`,
+  };
+}
+
+function buildExposureVerdict(exposure: Awaited<ReturnType<typeof scanProjectExposure>>): EndpointVerdict {
+  const level = exposure.exposureLevel;
+  const action: VerdictAction =
+    level === 'high' || level === 'critical'
+      ? 'AVOID'
+      : level === 'medium'
+        ? 'MONITOR'
+        : 'CLEAR';
+  const topRiskSnippet = exposure.riskFactors[0]
+    ? firstSentence(exposure.riskFactors[0])
+    : firstSentence(exposure.recommendation);
+
+  return {
+    action,
+    confidence: exposure.exposureScore,
+    one_liner: `${exposure.project}: ${level} exposure, score ${exposure.exposureScore}/100. ${topRiskSnippet}`,
+  };
+}
+
 router.get('/compliance/headlines', async (_req: Request, res: Response) => {
   try {
     const headlines = await scanComplianceHeadlines();
     const note = getComplianceScannerNote();
+    const sourceCount = new Set(headlines.map((headline) => headline.source)).size;
+    const topHeadlineTitle = headlines[0]?.title ?? 'No headline available.';
 
     res.json({
       headlines,
       count: headlines.length,
+      summary: `${headlines.length} regulatory headlines from ${sourceCount} sources. Top: ${topHeadlineTitle}.`,
       scannedAt: new Date().toISOString(),
       ...(note ? { note } : {}),
     });
@@ -112,10 +171,12 @@ router.get('/compliance/threat-radar', async (req: Request, res: Response) => {
       });
       return;
     }
+    const verdict = buildThreatRadarVerdict(radar);
 
     if (hasFullAccess(req)) {
       res.json({
         ...radar,
+        verdict,
         isTruncated: false,
       });
       return;
@@ -133,17 +194,26 @@ router.get('/compliance/threat-radar', async (req: Request, res: Response) => {
     const preview = previewParts.length > 0
       ? `${previewParts.join(' · ')} — upgrade for full details`
       : 'Regulatory intelligence available — upgrade for full details';
+    const jurisdictionDetailCount = radar.jurisdictionRisk ? Object.keys(radar.jurisdictionRisk).length : 0;
+    const highestHiddenConfidence = radar.overallThreatLevel ?? 0;
 
     trackFunnelEvent('paywall_hit', { endpoint: req.path, plan: 'free' });
     trackFunnelEvent('upgrade_cta_shown', { endpoint: req.path });
     res.json({
       overallThreatLevel: radar.overallThreatLevel,
       threatTrend: radar.threatTrend,
+      verdict,
       preview,
       isTruncated: true,
+      missed: {
+        count: enforcementCount,
+        description: `${enforcementCount} active enforcement item${enforcementCount === 1 ? '' : 's'} and ${jurisdictionDetailCount} jurisdiction risk detail${jurisdictionDetailCount === 1 ? '' : 's'} are hidden`,
+        highest_hidden_confidence: highestHiddenConfidence,
+        hidden_jurisdiction_details_count: jurisdictionDetailCount,
+      },
       upgrade: {
-        message: 'Upgrade to Pro or Basic for full threat radar intelligence.',
-        register: PRO_REGISTRATION_LINK,
+        message: `You are missing ${enforcementCount} active enforcement signal${enforcementCount === 1 ? '' : 's'}. Upgrade to see all.`,
+        register: BASIC_REGISTRATION_LINK,
       },
     });
   } catch (error) {
@@ -167,10 +237,12 @@ router.get('/compliance/exposure', async (req: Request, res: Response) => {
     }
 
     const exposure = await scanProjectExposure(project);
+    const verdict = buildExposureVerdict(exposure);
 
     if (hasFullAccess(req)) {
       res.json({
         ...exposure,
+        verdict,
         isTruncated: false,
       });
       return;
@@ -186,6 +258,8 @@ router.get('/compliance/exposure', async (req: Request, res: Response) => {
     const exposurePreview = exposureParts.length > 0
       ? `${exposureParts.join(' · ')} — upgrade for full report`
       : `Exposure analysis complete — upgrade for full report`;
+    const hiddenActionCount = exposure.activeActions.length;
+    const hiddenRiskFactorCount = exposure.riskFactors.length;
 
     trackFunnelEvent('paywall_hit', { endpoint: req.path, plan: 'free' });
     trackFunnelEvent('upgrade_cta_shown', { endpoint: req.path });
@@ -193,11 +267,18 @@ router.get('/compliance/exposure', async (req: Request, res: Response) => {
       project: exposure.project,
       exposureLevel: exposure.exposureLevel,
       exposureScore: exposure.exposureScore,
+      verdict,
       preview: exposurePreview,
       isTruncated: true,
+      missed: {
+        count: hiddenActionCount,
+        description: `${hiddenActionCount} active action${hiddenActionCount === 1 ? '' : 's'} and ${hiddenRiskFactorCount} risk factor${hiddenRiskFactorCount === 1 ? '' : 's'} are hidden`,
+        highest_hidden_confidence: exposure.exposureScore,
+        hidden_risk_factor_count: hiddenRiskFactorCount,
+      },
       upgrade: {
-        message: 'Upgrade to Pro or Basic for full project exposure details.',
-        register: PRO_REGISTRATION_LINK,
+        message: `You are missing ${hiddenActionCount} active regulatory action${hiddenActionCount === 1 ? '' : 's'}. Upgrade to see all.`,
+        register: BASIC_REGISTRATION_LINK,
       },
     });
   } catch (error) {
@@ -220,6 +301,7 @@ router.get('/compliance/overview', async (_req: Request, res: Response) => {
 
     res.json({
       headlineCount: headlines.length,
+      summary: `${headlines.length} compliance headlines cached. Threat trend: ${cachedThreatRadar?.threatTrend ?? 'unavailable'}, level: ${cachedThreatRadar?.overallThreatLevel ?? 'n/a'}/100.`,
       signalDeskSummary: {
         source: 'headlines-cache',
         highlights: signalDeskSummary,

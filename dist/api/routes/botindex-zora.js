@@ -15,6 +15,13 @@ const METADATA = {
     provider: 'Renaldo Corp / BotIndex',
     market: 'zora',
 };
+function buildTrendingSummary(coins) {
+    const top = coins[0];
+    if (!top) {
+        return '0 trending tokens. Top mover: none with 0 volume attention score.';
+    }
+    return `${coins.length} trending tokens. Top mover: ${top.name} with ${top.volume24h.toFixed(2)} volume attention score.`;
+}
 function parseLimit(value, defaultValue = 10, maxValue = 50) {
     if (value === undefined)
         return defaultValue;
@@ -38,6 +45,7 @@ router.get('/zora/trending-coins', async (req, res) => {
         const data = await (0, trending_1.getZoraTrendingCoins)(limit);
         res.json({
             ...data,
+            summary: buildTrendingSummary(data.coins),
             count: data.coins.length,
             timestamp: new Date().toISOString(),
             metadata: {
