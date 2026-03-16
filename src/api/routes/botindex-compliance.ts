@@ -30,7 +30,7 @@ function truncateMarketBrief(brief: string): string {
 }
 
 function hasFullAccess(req: Request): boolean {
-  const hasPaidPlan = req.apiKeyAuth?.plan === 'pro' || req.apiKeyAuth?.plan === 'basic';
+  const hasPaidPlan = req.apiKeyAuth?.plan === 'pro' || req.apiKeyAuth?.plan === 'basic' || req.apiKeyAuth?.plan === 'starter';
   const hasBypass = Boolean((req as any).__apiKeyAuthenticated);
   return hasPaidPlan || hasBypass;
 }

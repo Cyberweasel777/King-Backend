@@ -5,7 +5,7 @@ import path from 'path';
 import logger from '../../config/logger';
 import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
 
-export type BotIndexApiPlan = 'free' | 'basic' | 'pro';
+export type BotIndexApiPlan = 'free' | 'basic' | 'pro' | 'starter';
 
 export interface ApiKeyLedgerEntry {
   email: string;
@@ -229,6 +229,12 @@ export const optionalApiKey: RequestHandler = (req: Request, res: Response, next
       error: 'daily_limit_exceeded',
       message: `You've used all ${entry.dailyLimit} free requests for today. Upgrade to Pro for unlimited access, or pay per call with x402.`,
       upgrade: {
+        starter: {
+          url: 'https://api.botindex.dev/api/botindex/keys/register?plan=starter',
+          price: '$9/mo',
+          description: '50 requests/day. Most popular for indie builders.',
+          features: ['50 requests/day', 'All endpoints', 'Email support'],
+        },
         pro: {
           url: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
           price: '$29/mo',
@@ -262,7 +268,7 @@ export const optionalApiKey: RequestHandler = (req: Request, res: Response, next
     res.setHeader('X-BotIndex-Daily-Used', String(used));
     res.setHeader('X-BotIndex-Daily-Limit', String(entry.dailyLimit));
     res.setHeader('X-BotIndex-Daily-Remaining', String(remaining));
-    if (remaining <= 1) {
+    if (remaining <= 1 && entry.plan !== 'pro') {
       res.setHeader('X-BotIndex-Upgrade', 'https://api.botindex.dev/api/botindex/keys/register?plan=pro');
     }
   }

@@ -73,7 +73,7 @@ let alphaScanCache: { report: IntelReport; expiresAt: number } | null = null;
 let alphaScanInFlight: Promise<IntelReport> | null = null;
 
 function isPaidApiKey(req: Request): boolean {
-  return req.apiKeyAuth?.plan === 'pro' || req.apiKeyAuth?.plan === 'basic';
+  return req.apiKeyAuth?.plan === 'pro' || req.apiKeyAuth?.plan === 'basic' || req.apiKeyAuth?.plan === 'starter';
 }
 
 function hasFullIntelAccess(req: Request): boolean {
@@ -87,7 +87,7 @@ function hasFullIntelAccess(req: Request): boolean {
 }
 
 function hasFullAccess(req: Request): boolean {
-  const hasPaidPlan = req.apiKeyAuth?.plan === 'pro' || req.apiKeyAuth?.plan === 'basic';
+  const hasPaidPlan = req.apiKeyAuth?.plan === 'pro' || req.apiKeyAuth?.plan === 'basic' || req.apiKeyAuth?.plan === 'starter';
   const hasBypass = Boolean((req as any).__apiKeyAuthenticated);
   return hasPaidPlan || hasBypass;
 }

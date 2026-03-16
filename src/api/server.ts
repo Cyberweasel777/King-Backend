@@ -145,12 +145,8 @@ app.use('/api/botindex', anonRateLimit([
   '/crypto/intel',
   '/doppler/intel',
 ], [
-  '/hyperliquid/funding-arb',
-  '/hyperliquid/correlation-matrix',
   '/hyperliquid/liquidation-heatmap',
-  '/hyperliquid/whale-alerts',
   '/hyperliquid/hip6',
-  '/zora/trending-coins',
   '/zora/new-coins',
   '/zora/creator-scores',
   '/zora/attention-momentum',
@@ -172,7 +168,7 @@ app.get('/api/botindex/trust', trustLayerHandler);
 import botindexIntelRouter from './routes/botindex-intel';
 app.use('/api/botindex', optionalApiKey, (req, _res, next) => {
   if (req.apiKeyAuth) {
-    const isPaid = req.apiKeyAuth.plan === 'pro' || req.apiKeyAuth.plan === 'basic';
+    const isPaid = req.apiKeyAuth.plan === 'pro' || req.apiKeyAuth.plan === 'basic' || req.apiKeyAuth.plan === 'starter';
     if (isPaid) {
       (req as any).__apiKeyAuthenticated = true;
       (req as any).__freeTrialAuthenticated = true;

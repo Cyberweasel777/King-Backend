@@ -54,7 +54,7 @@ router.use('/', botindexBeaconRouter);
 // Free keys get higher rate limits but still hit x402 on premium endpoints.
 router.use(optionalApiKey, (req, _res, next) => {
   if (req.apiKeyAuth) {
-    const isPaid = req.apiKeyAuth.plan === 'pro' || req.apiKeyAuth.plan === 'basic';
+    const isPaid = req.apiKeyAuth.plan === 'pro' || req.apiKeyAuth.plan === 'basic' || req.apiKeyAuth.plan === 'starter';
     if (isPaid) {
       (req as any).__apiKeyAuthenticated = true;
       (req as any).__freeTrialAuthenticated = true;

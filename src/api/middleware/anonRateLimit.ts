@@ -100,6 +100,10 @@ export function anonRateLimit(paths: string[], exclude: string[] = []): RequestH
         description: 'Free API key — 3 req/day, instant activation.',
       },
       upgrade: {
+        starter: {
+          url: 'https://api.botindex.dev/api/botindex/keys/register?plan=starter',
+          description: 'Starter plan — 50 requests/day, $9/mo via Stripe',
+        },
         pro: {
           url: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
           description: 'Pro plan — unlimited requests, $29/mo via Stripe',

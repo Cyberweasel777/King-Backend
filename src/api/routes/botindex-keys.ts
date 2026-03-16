@@ -24,7 +24,7 @@ const ADMIN_ID = process.env.ADMIN_ID || '8063432083';
 
 const registerSchema = z.object({
   email: z.string().email(),
-  plan: z.enum(['basic', 'pro']).optional(),
+  plan: z.enum(['basic', 'pro', 'starter']).optional(),
 });
 
 function getStripeClient(): Stripe {
@@ -39,10 +39,12 @@ function getStripeClient(): Stripe {
 function getPlanPriceId(plan: BotIndexApiPlan): string {
   const basic = process.env.BOTINDEX_STRIPE_PRICE_BASIC;
   const pro = process.env.BOTINDEX_STRIPE_PRICE_PRO;
+  const starter = process.env.BOTINDEX_STRIPE_PRICE_STARTER;
   const byPlan: Record<BotIndexApiPlan, string | undefined> = {
     free: undefined,
     basic,
     pro,
+    starter,
   };
 
   const priceId = byPlan[plan];
@@ -56,6 +58,7 @@ function resolvePlanFromSession(session: Stripe.Checkout.Session): BotIndexApiPl
   const plan = session.metadata?.plan;
   if (plan === 'pro') return 'pro';
   if (plan === 'basic') return 'basic';
+  if (plan === 'starter') return 'starter';
   return 'basic';
 }
 
@@ -77,7 +80,13 @@ async function resolveEmailFromSession(stripe: Stripe, session: Stripe.Checkout.
 router.get('/register', async (req: Request, res: Response) => {
   try {
     const planParam = req.query.plan;
-    const plan: BotIndexApiPlan = (planParam === 'pro') ? 'pro' : (planParam === 'basic') ? 'basic' : 'free';
+    const plan: BotIndexApiPlan = (planParam === 'pro')
+      ? 'pro'
+      : (planParam === 'basic')
+        ? 'basic'
+        : (planParam === 'starter')
+          ? 'starter'
+          : 'free';
 
     if (plan === 'free') {
       trackFunnelEvent('register_page_hit', 'free');
@@ -193,6 +202,11 @@ router.get('/register', async (req: Request, res: Response) => {
     <span class="badge">FREE</span>
     <div class="key-box" id="keyBox" onclick="copyKey()">${apiKey}</div>
     <div class="warning">⚠️ Save this key now. It won't be shown again.</div>
+    <div style="background: #1a1a2e; border: 1px solid #7c3aed40; border-radius: 12px; padding: 20px; margin: 20px 0;">
+      <div style="color: #a78bfa; font-weight: 600; font-size: 15px; margin-bottom: 8px;">⚡ Need more than 3 calls/day?</div>
+      <div style="color: #a1a1aa; font-size: 13px; margin-bottom: 12px;">Starter plan: 50 req/day for just $9/mo. Most popular for indie builders.</div>
+      <a href="https://api.botindex.dev/api/botindex/keys/register?plan=starter" style="display: inline-block; padding: 10px 20px; background: #7c3aed20; color: #a78bfa; border: 1px solid #7c3aed40; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600;">Upgrade to Starter — $9/mo →</a>
+    </div>
     <div class="next-steps">
       <h2>Try it now — paste any command</h2>
       <div class="step">
@@ -396,12 +410,15 @@ router.get('/success', async (req: Request, res: Response) => {
     trackFunnelEvent('checkout_completed', plan);
 
     const apiKey = generateApiKey();
-    createApiKeyEntry({
+    const entry = createApiKeyEntry({
       apiKey,
       email,
       stripeCustomerId: customerId,
       plan,
     });
+    if (plan === 'starter') {
+      entry.dailyLimit = 50;
+    }
     trackFunnelEvent('api_key_issued', plan);
 
     try {
@@ -550,8 +567,8 @@ router.post('/admin/upgrade', express.json(), (req: Request, res: Response) => {
     return;
   }
   const { apiKey, plan } = req.body as { apiKey?: string; plan?: string };
-  if (!apiKey || !plan || !['free', 'basic', 'pro'].includes(plan)) {
-    res.status(400).json({ error: 'bad_request', message: 'Provide apiKey and plan (free|basic|pro)' });
+  if (!apiKey || !plan || !['free', 'basic', 'pro', 'starter'].includes(plan)) {
+    res.status(400).json({ error: 'bad_request', message: 'Provide apiKey and plan (free|basic|pro|starter)' });
     return;
   }
   const entry = getApiKeyEntry(apiKey);
