@@ -20,6 +20,7 @@ const fetcher_1 = require("../../services/botindex/engine/fetcher");
 const universe_1 = require("../../services/botindex/engine/universe");
 const predictionArb_1 = require("../../services/signals/predictionArb");
 const apiKeyAuth_1 = require("../middleware/apiKeyAuth");
+const funnel_tracker_1 = require("../../services/botindex/funnel-tracker");
 const router = (0, express_1.Router)();
 let x402RouteMounted = false;
 const BASIC_API_KEY_DAILY_LIMIT = 100;
@@ -174,6 +175,12 @@ function mountBotindexX402TestRoute() {
             if (x402Upgrade) {
                 res.setHeader('payment-required', x402Upgrade.header);
             }
+            (0, funnel_tracker_1.trackFunnelEvent)('rate_limit_hit', {
+                endpoint: req.path,
+                ip: req.ip?.slice(-6),
+                source: 'botindex.basicQuota',
+                plan: req.apiKeyAuth.plan,
+            });
             res.status(429).json({
                 error: 'api_key_rate_limited',
                 message: `Free API key limit reached (${BASIC_API_KEY_DAILY_LIMIT}/day). Upgrade to Pro for unlimited access, or pay per call with x402.`,

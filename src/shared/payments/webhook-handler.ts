@@ -18,6 +18,7 @@ import {
 } from './database';
 import { sendMetaCapiEvent } from './meta-capi';
 import { logger } from '../../utils/logger';
+import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
 
 /**
  * Verify and parse Stripe webhook payload
@@ -109,6 +110,14 @@ async function handleCheckoutCompleted(
   
   if (!externalUserId || !tier) {
     return { processed: false, message: 'Missing metadata in checkout session' };
+  }
+
+  if (appId === 'botindex') {
+    trackFunnelEvent('stripe_webhook_received', {
+      plan: tier,
+      email: session.customer_email || session.customer_details?.email || null,
+      source: 'shared.payments.webhook',
+    });
   }
 
   // Get subscription details

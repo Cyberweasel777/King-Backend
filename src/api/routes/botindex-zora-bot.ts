@@ -6,6 +6,7 @@ import {
   mapStripeStatusToSubscriberStatus,
   upsertZoraAlphaSubscriber,
 } from '../../services/botindex/zora/subscriber-store';
+import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
 
 const router = Router();
 
@@ -206,7 +207,13 @@ router.post('/zora/bot/stripe-webhook', async (req: Request, res: Response) => {
 
   try {
     if (event.type === 'checkout.session.completed') {
-      await handleCheckoutSessionCompleted(stripe, event.data.object as Stripe.Checkout.Session);
+      const session = event.data.object as Stripe.Checkout.Session;
+      trackFunnelEvent('stripe_webhook_received', {
+        plan: session.metadata?.plan || session.metadata?.tier,
+        email: session.customer_email || session.customer_details?.email || null,
+        source: 'botindex.zora.stripe-webhook',
+      });
+      await handleCheckoutSessionCompleted(stripe, session);
     } else if (event.type === 'customer.subscription.updated') {
       await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
     } else if (event.type === 'customer.subscription.deleted') {

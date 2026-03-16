@@ -42,6 +42,7 @@ const zod_1 = require("zod");
 const logger_1 = __importDefault(require("../../config/logger"));
 const apiKeyAuth_1 = require("../middleware/apiKeyAuth");
 const conversion_funnel_1 = require("../../services/botindex/conversion-funnel");
+const funnel_tracker_1 = require("../../services/botindex/funnel-tracker");
 const key_delivery_email_1 = require("../../services/botindex/key-delivery-email");
 const router = (0, express_1.Router)();
 const SUCCESS_URL = 'https://api.botindex.dev/api/botindex/keys/success?session_id={CHECKOUT_SESSION_ID}';
@@ -162,6 +163,7 @@ router.get('/register', async (req, res) => {
             // Free tier: 3 req/day — tight enough to taste, not enough to live on
             entry.dailyLimit = 3;
             (0, conversion_funnel_1.trackFunnelEvent)('api_key_issued', 'free');
+            (0, funnel_tracker_1.trackFunnelEvent)('key_issued', { plan: 'free', keyPrefix: apiKey.slice(0, 8) });
             // Send key to email as backup
             try {
                 await (0, key_delivery_email_1.sendApiKeyEmail)({ to: emailParam, apiKey, plan: 'free' });
@@ -313,6 +315,10 @@ router.get('/register', async (req, res) => {
             return;
         }
         (0, conversion_funnel_1.trackFunnelEvent)('checkout_session_created', plan);
+        (0, funnel_tracker_1.trackFunnelEvent)('key_issued_paid', { plan });
+        (0, funnel_tracker_1.trackFunnelEvent)('checkout_redirect', {
+            plan: typeof req.query.plan === 'string' ? req.query.plan : plan,
+        });
         res.redirect(303, session.url);
     }
     catch (error) {
@@ -352,6 +358,7 @@ router.post('/register', async (req, res) => {
             return;
         }
         (0, conversion_funnel_1.trackFunnelEvent)('checkout_session_created', plan);
+        (0, funnel_tracker_1.trackFunnelEvent)('key_issued_paid', { plan, source: 'api' });
         res.json({
             checkoutUrl: session.url,
             sessionId: session.id,

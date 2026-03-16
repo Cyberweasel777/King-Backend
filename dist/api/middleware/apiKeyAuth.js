@@ -13,6 +13,7 @@ const crypto_1 = __importDefault(require("crypto"));
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const logger_1 = __importDefault(require("../../config/logger"));
+const funnel_tracker_1 = require("../../services/botindex/funnel-tracker");
 const API_KEY_DATA_DIR = process.env.API_KEY_DATA_DIR || '/data';
 const API_KEY_DATA_FILE = path_1.default.join(API_KEY_DATA_DIR, 'api-keys.json');
 const apiKeyLedger = new Map();
@@ -103,6 +104,11 @@ function attachAuth(req, apiKey, entry) {
         email: entry.email,
         plan: entry.plan,
     };
+    (0, funnel_tracker_1.trackFunnelEvent)('first_auth_call', {
+        apiKey,
+        keyPrefix: apiKey.slice(0, 8),
+        plan: entry.plan,
+    });
 }
 function generateApiKey() {
     let apiKey = `botindex_sk_${crypto_1.default.randomBytes(16).toString('hex')}`;
@@ -174,6 +180,12 @@ const optionalApiKey = (req, res, next) => {
         if (x402Upgrade) {
             res.setHeader('payment-required', x402Upgrade.header);
         }
+        (0, funnel_tracker_1.trackFunnelEvent)('rate_limit_hit', {
+            endpoint: req.path,
+            ip: req.ip?.slice(-6),
+            source: 'apiKeyAuth.dailyLimit',
+            plan: entry.plan,
+        });
         res.status(429).json({
             error: 'daily_limit_exceeded',
             message: `You've used all ${entry.dailyLimit} free requests for today. Upgrade to Pro for unlimited access, or pay per call with x402.`,

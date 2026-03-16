@@ -12,6 +12,7 @@ import {
   updateApiKeyWallet,
 } from '../middleware/apiKeyAuth';
 import { getFunnelStats, trackFunnelEvent } from '../../services/botindex/conversion-funnel';
+import { trackFunnelEvent as trackRealtimeFunnelEvent } from '../../services/botindex/funnel-tracker';
 import { sendApiKeyEmail } from '../../services/botindex/key-delivery-email';
 
 const router = Router();
@@ -145,6 +146,7 @@ router.get('/register', async (req: Request, res: Response) => {
       // Free tier: 3 req/day — tight enough to taste, not enough to live on
       entry.dailyLimit = 3;
       trackFunnelEvent('api_key_issued', 'free');
+      trackRealtimeFunnelEvent('key_issued', { plan: 'free', keyPrefix: apiKey.slice(0, 8) });
 
       // Send key to email as backup
       try {
@@ -302,6 +304,10 @@ router.get('/register', async (req: Request, res: Response) => {
     }
 
     trackFunnelEvent('checkout_session_created', plan);
+    trackRealtimeFunnelEvent('key_issued_paid', { plan });
+    trackRealtimeFunnelEvent('checkout_redirect', {
+      plan: typeof req.query.plan === 'string' ? req.query.plan : plan,
+    });
     res.redirect(303, session.url);
   } catch (error) {
     logger.error({ err: error }, 'Failed to create BotIndex key checkout session (GET)');
@@ -346,6 +352,7 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     trackFunnelEvent('checkout_session_created', plan);
+    trackRealtimeFunnelEvent('key_issued_paid', { plan, source: 'api' });
 
     res.json({
       checkoutUrl: session.url,

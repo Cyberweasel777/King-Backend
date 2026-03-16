@@ -18,6 +18,7 @@ import {
   dopplerIntelConfig,
   alphaScanConfig,
 } from '../../services/botindex/intel/domains';
+import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
 
 // Import raw data fetchers
 import { getZoraTrendingCoins } from '../../services/botindex/zora/trending';
@@ -178,6 +179,8 @@ function sendIntelResponse(
     return;
   }
 
+  trackFunnelEvent('paywall_hit', { endpoint: req.path, plan: 'free' });
+  trackFunnelEvent('upgrade_cta_shown', { endpoint: req.path });
   res.json({
     ...buildTeaserReport(report),
     metadata: {
@@ -419,6 +422,8 @@ router.get('/intel/trade-signals', async (req: Request, res: Response) => {
       ? `${analysis.signals.length} signals detected. Top: ${topSignal.asset} ${topSignal.direction}, confidence ${topSignal.confidence}% — upgrade for full analysis`
       : '0 signals detected. Upgrade for full analysis.';
 
+    trackFunnelEvent('paywall_hit', { endpoint: req.path, plan: 'free' });
+    trackFunnelEvent('upgrade_cta_shown', { endpoint: req.path });
     res.json({
       signals: topSignal
         ? [{
@@ -469,6 +474,8 @@ router.post('/intel/portfolio-risk', async (req: Request, res: Response) => {
 
     const preview = `Risk score: ${analysis.overall_risk_score}/100 ${analysis.risk_level}. ${analysis.correlated_pairs.length} correlated pairs detected, ${analysis.hedge_recommendations.length} hedge recommended — upgrade for details`;
 
+    trackFunnelEvent('paywall_hit', { endpoint: req.path, plan: 'free' });
+    trackFunnelEvent('upgrade_cta_shown', { endpoint: req.path });
     res.json({
       overall_risk_score: analysis.overall_risk_score,
       risk_level: analysis.risk_level,
@@ -507,6 +514,8 @@ router.get('/intel/convergence', async (req: Request, res: Response) => {
       ? `${analysis.convergences.length} convergences detected. Strongest: ${top.asset} (${top.signal_count} signals, ${top.direction}) — upgrade for full report`
       : '0 convergences detected. Upgrade for full report.';
 
+    trackFunnelEvent('paywall_hit', { endpoint: req.path, plan: 'free' });
+    trackFunnelEvent('upgrade_cta_shown', { endpoint: req.path });
     res.json({
       convergence_count: analysis.convergences.length,
       top_asset: top?.asset ?? null,
@@ -545,6 +554,8 @@ router.get('/intel/launch-alpha', async (req: Request, res: Response) => {
       ? `${analysis.launches.length} launches scored. Top: ${top.token}, confidence ${top.entry_confidence} — upgrade for full rankings`
       : '0 launches scored. Upgrade for full rankings.';
 
+    trackFunnelEvent('paywall_hit', { endpoint: req.path, plan: 'free' });
+    trackFunnelEvent('upgrade_cta_shown', { endpoint: req.path });
     res.json({
       launches: top
         ? [{ token: top.token, entry_confidence: top.entry_confidence }]

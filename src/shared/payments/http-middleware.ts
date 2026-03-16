@@ -10,6 +10,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { AppId, SubscriptionTier } from './types';
 import { isSubscribed } from './access-control';
+import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
 
 type FreeLimitOptions = {
   /** max free requests per UTC day */
@@ -85,6 +86,11 @@ export function withFreeLimit(options: FreeLimitOptions) {
     }
 
     if (cur.count >= options.perDay) {
+      trackFunnelEvent('rate_limit_hit', {
+        endpoint: req.path,
+        ip: req.ip?.slice(-6),
+        source: 'shared.withFreeLimit',
+      });
       res.status(429).json({
         error: 'free_limit_reached',
         message: `Free limit reached (${options.perDay}/day). Upgrade for unlimited access.`

@@ -4,6 +4,7 @@ import { analyzeComplianceHeadlines } from '../../services/botindex/compliance/a
 import { getComplianceScannerNote, scanComplianceHeadlines } from '../../services/botindex/compliance/scanner';
 import { scanProjectExposure } from '../../services/botindex/compliance/exposure-scanner';
 import { getThreatRadar } from '../../services/botindex/compliance/threat-radar';
+import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
 
 const router = Router();
 
@@ -79,6 +80,8 @@ router.get('/compliance/signal-desk', async (req: Request, res: Response) => {
       reasoning: truncateReasoning(signal.reasoning),
     }));
 
+    trackFunnelEvent('paywall_hit', { endpoint: req.path, plan: 'free' });
+    trackFunnelEvent('upgrade_cta_shown', { endpoint: req.path });
     res.json({
       ...analysis,
       signals: teaserSignals,
@@ -131,6 +134,8 @@ router.get('/compliance/threat-radar', async (req: Request, res: Response) => {
       ? `${previewParts.join(' · ')} — upgrade for full details`
       : 'Regulatory intelligence available — upgrade for full details';
 
+    trackFunnelEvent('paywall_hit', { endpoint: req.path, plan: 'free' });
+    trackFunnelEvent('upgrade_cta_shown', { endpoint: req.path });
     res.json({
       overallThreatLevel: radar.overallThreatLevel,
       threatTrend: radar.threatTrend,
@@ -182,6 +187,8 @@ router.get('/compliance/exposure', async (req: Request, res: Response) => {
       ? `${exposureParts.join(' · ')} — upgrade for full report`
       : `Exposure analysis complete — upgrade for full report`;
 
+    trackFunnelEvent('paywall_hit', { endpoint: req.path, plan: 'free' });
+    trackFunnelEvent('upgrade_cta_shown', { endpoint: req.path });
     res.json({
       project: exposure.project,
       exposureLevel: exposure.exposureLevel,

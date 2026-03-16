@@ -14,6 +14,7 @@ const config_1 = require("./config");
 const database_1 = require("./database");
 const meta_capi_1 = require("./meta-capi");
 const logger_1 = require("../../utils/logger");
+const funnel_tracker_1 = require("../../services/botindex/funnel-tracker");
 /**
  * Verify and parse Stripe webhook payload
  */
@@ -82,6 +83,13 @@ async function handleCheckoutCompleted(appId, event) {
     const tier = normalizeTierForApp(appId, session.metadata?.tier);
     if (!externalUserId || !tier) {
         return { processed: false, message: 'Missing metadata in checkout session' };
+    }
+    if (appId === 'botindex') {
+        (0, funnel_tracker_1.trackFunnelEvent)('stripe_webhook_received', {
+            plan: tier,
+            email: session.customer_email || session.customer_details?.email || null,
+            source: 'shared.payments.webhook',
+        });
     }
     // Get subscription details
     const stripeSubId = session.subscription;

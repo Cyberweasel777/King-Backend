@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getHits } from '../middleware/hitCounter';
 import { getOptionalConvexAnalyticsStore } from '../../shared/analytics/convex-client';
+import { getFunnelSummary, getRecentEvents } from '../../services/botindex/funnel-tracker';
 
 const router = Router();
 
@@ -13,6 +14,13 @@ function parsePositiveNumber(value: unknown): number | undefined {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
   return parsed;
+}
+
+function toPercent(numerator: number, denominator: number): string {
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) {
+    return '0.0%';
+  }
+  return `${((numerator / denominator) * 100).toFixed(1)}%`;
 }
 
 router.get('/botindex/admin/hits', (req, res) => {
@@ -67,6 +75,52 @@ router.get('/botindex/admin/analytics', async (req, res) => {
       message: error instanceof Error ? error.message : 'Failed to query Convex analytics',
     });
   }
+});
+
+router.get('/botindex/admin/funnel', (req, res) => {
+  const adminId = getAdminId(req.query.adminId);
+
+  if (adminId !== '8063432083') {
+    res.status(403).json({ error: 'unauthorized' });
+    return;
+  }
+
+  const summary = getFunnelSummary();
+  const total = (step: string) => summary[step]?.total || 0;
+
+  const keyIssued = total('key_issued');
+  const firstAuthCall = total('first_auth_call');
+  const paywallHit = total('paywall_hit');
+  const checkoutRedirect = total('checkout_redirect');
+  const stripeWebhook = total('stripe_webhook_received');
+
+  res.json({
+    summary,
+    conversion_rates: {
+      key_issued_to_first_call: toPercent(firstAuthCall, keyIssued),
+      first_call_to_paywall: toPercent(paywallHit, firstAuthCall),
+      paywall_to_checkout: toPercent(checkoutRedirect, paywallHit),
+      checkout_to_paid: toPercent(stripeWebhook, checkoutRedirect),
+      overall_free_to_paid: toPercent(stripeWebhook, keyIssued),
+    },
+    recentEvents: getRecentEvents(undefined, 20),
+  });
+});
+
+router.get('/botindex/admin/funnel/events', (req, res) => {
+  const adminId = getAdminId(req.query.adminId);
+
+  if (adminId !== '8063432083') {
+    res.status(403).json({ error: 'unauthorized' });
+    return;
+  }
+
+  const step = typeof req.query.step === 'string' ? req.query.step : undefined;
+  const limit = parsePositiveNumber(req.query.limit);
+
+  res.json({
+    events: getRecentEvents(step, limit),
+  });
 });
 
 export default router;

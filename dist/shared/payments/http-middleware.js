@@ -12,6 +12,7 @@ exports.withSubscriptionHttp = withSubscriptionHttp;
 exports.withFreeLimit = withFreeLimit;
 exports.getFreeLimitKey = getFreeLimitKey;
 const access_control_1 = require("./access-control");
+const funnel_tracker_1 = require("../../services/botindex/funnel-tracker");
 const DAILY_COUNTER = new Map();
 function utcDay() {
     const d = new Date();
@@ -67,6 +68,11 @@ function withFreeLimit(options) {
             return;
         }
         if (cur.count >= options.perDay) {
+            (0, funnel_tracker_1.trackFunnelEvent)('rate_limit_hit', {
+                endpoint: req.path,
+                ip: req.ip?.slice(-6),
+                source: 'shared.withFreeLimit',
+            });
             res.status(429).json({
                 error: 'free_limit_reached',
                 message: `Free limit reached (${options.perDay}/day). Upgrade for unlimited access.`

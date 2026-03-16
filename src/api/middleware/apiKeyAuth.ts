@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import logger from '../../config/logger';
+import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
 
 export type BotIndexApiPlan = 'free' | 'basic' | 'pro';
 
@@ -125,6 +126,12 @@ function attachAuth(req: Request, apiKey: string, entry: ApiKeyLedgerEntry): voi
     email: entry.email,
     plan: entry.plan,
   };
+
+  trackFunnelEvent('first_auth_call', {
+    apiKey,
+    keyPrefix: apiKey.slice(0, 8),
+    plan: entry.plan,
+  });
 }
 
 export function generateApiKey(): string {
@@ -210,6 +217,13 @@ export const optionalApiKey: RequestHandler = (req: Request, res: Response, next
     if (x402Upgrade) {
       res.setHeader('payment-required', x402Upgrade.header);
     }
+
+    trackFunnelEvent('rate_limit_hit', {
+      endpoint: req.path,
+      ip: req.ip?.slice(-6),
+      source: 'apiKeyAuth.dailyLimit',
+      plan: entry.plan,
+    });
 
     res.status(429).json({
       error: 'daily_limit_exceeded',

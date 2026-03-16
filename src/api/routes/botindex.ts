@@ -19,6 +19,7 @@ import { fetchMultiplePriceSeries } from '../../services/botindex/engine/fetcher
 import { getBotindexTokenUniverse } from '../../services/botindex/engine/universe';
 import { buildHeatMap, getPredictionArbFeed } from '../../services/signals/predictionArb';
 import { optionalApiKey } from '../middleware/apiKeyAuth';
+import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
 
 const router = Router();
 let x402RouteMounted = false;
@@ -187,6 +188,13 @@ export function mountBotindexX402TestRoute(): void {
         if (x402Upgrade) {
           res.setHeader('payment-required', x402Upgrade.header);
         }
+
+        trackFunnelEvent('rate_limit_hit', {
+          endpoint: req.path,
+          ip: req.ip?.slice(-6),
+          source: 'botindex.basicQuota',
+          plan: req.apiKeyAuth.plan,
+        });
 
         res.status(429).json({
           error: 'api_key_rate_limited',
