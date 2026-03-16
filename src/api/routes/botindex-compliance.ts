@@ -5,6 +5,7 @@ import { getComplianceScannerNote, scanComplianceHeadlines } from '../../service
 import { scanProjectExposure } from '../../services/botindex/compliance/exposure-scanner';
 import { getThreatRadar } from '../../services/botindex/compliance/threat-radar';
 import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
+import { buildFreeCTA } from '../../shared/response-cta';
 
 const router = Router();
 
@@ -111,6 +112,7 @@ router.get('/compliance/headlines', async (_req: Request, res: Response) => {
       summary: `${headlines.length} regulatory headlines from ${sourceCount} sources. Top: ${topHeadlineTitle}.`,
       scannedAt: new Date().toISOString(),
       ...(note ? { note } : {}),
+      ...buildFreeCTA('DeepSeek threat radar: scores regulatory risk 0-100 with jurisdiction breakdown and enforcement tracking. Upgrade for full signal desk.'),
     });
   } catch (error) {
     logger.error({ err: error }, '[compliance.headlines] failed');

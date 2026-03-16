@@ -11,6 +11,7 @@ const correlation_1 = require("../../services/botindex/hyperliquid/correlation")
 const whale_alerts_1 = require("../../services/botindex/hyperliquid/whale-alerts");
 const liquidations_1 = require("../../services/botindex/hyperliquid/liquidations");
 const hip6_1 = require("../../services/botindex/hyperliquid/hip6");
+const response_cta_1 = require("../../shared/response-cta");
 const router = (0, express_1.Router)();
 const METADATA = {
     protocol: 'x402',
@@ -66,6 +67,10 @@ router.get('/hyperliquid/funding-arb', async (_req, res) => {
     try {
         const data = await (0, funding_arb_1.getFundingArbOpportunities)();
         const summary = buildFundingSummary(data.opportunities);
+        const topOpp = data.opportunities[0];
+        const teaser = topOpp
+            ? `DeepSeek analysis: ${topOpp.symbol} rate divergence suggests ${Math.abs(topOpp.hlFundingRate) > 0.001 ? 'high-conviction' : 'moderate'} arb window. Full trade signal + risk score available with API key.`
+            : undefined;
         res.json({
             ...data,
             summary,
@@ -76,6 +81,7 @@ router.get('/hyperliquid/funding-arb', async (_req, res) => {
                 endpoint: '/botindex/hyperliquid/funding-arb',
                 price: 'FREE',
             },
+            ...(0, response_cta_1.buildFreeCTA)(teaser),
         });
     }
     catch (error) {
@@ -90,14 +96,16 @@ router.get('/hyperliquid/funding-arb', async (_req, res) => {
 router.get('/hyperliquid/correlation-matrix', async (_req, res) => {
     try {
         const data = await (0, correlation_1.getHLCorrelationMatrix)();
+        const corrSummary = buildCorrelationSummary(data.matrix);
         res.json({
             ...data,
-            summary: buildCorrelationSummary(data.matrix),
+            summary: corrSummary,
             metadata: {
                 ...METADATA,
                 endpoint: '/botindex/hyperliquid/correlation-matrix',
                 price: 'FREE',
             },
+            ...(0, response_cta_1.buildFreeCTA)('DeepSeek convergence detector: analyzes correlation shifts + funding rates + whale flow to find multi-signal trade setups. Upgrade for full analysis.'),
         });
     }
     catch (error) {
@@ -121,6 +129,7 @@ router.get('/hyperliquid/liquidation-heatmap', async (_req, res) => {
                 endpoint: '/botindex/hyperliquid/liquidation-heatmap',
                 price: 'FREE',
             },
+            ...(0, response_cta_1.buildFreeCTA)('DeepSeek portfolio risk engine: overlays liquidation clusters with your positions to flag cascade risk. Upgrade for personalized risk scores.'),
         });
     }
     catch (error) {
@@ -226,6 +235,10 @@ router.get('/hyperliquid/whale-alerts', async (_req, res) => {
     try {
         const data = await (0, whale_alerts_1.getHyperliquidWhaleAlerts)();
         const whaleSummaryLine = buildWhaleSummaryLine(data);
+        const topWhale = data.topPositions[0];
+        const whaleTeaser = topWhale
+            ? `DeepSeek signal: ${topWhale.coin} has $${formatUsdMillions(data.totalTrackedValue)}m in whale exposure. Trade signal + confidence score available with API key.`
+            : undefined;
         res.json({
             summary: {
                 oneLiner: whaleSummaryLine,
@@ -247,6 +260,7 @@ router.get('/hyperliquid/whale-alerts', async (_req, res) => {
                 endpoint: '/botindex/hyperliquid/whale-alerts',
                 price: 'free (summary)',
             },
+            ...(0, response_cta_1.buildFreeCTA)(whaleTeaser),
         });
     }
     catch (error) {

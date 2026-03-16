@@ -8,6 +8,7 @@ const logger_1 = __importDefault(require("../../config/logger"));
 const trending_1 = require("../../services/botindex/zora/trending");
 const creator_scores_1 = require("../../services/botindex/zora/creator-scores");
 const attention_1 = require("../../services/botindex/zora/attention");
+const response_cta_1 = require("../../shared/response-cta");
 const router = (0, express_1.Router)();
 const METADATA = {
     protocol: 'x402',
@@ -43,6 +44,10 @@ router.get('/zora/trending-coins', async (req, res) => {
     }
     try {
         const data = await (0, trending_1.getZoraTrendingCoins)(limit);
+        const topCoin = data.coins[0];
+        const zoraTeaser = topCoin
+            ? `DeepSeek launch alpha: ${topCoin.name} showing ${topCoin.volume24h > 1000 ? 'breakout' : 'early'} attention signals. Entry confidence + risk score available with API key.`
+            : undefined;
         res.json({
             ...data,
             summary: buildTrendingSummary(data.coins),
@@ -53,6 +58,7 @@ router.get('/zora/trending-coins', async (req, res) => {
                 endpoint: '/botindex/zora/trending-coins',
                 price: 'FREE',
             },
+            ...(0, response_cta_1.buildFreeCTA)(zoraTeaser),
         });
     }
     catch (error) {
@@ -85,6 +91,7 @@ router.get('/zora/creator-scores', async (req, res) => {
                 endpoint: '/botindex/zora/creator-scores',
                 price: 'FREE',
             },
+            ...(0, response_cta_1.buildFreeCTA)('DeepSeek launch alpha: scores creator track records + token momentum to flag high-conviction early entries. Upgrade for full analysis.'),
         });
     }
     catch (error) {
@@ -117,6 +124,7 @@ router.get('/zora/attention-momentum', async (req, res) => {
                 endpoint: '/botindex/zora/attention-momentum',
                 price: 'FREE',
             },
+            ...(0, response_cta_1.buildFreeCTA)('DeepSeek convergence detector: cross-references attention spikes with on-chain flows to find breakout candidates before the crowd. Upgrade for signals.'),
         });
     }
     catch (error) {

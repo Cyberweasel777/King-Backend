@@ -3,6 +3,7 @@ import logger from '../../config/logger';
 import { getZoraTrendingCoins } from '../../services/botindex/zora/trending';
 import { getZoraCreatorScores } from '../../services/botindex/zora/creator-scores';
 import { getAttentionMomentum } from '../../services/botindex/zora/attention';
+import { buildFreeCTA } from '../../shared/response-cta';
 
 const router = Router();
 
@@ -46,6 +47,10 @@ router.get('/zora/trending-coins', async (req: Request, res: Response) => {
 
   try {
     const data = await getZoraTrendingCoins(limit);
+    const topCoin = data.coins[0];
+    const zoraTeaser = topCoin
+      ? `DeepSeek launch alpha: ${topCoin.name} showing ${topCoin.volume24h > 1000 ? 'breakout' : 'early'} attention signals. Entry confidence + risk score available with API key.`
+      : undefined;
     res.json({
       ...data,
       summary: buildTrendingSummary(data.coins),
@@ -56,6 +61,7 @@ router.get('/zora/trending-coins', async (req: Request, res: Response) => {
         endpoint: '/botindex/zora/trending-coins',
         price: 'FREE',
       },
+      ...buildFreeCTA(zoraTeaser),
     });
   } catch (error) {
     logger.error({ err: error }, 'Failed to fetch Zora trending coins');
@@ -91,6 +97,7 @@ router.get(
           endpoint: '/botindex/zora/creator-scores',
           price: 'FREE',
         },
+        ...buildFreeCTA('DeepSeek launch alpha: scores creator track records + token momentum to flag high-conviction early entries. Upgrade for full analysis.'),
       });
     } catch (error) {
       logger.error({ err: error }, 'Failed to fetch Zora creator scores');
@@ -127,6 +134,7 @@ router.get(
           endpoint: '/botindex/zora/attention-momentum',
           price: 'FREE',
         },
+        ...buildFreeCTA('DeepSeek convergence detector: cross-references attention spikes with on-chain flows to find breakout candidates before the crowd. Upgrade for signals.'),
       });
     } catch (error) {
       logger.error({ err: error }, 'Failed to fetch Zora attention momentum');
