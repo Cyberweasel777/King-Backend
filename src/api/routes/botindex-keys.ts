@@ -77,7 +77,7 @@ async function resolveEmailFromSession(stripe: Stripe, session: Stripe.Checkout.
 router.get('/register', async (req: Request, res: Response) => {
   try {
     const planParam = req.query.plan;
-    const plan: BotIndexApiPlan = (planParam === 'free') ? 'free' : (planParam === 'pro') ? 'pro' : 'basic';
+    const plan: BotIndexApiPlan = (planParam === 'pro') ? 'pro' : (planParam === 'basic') ? 'basic' : 'free';
 
     if (plan === 'free') {
       trackFunnelEvent('register_page_hit', 'free');

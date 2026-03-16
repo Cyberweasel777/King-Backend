@@ -99,7 +99,7 @@ async function resolveEmailFromSession(stripe, session) {
 router.get('/register', async (req, res) => {
     try {
         const planParam = req.query.plan;
-        const plan = (planParam === 'free') ? 'free' : (planParam === 'pro') ? 'pro' : 'basic';
+        const plan = (planParam === 'pro') ? 'pro' : (planParam === 'basic') ? 'basic' : 'free';
         if (plan === 'free') {
             (0, conversion_funnel_1.trackFunnelEvent)('register_page_hit', 'free');
             const emailParam = typeof req.query.email === 'string' ? req.query.email.trim().toLowerCase() : '';
