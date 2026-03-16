@@ -483,10 +483,10 @@ export declare const BotCommandContract: z.ZodObject<{
         type: z.ZodEnum<["text", "markdown", "json", "image"]>;
         template: z.ZodOptional<z.ZodString>;
     }, "strip", z.ZodTypeAny, {
-        type: "text" | "image" | "json" | "markdown";
+        type: "text" | "image" | "markdown" | "json";
         template?: string | undefined;
     }, {
-        type: "text" | "image" | "json" | "markdown";
+        type: "text" | "image" | "markdown" | "json";
         template?: string | undefined;
     }>;
 }, "strip", z.ZodTypeAny, {
@@ -494,7 +494,7 @@ export declare const BotCommandContract: z.ZodObject<{
     tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
     description: string;
     response: {
-        type: "text" | "image" | "json" | "markdown";
+        type: "text" | "image" | "markdown" | "json";
         template?: string | undefined;
     };
     params?: {
@@ -508,7 +508,7 @@ export declare const BotCommandContract: z.ZodObject<{
     tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
     description: string;
     response: {
-        type: "text" | "image" | "json" | "markdown";
+        type: "text" | "image" | "markdown" | "json";
         template?: string | undefined;
     };
     params?: {
@@ -549,10 +549,10 @@ export declare const AppFeatureConfig: z.ZodObject<{
                 type: z.ZodEnum<["text", "markdown", "json", "image"]>;
                 template: z.ZodOptional<z.ZodString>;
             }, "strip", z.ZodTypeAny, {
-                type: "text" | "image" | "json" | "markdown";
+                type: "text" | "image" | "markdown" | "json";
                 template?: string | undefined;
             }, {
-                type: "text" | "image" | "json" | "markdown";
+                type: "text" | "image" | "markdown" | "json";
                 template?: string | undefined;
             }>;
         }, "strip", z.ZodTypeAny, {
@@ -560,7 +560,7 @@ export declare const AppFeatureConfig: z.ZodObject<{
             tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
             description: string;
             response: {
-                type: "text" | "image" | "json" | "markdown";
+                type: "text" | "image" | "markdown" | "json";
                 template?: string | undefined;
             };
             params?: {
@@ -574,7 +574,7 @@ export declare const AppFeatureConfig: z.ZodObject<{
             tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
             description: string;
             response: {
-                type: "text" | "image" | "json" | "markdown";
+                type: "text" | "image" | "markdown" | "json";
                 template?: string | undefined;
             };
             params?: {
@@ -593,7 +593,7 @@ export declare const AppFeatureConfig: z.ZodObject<{
             tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
             description: string;
             response: {
-                type: "text" | "image" | "json" | "markdown";
+                type: "text" | "image" | "markdown" | "json";
                 template?: string | undefined;
             };
             params?: {
@@ -612,7 +612,7 @@ export declare const AppFeatureConfig: z.ZodObject<{
             tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
             description: string;
             response: {
-                type: "text" | "image" | "json" | "markdown";
+                type: "text" | "image" | "markdown" | "json";
                 template?: string | undefined;
             };
             params?: {
@@ -634,7 +634,7 @@ export declare const AppFeatureConfig: z.ZodObject<{
             tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
             description: string;
             response: {
-                type: "text" | "image" | "json" | "markdown";
+                type: "text" | "image" | "markdown" | "json";
                 template?: string | undefined;
             };
             params?: {
@@ -656,7 +656,7 @@ export declare const AppFeatureConfig: z.ZodObject<{
             tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
             description: string;
             response: {
-                type: "text" | "image" | "json" | "markdown";
+                type: "text" | "image" | "markdown" | "json";
                 template?: string | undefined;
             };
             params?: {

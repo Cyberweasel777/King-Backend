@@ -1,14 +1,12 @@
 import logger from '../../../config/logger';
 import type { ComplianceHeadline } from './scanner';
+import { complianceSearchMulti } from './search-provider';
 
-const BRAVE_SEARCH_API_URL = 'https://api.search.brave.com/res/v1/web/search';
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
 
 const MODEL = 'deepseek-chat';
 const TEMPERATURE = 0.2;
 const MAX_TOKENS = 4096;
-const BRAVE_QUERY_COUNT = 10;
-const BRAVE_TIMEOUT_MS = 15_000;
 const DEEPSEEK_TIMEOUT_MS = 60_000;
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
@@ -20,27 +18,6 @@ const THREAT_QUERIES = [
 
 const THREAT_TRENDS = ['escalating', 'stable', 'deescalating'] as const;
 type ThreatTrend = typeof THREAT_TRENDS[number];
-
-interface BraveWebResult {
-  title?: string;
-  url?: string;
-  description?: string;
-  age?: string;
-  page_age?: string;
-  published?: string;
-  profile?: {
-    name?: string;
-  };
-  meta_url?: {
-    hostname?: string;
-  };
-}
-
-interface BraveSearchResponse {
-  web?: {
-    results?: BraveWebResult[];
-  };
-}
 
 interface DeepSeekResponse {
   choices?: Array<{
@@ -83,58 +60,6 @@ export interface ThreatRadarResult {
 }
 
 let threatRadarCache: { data: ThreatRadarResult; expiresAt: number } | null = null;
-
-function normalizeUrl(raw: string): string {
-  try {
-    const parsed = new URL(raw);
-    parsed.hash = '';
-    parsed.searchParams.sort();
-    const normalized = parsed.toString();
-    return normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
-  } catch {
-    return raw.trim();
-  }
-}
-
-function parseDate(value: string | undefined): string | null {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toISOString();
-}
-
-function normalizeSource(result: BraveWebResult, url: string): string {
-  if (result.profile?.name && result.profile.name.trim().length > 0) {
-    return result.profile.name.trim();
-  }
-
-  if (result.meta_url?.hostname && result.meta_url.hostname.trim().length > 0) {
-    return result.meta_url.hostname.trim();
-  }
-
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return 'unknown';
-  }
-}
-
-function normalizeHeadline(result: BraveWebResult): ComplianceHeadline | null {
-  const title = String(result.title || '').trim();
-  const rawUrl = String(result.url || '').trim();
-  if (!title || !rawUrl) return null;
-
-  const normalizedUrl = normalizeUrl(rawUrl);
-  const publishedAt = parseDate(result.page_age) || parseDate(result.published) || parseDate(result.age) || new Date().toISOString();
-
-  return {
-    title,
-    url: normalizedUrl,
-    source: normalizeSource(result, normalizedUrl),
-    snippet: String(result.description || '').trim(),
-    publishedAt,
-  };
-}
 
 function clamp0to100(value: unknown, fallback: number): number {
   const parsed = Number(value);
@@ -220,38 +145,7 @@ function buildDegradedThreatRadar(reason: string): ThreatRadarResult {
   };
 }
 
-async function fetchBraveSearch(query: string, apiKey: string): Promise<ComplianceHeadline[]> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), BRAVE_TIMEOUT_MS);
-
-  try {
-    const url = new URL(BRAVE_SEARCH_API_URL);
-    url.searchParams.set('q', query);
-    url.searchParams.set('count', String(BRAVE_QUERY_COUNT));
-
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        'X-Subscription-Token': apiKey,
-      },
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Brave HTTP ${response.status}: ${errorText}`);
-    }
-
-    const payload = (await response.json()) as BraveSearchResponse;
-    const results = payload.web?.results || [];
-    return results
-      .map(normalizeHeadline)
-      .filter((headline): headline is ComplianceHeadline => Boolean(headline));
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
+// Search is now handled by search-provider.ts (Firecrawl primary, Brave fallback)
 
 function normalizeThreatRadar(raw: unknown): ThreatRadarResult {
   const payload = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
@@ -377,17 +271,22 @@ async function callDeepSeek(headlines: ComplianceHeadline[]): Promise<string> {
 }
 
 async function generateThreatRadar(): Promise<ThreatRadarResult> {
-  const braveApiKey = process.env.BRAVE_API_KEY;
-  if (!braveApiKey) {
-    logger.warn('[compliance.threat-radar] BRAVE_API_KEY missing, returning degraded payload');
-    return buildDegradedThreatRadar('brave_api_key_missing');
+  const hasSearchKey = process.env.FIRECRAWL_API_KEY || process.env.BRAVE_API_KEY;
+  if (!hasSearchKey) {
+    logger.warn('[compliance.threat-radar] No search API keys configured, returning degraded payload');
+    return buildDegradedThreatRadar('search_api_key_missing');
   }
 
-  const queryResults = await Promise.all(
-    THREAT_QUERIES.map((query) => fetchBraveSearch(query, braveApiKey)),
-  );
+  const searchResults = await complianceSearchMulti([...THREAT_QUERIES]);
+  const queryResults: ComplianceHeadline[] = searchResults.map((r) => ({
+    title: r.title,
+    url: r.url,
+    source: r.source,
+    snippet: r.snippet,
+    publishedAt: new Date().toISOString(),
+  }));
 
-  const dedupedHeadlines = dedupeHeadlinesByUrl(queryResults.flat())
+  const dedupedHeadlines = dedupeHeadlinesByUrl(queryResults)
     .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
     .slice(0, 24);
 

@@ -1,33 +1,16 @@
 import logger from '../../../config/logger';
+import { complianceSearchMulti } from './search-provider';
 
-const BRAVE_SEARCH_API_URL = 'https://api.search.brave.com/res/v1/web/search';
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
 const MODEL = 'deepseek-chat';
 const TEMPERATURE = 0.2;
 const MAX_TOKENS = 4096;
 
-const BRAVE_TIMEOUT_MS = 15_000;
 const DEEPSEEK_TIMEOUT_MS = 60_000;
-const BRAVE_QUERY_COUNT = 10;
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
 const EXPOSURE_LEVELS = ['none', 'low', 'medium', 'high', 'critical'] as const;
 export type ExposureLevel = typeof EXPOSURE_LEVELS[number];
-
-interface BraveWebResult {
-  title?: string;
-  url?: string;
-  description?: string;
-  age?: string;
-  page_age?: string;
-  published?: string;
-}
-
-interface BraveSearchResponse {
-  web?: {
-    results?: BraveWebResult[];
-  };
-}
 
 interface DeepSeekResponse {
   choices?: Array<{
@@ -70,37 +53,7 @@ export interface ExposureScanResult {
 
 const exposureCache = new Map<string, { data: ExposureScanResult; expiresAt: number }>();
 
-function normalizeUrl(raw: string): string {
-  try {
-    const parsed = new URL(raw);
-    parsed.hash = '';
-    parsed.searchParams.sort();
-    const normalized = parsed.toString();
-    return normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
-  } catch {
-    return raw.trim();
-  }
-}
-
-function parseDate(value: string | undefined): string | null {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toISOString();
-}
-
-function normalizeHeadline(result: BraveWebResult): ExposureHeadline | null {
-  const title = String(result.title || '').trim();
-  const rawUrl = String(result.url || '').trim();
-  if (!title || !rawUrl) return null;
-
-  return {
-    title,
-    url: normalizeUrl(rawUrl),
-    snippet: String(result.description || '').trim(),
-    publishedAt: parseDate(result.page_age) || parseDate(result.published) || parseDate(result.age) || new Date().toISOString(),
-  };
-}
+// Brave-specific normalize functions removed — search-provider handles normalization
 
 function stripMarkdownFences(text: string): string {
   return text
@@ -198,14 +151,14 @@ function buildSampleExposure(project: string): ExposureScanResult {
     activeActions: [],
     riskFactors: [
       'Live Brave search is unavailable in this environment.',
-      'Exposure estimate is sample-only until BRAVE_API_KEY is configured.',
+      'Exposure estimate is sample-only until FIRECRAWL_API_KEY or BRAVE_API_KEY is configured.',
     ],
-    recommendation: 'Configure BRAVE_API_KEY to enable live project-level compliance exposure scans.',
+    recommendation: 'Configure FIRECRAWL_API_KEY or BRAVE_API_KEY to enable live project-level compliance exposure scans.',
     sources: [
       { title: 'Sample: Regulatory exposure monitor', url: 'https://example.com/sample/project-exposure' },
     ],
     analyzedAt: now,
-    note: 'Sample response only. Set BRAVE_API_KEY for live exposure intelligence.',
+    note: 'Sample response only. Set FIRECRAWL_API_KEY or BRAVE_API_KEY for live exposure intelligence.',
   };
 }
 
@@ -271,38 +224,7 @@ function normalizeExposureResult(raw: unknown, project: string, sources: Exposur
   };
 }
 
-async function fetchBraveSearch(query: string, apiKey: string): Promise<ExposureHeadline[]> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), BRAVE_TIMEOUT_MS);
-
-  try {
-    const url = new URL(BRAVE_SEARCH_API_URL);
-    url.searchParams.set('q', query);
-    url.searchParams.set('count', String(BRAVE_QUERY_COUNT));
-
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        'X-Subscription-Token': apiKey,
-      },
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Brave HTTP ${response.status}: ${errorText}`);
-    }
-
-    const payload = (await response.json()) as BraveSearchResponse;
-    const results = payload.web?.results || [];
-    return results
-      .map(normalizeHeadline)
-      .filter((headline): headline is ExposureHeadline => Boolean(headline));
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
+// Search is now handled by search-provider.ts (Firecrawl primary, Brave fallback)
 
 async function callDeepSeek(project: string, headlines: ExposureHeadline[]): Promise<string> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -377,9 +299,9 @@ export async function scanProjectExposure(projectInput: string): Promise<Exposur
     return cached.data;
   }
 
-  const braveApiKey = process.env.BRAVE_API_KEY;
-  if (!braveApiKey) {
-    logger.warn({ project }, '[compliance.exposure-scanner] BRAVE_API_KEY missing, returning sample payload');
+  const hasSearchKey = process.env.FIRECRAWL_API_KEY || process.env.BRAVE_API_KEY;
+  if (!hasSearchKey) {
+    logger.warn({ project }, '[compliance.exposure-scanner] No search API keys configured, returning sample payload');
     const sample = buildSampleExposure(project);
     exposureCache.set(cacheKey, { data: sample, expiresAt: now + CACHE_TTL_MS });
     return sample;
@@ -392,8 +314,15 @@ export async function scanProjectExposure(projectInput: string): Promise<Exposur
   ];
 
   try {
-    const queryResults = await Promise.all(queries.map((query) => fetchBraveSearch(query, braveApiKey)));
-    const dedupedHeadlines = dedupeHeadlines(queryResults.flat())
+    const searchResults = await complianceSearchMulti(queries);
+    const queryResults: ExposureHeadline[] = searchResults.map((r) => ({
+      title: r.title,
+      url: r.url,
+      source: r.source,
+      snippet: r.snippet,
+      publishedAt: new Date().toISOString(),
+    }));
+    const dedupedHeadlines = dedupeHeadlines(queryResults)
       .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
       .slice(0, 20);
 
