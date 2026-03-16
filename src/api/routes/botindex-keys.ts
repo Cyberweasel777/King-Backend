@@ -40,6 +40,17 @@ function getPlanPriceId(plan: BotIndexApiPlan): string {
   const basic = process.env.BOTINDEX_STRIPE_PRICE_BASIC;
   const pro = process.env.BOTINDEX_STRIPE_PRICE_PRO;
   const starter = process.env.BOTINDEX_STRIPE_PRICE_STARTER;
+
+  // Safe fallback: if starter price is not configured yet, route to basic checkout
+  // so registration never hard-fails in production.
+  if (plan === 'starter' && !starter) {
+    logger.warn('BOTINDEX_STRIPE_PRICE_STARTER not set; falling back to BASIC Stripe price');
+    if (!basic) {
+      throw new Error('Missing Stripe price IDs for starter fallback (BOTINDEX_STRIPE_PRICE_BASIC)');
+    }
+    return basic;
+  }
+
   const byPlan: Record<BotIndexApiPlan, string | undefined> = {
     free: undefined,
     basic,
