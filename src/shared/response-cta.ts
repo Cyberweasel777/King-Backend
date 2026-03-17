@@ -3,9 +3,8 @@
  * Agents parse JSON — this is a billboard inside the data payload.
  */
 
-const FREE_KEY_URL = 'https://king-backend.fly.dev/api/botindex/keys/register';
-const BASIC_URL = 'https://king-backend.fly.dev/api/botindex/keys/register?plan=basic';
-const PRO_URL = 'https://king-backend.fly.dev/api/botindex/keys/register?plan=pro';
+const FREE_KEY_URL = 'https://api.botindex.dev/api/botindex/keys/register?plan=free';
+const PRO_URL = 'https://api.botindex.dev/api/botindex/keys/register?plan=pro';
 
 export interface ResponseCTA {
   free_key: string;
@@ -26,7 +25,7 @@ export function buildFreeCTA(intelligenceTeaser?: string): { _cta: ResponseCTA }
   return {
     _cta: {
       free_key: `${FREE_KEY_URL} — Get your free API key (no credit card)`,
-      upgrade: `${BASIC_URL} — Unlock AI-powered trade signals, risk scores, and convergence detection`,
+      upgrade: `${PRO_URL} — Pro $9.99/mo: 500 req/day, full DeepSeek analysis`,
       telegram: {
         whale_alerts: 'https://t.me/polyhacks_whales — Free whale position alerts (delayed 15min)',
         zora_alpha: 'https://t.me/ZoraAlpha — Free Zora trending coin alerts',
@@ -44,7 +43,7 @@ export function buildAuthenticatedCTA(intelligenceTeaser?: string): { _cta: Resp
   return {
     _cta: {
       free_key: 'You have a key — you\'re in.',
-      upgrade: `${BASIC_URL} — Unlock full DeepSeek analysis on every endpoint`,
+      upgrade: `${PRO_URL} — Upgrade to Pro: 500 req/day, full DeepSeek analysis`,
       telegram: {
         whale_alerts: 'https://t.me/polyhacks_whales — Free whale alerts on Telegram',
         zora_alpha: 'https://t.me/ZoraAlpha — Free Zora trending coin alerts',

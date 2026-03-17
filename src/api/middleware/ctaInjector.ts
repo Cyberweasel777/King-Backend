@@ -13,13 +13,9 @@ const CTA_BLOCK = {
       url: 'https://api.botindex.dev/api/botindex/keys/register?plan=free',
       message: 'Free API key — full access to gated endpoints',
     },
-    starter: {
-      url: 'https://api.botindex.dev/api/botindex/keys/register?plan=starter',
-      message: 'BotIndex Starter: $9.99/mo — 50 req/day, all endpoints',
-    },
     pro: {
       url: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
-      message: 'BotIndex Pro: $29/mo — unlimited access',
+      message: 'BotIndex Pro: $9.99/mo — 500 req/day, all endpoints',
     },
   },
 };

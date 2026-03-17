@@ -37,40 +37,22 @@ function getStripeClient(): Stripe {
 }
 
 function getPlanPriceId(plan: BotIndexApiPlan): string {
-  const basic = process.env.BOTINDEX_STRIPE_PRICE_BASIC;
-  const pro = process.env.BOTINDEX_STRIPE_PRICE_PRO;
+  if (plan === 'free') {
+    throw new Error('Free plan does not require a Stripe price ID');
+  }
+
   const starter = process.env.BOTINDEX_STRIPE_PRICE_STARTER;
-
-  // Safe fallback: if starter price is not configured yet, route to basic checkout
-  // so registration never hard-fails in production.
-  if (plan === 'starter' && !starter) {
-    logger.warn('BOTINDEX_STRIPE_PRICE_STARTER not set; falling back to BASIC Stripe price');
-    if (!basic) {
-      throw new Error('Missing Stripe price IDs for starter fallback (BOTINDEX_STRIPE_PRICE_BASIC)');
-    }
-    return basic;
+  if (!starter) {
+    throw new Error('Missing Stripe price ID for paid plans (BOTINDEX_STRIPE_PRICE_STARTER)');
   }
 
-  const byPlan: Record<BotIndexApiPlan, string | undefined> = {
-    free: undefined,
-    basic,
-    pro,
-    starter,
-  };
-
-  const priceId = byPlan[plan];
-  if (!priceId) {
-    throw new Error(`Missing Stripe price ID for plan "${plan}"`);
-  }
-  return priceId;
+  return starter;
 }
 
 function resolvePlanFromSession(session: Stripe.Checkout.Session): BotIndexApiPlan {
   const plan = session.metadata?.plan;
-  if (plan === 'pro') return 'pro';
-  if (plan === 'basic') return 'basic';
-  if (plan === 'starter') return 'starter';
-  return 'basic';
+  if (plan === 'free') return 'free';
+  return 'pro';
 }
 
 async function resolveEmailFromSession(stripe: Stripe, session: Stripe.Checkout.Session): Promise<string | null> {
@@ -91,13 +73,11 @@ async function resolveEmailFromSession(stripe: Stripe, session: Stripe.Checkout.
 router.get('/register', async (req: Request, res: Response) => {
   try {
     const planParam = req.query.plan;
-    const plan: BotIndexApiPlan = (planParam === 'pro')
-      ? 'pro'
-      : (planParam === 'basic')
-        ? 'basic'
-        : (planParam === 'starter')
-          ? 'starter'
-          : 'free';
+    const plan: BotIndexApiPlan = (planParam === 'free')
+      ? 'free'
+      : (planParam === 'pro' || planParam === 'basic' || planParam === 'starter')
+        ? 'pro'
+        : 'free';
 
     if (plan === 'free') {
       trackFunnelEvent('register_page_hit', 'free');
@@ -133,7 +113,7 @@ router.get('/register', async (req: Request, res: Response) => {
 <body>
   <div class="card">
     <h1>Get Your Free API Key</h1>
-    <p class="subtitle">3 requests/day — instant activation, no credit card.</p>
+    <p class="subtitle">10 requests/day — instant activation, no credit card.</p>
     <span class="badge">FREE TIER</span>
     <form action="/api/botindex/keys/register" method="GET">
       <input type="hidden" name="plan" value="free">
@@ -163,8 +143,8 @@ router.get('/register', async (req: Request, res: Response) => {
         email: emailParam,
         plan: 'free',
       });
-      // Free tier: 3 req/day — tight enough to taste, not enough to live on
-      entry.dailyLimit = 3;
+      // Free tier: 10 req/day
+      entry.dailyLimit = 10;
       trackFunnelEvent('api_key_issued', 'free');
       trackRealtimeFunnelEvent('key_issued', { plan: 'free', keyPrefix: apiKey.slice(0, 8) });
 
@@ -209,14 +189,14 @@ router.get('/register', async (req: Request, res: Response) => {
 <body>
   <div class="card" id="card">
     <h1>Your API Key</h1>
-    <p class="subtitle">BotIndex Free Tier — 3 requests per hour</p>
+    <p class="subtitle">BotIndex Free Tier — 10 requests/day</p>
     <span class="badge">FREE</span>
     <div class="key-box" id="keyBox" onclick="copyKey()">${apiKey}</div>
     <div class="warning">⚠️ Save this key now. It won't be shown again.</div>
     <div style="background: #1a1a2e; border: 1px solid #7c3aed40; border-radius: 12px; padding: 20px; margin: 20px 0;">
-      <div style="color: #a78bfa; font-weight: 600; font-size: 15px; margin-bottom: 8px;">⚡ Need more than 3 calls/day?</div>
-      <div style="color: #a1a1aa; font-size: 13px; margin-bottom: 12px;">Starter plan: 50 req/day for just $9/mo. Most popular for indie builders.</div>
-      <a href="https://api.botindex.dev/api/botindex/keys/register?plan=starter" style="display: inline-block; padding: 10px 20px; background: #7c3aed20; color: #a78bfa; border: 1px solid #7c3aed40; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600;">Upgrade to Starter — $9/mo →</a>
+      <div style="color: #a78bfa; font-weight: 600; font-size: 15px; margin-bottom: 8px;">⚡ Need more than 10 calls/day?</div>
+      <div style="color: #a1a1aa; font-size: 13px; margin-bottom: 12px;">Pro plan: 500 req/day for $9.99/mo. Full endpoint access.</div>
+      <a href="https://api.botindex.dev/api/botindex/keys/register?plan=pro" style="display: inline-block; padding: 10px 20px; background: #7c3aed20; color: #a78bfa; border: 1px solid #7c3aed40; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600;">Upgrade to Pro — $9.99/mo →</a>
     </div>
     <div class="next-steps">
       <h2>Try it now — paste any command</h2>
@@ -248,7 +228,7 @@ router.get('/register', async (req: Request, res: Response) => {
     <div class="links">
       <a href="https://botindex.dev" class="primary">Documentation</a>
       <a href="https://aar.botindex.dev" class="secondary">AAR Trust Layer</a>
-      <a href="https://api.botindex.dev/api/botindex/keys/register?plan=starter" class="secondary">Upgrade to Starter</a>
+      <a href="https://api.botindex.dev/api/botindex/keys/register?plan=pro" class="secondary">Upgrade to Pro</a>
     </div>
   </div>
   <script>
@@ -266,7 +246,7 @@ router.get('/register', async (req: Request, res: Response) => {
       res.json({
         key: apiKey,
         plan: 'free',
-        rateLimit: '3 req/day (upgrade to Pro for unlimited: $29/mo)',
+        rateLimit: '10 req/day (upgrade to Pro for 500 req/day: $9.99/mo)',
         message: "Your API key is ready. Copy a command below and paste it in your terminal — you'll get live data in 2 seconds.",
         quickstart: {
           step_1: 'Copy any curl command below and paste it in your terminal',
@@ -352,7 +332,7 @@ router.post('/register', async (req: Request, res: Response) => {
 
   try {
     const stripe = getStripeClient();
-    const plan: BotIndexApiPlan = parsed.data.plan || 'basic';
+    const plan: BotIndexApiPlan = 'pro';
     const priceId = getPlanPriceId(plan);
 
     trackFunnelEvent('register_page_hit', plan);
@@ -426,8 +406,8 @@ router.get('/success', async (req: Request, res: Response) => {
       stripeCustomerId: customerId,
       plan,
     });
-    if (plan === 'starter') {
-      entry.dailyLimit = 50;
+    if (plan === 'pro') {
+      entry.dailyLimit = 500;
     }
     trackFunnelEvent('api_key_issued', plan);
 
@@ -445,7 +425,7 @@ router.get('/success', async (req: Request, res: Response) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BotIndex — Your ${plan.charAt(0).toUpperCase() + plan.slice(1)} API Key</title>
+  <title>BotIndex — Your Pro API Key</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #e5e5e5; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 24px; }
@@ -467,9 +447,9 @@ router.get('/success', async (req: Request, res: Response) => {
 <body>
   <div class="card" id="card">
     <h1>Payment Confirmed ✓</h1>
-    <p class="subtitle">Your ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan is active.</p>
-    <span class="badge">${plan.toUpperCase()} PLAN</span>
-    <div class="success-msg">✅ Subscription active — ${plan === 'starter' ? '50' : 'unlimited'} requests/day</div>
+    <p class="subtitle">Your Pro plan is active.</p>
+    <span class="badge">PRO PLAN</span>
+    <div class="success-msg">✅ Subscription active — 500 requests/day</div>
     <div class="key-box" id="keyBox" onclick="copyKey()">${apiKey}</div>
     <div class="warning">⚠️ Save this key now. It won't be shown again.</div>
     <h2>Try it now</h2>
@@ -638,8 +618,8 @@ router.post('/admin/upgrade', express.json(), (req: Request, res: Response) => {
     return;
   }
   const { apiKey, plan } = req.body as { apiKey?: string; plan?: string };
-  if (!apiKey || !plan || !['free', 'basic', 'pro', 'starter'].includes(plan)) {
-    res.status(400).json({ error: 'bad_request', message: 'Provide apiKey and plan (free|basic|pro|starter)' });
+  if (!apiKey || !plan || !['free', 'pro'].includes(plan)) {
+    res.status(400).json({ error: 'bad_request', message: 'Provide apiKey and plan (free|pro)' });
     return;
   }
   const entry = getApiKeyEntry(apiKey);
