@@ -248,7 +248,7 @@ router.get('/register', async (req: Request, res: Response) => {
     <div class="links">
       <a href="https://botindex.dev" class="primary">Documentation</a>
       <a href="https://aar.botindex.dev" class="secondary">AAR Trust Layer</a>
-      <a href="https://api.botindex.dev/api/botindex/keys/register?plan=basic" class="secondary">Upgrade to Basic</a>
+      <a href="https://api.botindex.dev/api/botindex/keys/register?plan=starter" class="secondary">Upgrade to Starter</a>
     </div>
   </div>
   <script>
@@ -329,7 +329,6 @@ router.get('/register', async (req: Request, res: Response) => {
     }
 
     trackFunnelEvent('checkout_session_created', plan);
-    trackRealtimeFunnelEvent('key_issued_paid', { plan });
     trackRealtimeFunnelEvent('checkout_redirect', {
       plan: typeof req.query.plan === 'string' ? req.query.plan : plan,
     });
@@ -436,6 +435,67 @@ router.get('/success', async (req: Request, res: Response) => {
       await sendApiKeyEmail({ to: email, apiKey, plan });
     } catch (emailError) {
       logger.error({ err: emailError, email }, 'Failed to send BotIndex API key email');
+    }
+
+    const acceptsHtml = (req.headers.accept || '').includes('text/html');
+    if (acceptsHtml) {
+      res.setHeader('Content-Type', 'text/html');
+      res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BotIndex — Your ${plan.charAt(0).toUpperCase() + plan.slice(1)} API Key</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #e5e5e5; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 24px; }
+    .card { max-width: 520px; width: 100%; border: 1px solid #27272a; border-radius: 16px; background: #18181b; padding: 32px; }
+    h1 { font-size: 24px; color: #fff; margin-bottom: 8px; }
+    .subtitle { color: #a1a1aa; font-size: 14px; margin-bottom: 24px; }
+    .key-box { background: #0a0a0a; border: 1px solid #22d3ee40; border-radius: 8px; padding: 16px; margin-bottom: 16px; word-break: break-all; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 14px; color: #22d3ee; cursor: pointer; position: relative; }
+    .key-box:hover { border-color: #22d3ee; }
+    .key-box::after { content: 'Click to copy'; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 11px; color: #71717a; font-family: -apple-system, sans-serif; }
+    .copied .key-box::after { content: 'Copied ✓'; color: #22d3ee; }
+    .badge { display: inline-block; background: #7c3aed20; color: #a78bfa; border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 500; margin-bottom: 20px; }
+    .warning { background: #f59e0b15; border: 1px solid #f59e0b30; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #fbbf24; margin-bottom: 20px; }
+    .success-msg { background: #22c55e15; border: 1px solid #22c55e30; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #22c55e; margin-bottom: 20px; }
+    .step { background: #0a0a0a; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; font-size: 13px; }
+    .step code { color: #22d3ee; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
+    h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; margin: 20px 0 12px; }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <h1>Payment Confirmed ✓</h1>
+    <p class="subtitle">Your ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan is active.</p>
+    <span class="badge">${plan.toUpperCase()} PLAN</span>
+    <div class="success-msg">✅ Subscription active — ${plan === 'starter' ? '50' : 'unlimited'} requests/day</div>
+    <div class="key-box" id="keyBox" onclick="copyKey()">${apiKey}</div>
+    <div class="warning">⚠️ Save this key now. It won't be shown again.</div>
+    <h2>Try it now</h2>
+    <div class="step">
+      <strong>🐋 Whale Alerts</strong><br>
+      <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/hyperliquid/whale-alerts</code>
+    </div>
+    <div class="step">
+      <strong>📊 Market Signals</strong><br>
+      <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/v1/signals</code>
+    </div>
+    <div class="step">
+      <strong>💰 Funding Arb</strong><br>
+      <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/hyperliquid/funding-arb</code>
+    </div>
+  </div>
+  <script>
+    function copyKey() {
+      navigator.clipboard.writeText('${apiKey}');
+      document.getElementById('card').classList.add('copied');
+      setTimeout(() => document.getElementById('card').classList.remove('copied'), 2000);
+    }
+  </script>
+</body>
+</html>`);
+      return;
     }
 
     res.json({
