@@ -25,7 +25,10 @@ type MatrixTarget = {
 type CollectionTarget = ArrayTarget | MatrixTarget;
 
 const REGISTER_URL = 'https://api.botindex.dev/api/botindex/keys/register?plan=free';
-const UPGRADE_URL = 'https://api.botindex.dev/api/botindex/keys/register?plan=starter';
+const UPGRADE_URL = 'https://api.botindex.dev/api/botindex/keys/register?plan=pro';
+const PRO_UPGRADE_URL = 'https://api.botindex.dev/api/botindex/keys/register?plan=pro';
+
+const ANON_DAILY_LIMIT = parseInt(process.env.ANON_RATE_LIMIT || '10', 10);
 const PRIORITY_KEYS = ['results', 'data', 'coins', 'opportunities', 'alerts', 'matrix'] as const;
 
 const ANON_GATE: GateConfig = {
@@ -35,8 +38,14 @@ const ANON_GATE: GateConfig = {
 
 const FREE_PLAN_GATE: GateConfig = {
   limit: 5,
-  message: 'Upgrade to Starter for full access',
+  message: 'Upgrade to Pro ($9.99/mo) for full access',
 };
+
+function nextUtcMidnightUnix(): number {
+  const now = new Date();
+  const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  return Math.floor(midnight / 1000);
+}
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -235,6 +244,12 @@ export function softGate(): RequestHandler {
       next();
       return;
     }
+
+    // Inject standard rate-limit headers so bots/scripts see quota info
+    res.setHeader('X-RateLimit-Limit', String(ANON_DAILY_LIMIT));
+    res.setHeader('X-RateLimit-Remaining', '0');
+    res.setHeader('X-RateLimit-Reset', String(nextUtcMidnightUnix()));
+    res.setHeader('X-Upgrade-URL', PRO_UPGRADE_URL);
 
     const originalJson = res.json.bind(res);
     res.json = function softGatedJson(body: unknown) {
