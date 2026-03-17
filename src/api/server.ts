@@ -145,6 +145,12 @@ app.use('/api/botindex', anonRateLimit([
   '/crypto/intel',
   '/doppler/intel',
 ], [
+  // Soft-gated endpoints — softGate() middleware handles truncation for anon/free users
+  '/zora/trending-coins',
+  '/hyperliquid/whale-alerts',
+  '/hyperliquid/funding-arb',
+  '/hyperliquid/correlation-matrix',
+  // Other excludes — x402 or internal endpoints
   '/hyperliquid/liquidation-heatmap',
   '/hyperliquid/hip6',
   '/zora/new-coins',
