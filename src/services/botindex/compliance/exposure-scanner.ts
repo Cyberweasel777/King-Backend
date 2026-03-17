@@ -7,7 +7,7 @@ const TEMPERATURE = 0.2;
 const MAX_TOKENS = 4096;
 
 const DEEPSEEK_TIMEOUT_MS = 60_000;
-const CACHE_TTL_MS = 60 * 60 * 1000;
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours — regulatory news doesn't change hourly
 
 const EXPOSURE_LEVELS = ['none', 'low', 'medium', 'high', 'critical'] as const;
 export type ExposureLevel = typeof EXPOSURE_LEVELS[number];

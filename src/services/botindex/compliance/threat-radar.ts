@@ -8,7 +8,7 @@ const MODEL = 'deepseek-chat';
 const TEMPERATURE = 0.2;
 const MAX_TOKENS = 4096;
 const DEEPSEEK_TIMEOUT_MS = 60_000;
-const CACHE_TTL_MS = 30 * 60 * 1000;
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours — threat radar scanned weekly, cache aggressively
 
 const THREAT_QUERIES = [
   'SEC enforcement action crypto 2026',

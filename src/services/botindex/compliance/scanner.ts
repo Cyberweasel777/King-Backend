@@ -1,7 +1,7 @@
 import logger from '../../../config/logger';
 import { complianceSearchMulti, type SearchResult } from './search-provider';
 
-const CACHE_TTL_MS = 30 * 60 * 1000;
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 const COMPLIANCE_SEARCH_QUERIES = [
   'prediction market regulation',

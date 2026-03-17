@@ -7,7 +7,7 @@ const MODEL = 'deepseek-chat';
 const TEMPERATURE = 0.2;
 const MAX_TOKENS = 4096;
 const REQUEST_TIMEOUT_MS = 60_000;
-const CACHE_TTL_MS = 15 * 60 * 1000;
+const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 
 const RISK_LEVELS = ['low', 'medium', 'high', 'critical'] as const;
 const VERDICTS = ['COPY', 'IGNORE', 'COUNTER'] as const;

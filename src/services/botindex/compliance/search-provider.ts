@@ -1,5 +1,5 @@
 /**
- * Search provider abstraction: Firecrawl (primary) → Brave (fallback).
+ * Search provider abstraction: Brave (primary) → Firecrawl (fallback).
  * Returns normalized headline-style results from either source.
  */
 import logger from '../../../config/logger';
@@ -122,34 +122,34 @@ async function searchBrave(query: string, apiKey: string): Promise<SearchResult[
  * Returns normalized SearchResult[].
  */
 export async function complianceSearch(query: string): Promise<SearchResult[]> {
-  const firecrawlKey = process.env.FIRECRAWL_API_KEY;
   const braveKey = process.env.BRAVE_API_KEY;
+  const firecrawlKey = process.env.FIRECRAWL_API_KEY;
 
-  // Try Firecrawl first
-  if (firecrawlKey) {
+  // Try Brave first (cheaper, faster, fresh key)
+  if (braveKey) {
     try {
-      const results = await searchFirecrawl(query, firecrawlKey);
+      const results = await searchBrave(query, braveKey);
       if (results.length > 0) {
         return results;
       }
-      logger.warn({ query }, '[search-provider] Firecrawl returned 0 results, trying Brave fallback');
+      logger.warn({ query }, '[search-provider] Brave returned 0 results, trying Firecrawl fallback');
     } catch (error) {
-      logger.warn({ err: error, query }, '[search-provider] Firecrawl failed, trying Brave fallback');
+      logger.warn({ err: error, query }, '[search-provider] Brave failed, trying Firecrawl fallback');
     }
   }
 
-  // Fallback to Brave
-  if (braveKey) {
+  // Fallback to Firecrawl
+  if (firecrawlKey) {
     try {
-      return await searchBrave(query, braveKey);
+      return await searchFirecrawl(query, firecrawlKey);
     } catch (error) {
-      logger.warn({ err: error, query }, '[search-provider] Brave fallback also failed');
+      logger.warn({ err: error, query }, '[search-provider] Firecrawl fallback also failed');
     }
   }
 
   // Both unavailable
-  if (!firecrawlKey && !braveKey) {
-    logger.warn('[search-provider] No search API keys configured (FIRECRAWL_API_KEY or BRAVE_API_KEY)');
+  if (!braveKey && !firecrawlKey) {
+    logger.warn('[search-provider] No search API keys configured (BRAVE_API_KEY or FIRECRAWL_API_KEY)');
   }
 
   return [];

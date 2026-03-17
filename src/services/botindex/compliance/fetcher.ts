@@ -41,7 +41,7 @@ type BraveSearchResponse = {
 
 const BRAVE_SEARCH_URL = 'https://api.search.brave.com/res/v1/web/search';
 const BRAVE_REQUEST_TIMEOUT_MS = 12_000;
-const CACHE_TTL_MS = 30 * 60 * 1000;
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 const ENFORCEMENT_QUERIES = ['SEC crypto enforcement action 2026', 'CFTC crypto enforcement'];
 const SANCTIONS_QUERY = 'OFAC crypto sanctions SDN update';
