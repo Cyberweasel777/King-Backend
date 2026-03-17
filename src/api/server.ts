@@ -35,7 +35,14 @@ const x402Config = getX402RuntimeConfig();
 mountBotindexX402TestRoute();
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      'form-action': ["'self'", 'https://checkout.stripe.com'],
+    },
+  },
+}));
 app.use(cors());
 
 // Stripe webhook needs raw body
