@@ -39,7 +39,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-      'form-action': ["'self'", 'https://checkout.stripe.com'],
+      'form-action': ["'self'", 'https://checkout.stripe.com', 'https://api.botindex.dev'],
     },
   },
 }));
@@ -179,6 +179,7 @@ app.get('/api/botindex/trust', trustLayerHandler);
 // Premium Intel endpoints (DeepSeek-powered, $0.05/call)
 // Must run optionalApiKey + pro bypass before intel gates (mounted outside index.ts router)
 import botindexIntelRouter from './routes/botindex-intel';
+import botindexContactRouter from './routes/botindex-contact';
 app.use('/api/botindex', optionalApiKey, (req, _res, next) => {
   if (req.apiKeyAuth) {
     const isPaid = req.apiKeyAuth.plan === 'pro' || req.apiKeyAuth.plan === 'basic' || req.apiKeyAuth.plan === 'starter';
@@ -194,7 +195,8 @@ app.use('/api/botindex', optionalApiKey, (req, _res, next) => {
 import mcpTransportRouter from './routes/mcp-transport';
 app.use('/api/botindex', mcpTransportRouter);
 
-// BotIndex Meme + Stablecoin intelligence routes
+// BotIndex Contact + Meme + Stablecoin intelligence routes
+app.use('/api/botindex/contact', express.urlencoded({ extended: true }), express.json(), botindexContactRouter);
 app.use('/api/botindex', botindexMemeRouter);
 app.use('/api/botindex', botindexStablecoinRouter);
 
