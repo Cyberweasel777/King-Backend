@@ -1,5 +1,6 @@
 import { Request, Response, Router } from 'express';
 import { createX402Gate } from '../middleware/x402Gate';
+import { softGate } from '../middleware/softGate';
 import logger from '../../config/logger';
 import { getFundingArbOpportunities } from '../../services/botindex/hyperliquid/funding-arb';
 import { getHLCorrelationMatrix } from '../../services/botindex/hyperliquid/correlation';
@@ -80,6 +81,7 @@ function buildWhaleSummaryLine(data: {
 
 router.get(
   '/hyperliquid/funding-arb',
+  softGate(),
   async (_req: Request, res: Response) => {
     try {
       const data = await getFundingArbOpportunities();
@@ -113,6 +115,7 @@ router.get(
 
 router.get(
   '/hyperliquid/correlation-matrix',
+  softGate(),
   async (_req: Request, res: Response) => {
     try {
       const data = await getHLCorrelationMatrix();
@@ -262,7 +265,7 @@ router.get(
 
 // --- Whale Alerts ---
 
-router.get('/hyperliquid/whale-alerts', async (_req: Request, res: Response) => {
+router.get('/hyperliquid/whale-alerts', softGate(), async (_req: Request, res: Response) => {
   try {
     const data = await getHyperliquidWhaleAlerts();
     const whaleSummaryLine = buildWhaleSummaryLine(data);

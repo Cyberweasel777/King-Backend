@@ -76,7 +76,7 @@ function scheduleLedgerFlush(): void {
   }, 500);
 }
 
-function extractApiKey(req: Request): string | null {
+export function extractApiKey(req: Request): string | null {
   const header = req.header('x-api-key');
   if (!header) return null;
   const firstValue = header.split(',')[0]?.trim();

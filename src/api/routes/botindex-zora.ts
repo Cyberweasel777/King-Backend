@@ -4,6 +4,7 @@ import { getZoraTrendingCoins } from '../../services/botindex/zora/trending';
 import { getZoraCreatorScores } from '../../services/botindex/zora/creator-scores';
 import { getAttentionMomentum } from '../../services/botindex/zora/attention';
 import { buildFreeCTA } from '../../shared/response-cta';
+import { softGate } from '../middleware/softGate';
 
 const router = Router();
 
@@ -34,7 +35,7 @@ function parseLimit(value: unknown, defaultValue: number = 10, maxValue: number 
   return Math.min(parsed, maxValue);
 }
 
-router.get('/zora/trending-coins', async (req: Request, res: Response) => {
+router.get('/zora/trending-coins', softGate(), async (req: Request, res: Response) => {
   const limit = parseLimit(req.query.limit);
   if (limit === null) {
     res.status(400).json({

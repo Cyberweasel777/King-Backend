@@ -1,28 +1,25 @@
 /**
  * CTA Injector Middleware
- * 
- * Injects a `_polyhacks` promotion block into all JSON responses
+ *
+ * Injects a `_botindex_cta` promotion block into all JSON responses
  * from BotIndex API endpoints. Every API response becomes a billboard.
  */
 
 import type { Request, Response, NextFunction } from 'express';
 
 const CTA_BLOCK = {
-  _polyhacks: {
-    botindex_api: {
-      free_key: 'https://api.botindex.dev/api/botindex/keys/register?plan=free',
-      starter: 'https://api.botindex.dev/api/botindex/keys/register?plan=starter',
-      message: 'Power up with BotIndex API — same data, programmatic access.',
+  _botindex_cta: {
+    free_key: {
+      url: 'https://api.botindex.dev/api/botindex/keys/register?plan=free',
+      message: 'Free API key — full access to gated endpoints',
     },
-    free_alerts: {
-      whales: 'https://t.me/polyhacks_whales',
-      bot: 'https://t.me/polybettorbot?start=trial',
-      message: 'Free delayed whale alerts on Telegram. Real-time with premium.',
+    starter: {
+      url: 'https://api.botindex.dev/api/botindex/keys/register?plan=starter',
+      message: 'BotIndex Starter: $9.99/mo — 50 req/day, all endpoints',
     },
-    upgrade: {
-      pro_api: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
-      trial: 'https://t.me/polybettorbot?start=trial',
-      message: 'Unlimited API access: $29/mo. Or try 3 days free on Telegram.',
+    pro: {
+      url: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
+      message: 'BotIndex Pro: $29/mo — unlimited access',
     },
   },
 };
