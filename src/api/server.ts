@@ -134,7 +134,8 @@ app.use('/api', adminHitsRouter);
 app.use('/api/botindex', optionalApiKey);
 
 // Anonymous rate limiting on high-value endpoints (3 req/day without API key, 100/day with free key)
-// Excludes x402-paid endpoints — those handle access control via payment gates
+// Rate limit all BotIndex endpoints (10 req/day anonymous)
+// Soft-gated endpoints now included — bots get truncated data for 10 calls, then 429
 app.use('/api/botindex', anonRateLimit([
   '/signals',
   '/v1/signals',
@@ -152,13 +153,16 @@ app.use('/api/botindex', anonRateLimit([
   '/hyperliquid/intel',
   '/crypto/intel',
   '/doppler/intel',
-], [
-  // Soft-gated endpoints — softGate() middleware handles truncation for anon/free users
+  // Previously excluded soft-gated endpoints — now rate limited too
   '/zora/trending-coins',
   '/hyperliquid/whale-alerts',
   '/hyperliquid/funding-arb',
   '/hyperliquid/correlation-matrix',
-  // Other excludes — x402 or internal endpoints
+  // Synthesis endpoints
+  '/smart-money-flow',
+  '/risk-radar',
+], [
+  // Only exclude x402-paid or internal endpoints
   '/hyperliquid/liquidation-heatmap',
   '/hyperliquid/hip6',
   '/zora/new-coins',
