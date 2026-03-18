@@ -21,7 +21,49 @@ type PersistedData = {
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const HITS_FILE = path.join(DATA_DIR, 'hits.json');
+const QUERY_SURGE_FILE = path.join(DATA_DIR, 'query-surge-history.jsonl');
 const FLUSH_INTERVAL_MS = 60_000; // 60 seconds
+const SURGE_WINDOW_MS = 5 * 60 * 1000; // 5-minute windows
+
+// Per-endpoint request counts in 5-minute windows for surge detection
+const surgeWindows = new Map<string, number>();
+let currentSurgeWindowStart = Math.floor(Date.now() / SURGE_WINDOW_MS) * SURGE_WINDOW_MS;
+
+function flushSurgeWindow(): void {
+  const now = Date.now();
+  const newWindowStart = Math.floor(now / SURGE_WINDOW_MS) * SURGE_WINDOW_MS;
+
+  if (newWindowStart <= currentSurgeWindowStart) return;
+  if (surgeWindows.size === 0) {
+    currentSurgeWindowStart = newWindowStart;
+    return;
+  }
+
+  const windows: Array<{ endpoint: string; count: number }> = [];
+  for (const [endpoint, count] of surgeWindows) {
+    windows.push({ endpoint, count });
+  }
+  windows.sort((a, b) => b.count - a.count);
+
+  const record = {
+    timestamp: new Date().toISOString(),
+    window_start: new Date(currentSurgeWindowStart).toISOString(),
+    window_end: new Date(currentSurgeWindowStart + SURGE_WINDOW_MS).toISOString(),
+    total_requests: windows.reduce((sum, w) => sum + w.count, 0),
+    unique_endpoints: windows.length,
+    top_5: windows.slice(0, 5),
+    peak: windows[0] || null,
+  };
+
+  try {
+    fs.appendFileSync(QUERY_SURGE_FILE, JSON.stringify(record) + '\n');
+  } catch {
+    // Non-fatal
+  }
+
+  surgeWindows.clear();
+  currentSurgeWindowStart = newWindowStart;
+}
 
 const hits: Record<string, HitEntry> = {};
 const globalVisitorHashes = new Set<string>();
@@ -153,9 +195,10 @@ function flushToDisk(): void {
 // Initialize
 loadFromDisk();
 setInterval(flushToDisk, FLUSH_INTERVAL_MS);
+setInterval(flushSurgeWindow, SURGE_WINDOW_MS);
 // Flush on graceful shutdown
-process.on('SIGTERM', flushToDisk);
-process.on('SIGINT', flushToDisk);
+process.on('SIGTERM', () => { flushToDisk(); flushSurgeWindow(); });
+process.on('SIGINT', () => { flushToDisk(); flushSurgeWindow(); });
 
 export function hitCounter(req: Request, res: Response, next: NextFunction): void {
   const p = req.path;
@@ -171,6 +214,10 @@ export function hitCounter(req: Request, res: Response, next: NextFunction): voi
     const entry = hits[trackKey];
     entry.count += 1;
     entry.lastHit = new Date().toISOString();
+
+    // Track query surge (5-min windows for behavioral analysis)
+    const surgeKey = trackKey;
+    surgeWindows.set(surgeKey, (surgeWindows.get(surgeKey) || 0) + 1);
 
     const visitorHash = hashIp(getClientIp(req));
     const requestStartedAt = Date.now();

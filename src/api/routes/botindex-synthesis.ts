@@ -11,9 +11,77 @@ import logger from '../../config/logger';
 import { getHyperliquidWhaleAlerts } from '../../services/botindex/hyperliquid/whale-alerts';
 import { getFundingArbOpportunities } from '../../services/botindex/hyperliquid/funding-arb';
 
+import fs from 'fs';
+import path from 'path';
+
 const router = Router();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const FETCH_TIMEOUT_MS = 10_000;
+
+// ---------------------------------------------------------------------------
+// JSONL Logging — persist snapshots as native proprietary data
+// ---------------------------------------------------------------------------
+
+const DATA_DIR = process.env.DATA_DIR || '/data';
+const RISK_RADAR_LOG = path.join(DATA_DIR, 'risk-radar-history.jsonl');
+const SMART_MONEY_LOG = path.join(DATA_DIR, 'smart-money-history.jsonl');
+const QUERY_SURGE_LOG = path.join(DATA_DIR, 'query-surge-history.jsonl');
+
+function appendJsonl(filePath: string, data: unknown): void {
+  try {
+    fs.appendFileSync(filePath, JSON.stringify(data) + '\n');
+  } catch (err) {
+    logger.warn({ err, filePath }, 'Failed to append JSONL log');
+  }
+}
+
+// Query surge tracking — count requests per endpoint per 5-min window
+const querySurgeWindow = new Map<string, { count: number; windowStart: number }>();
+const SURGE_WINDOW_MS = 5 * 60 * 1000;
+
+function trackQuerySurge(endpoint: string): void {
+  const now = Date.now();
+  const windowStart = Math.floor(now / SURGE_WINDOW_MS) * SURGE_WINDOW_MS;
+  const key = `${endpoint}:${windowStart}`;
+  const entry = querySurgeWindow.get(key);
+
+  if (entry) {
+    entry.count++;
+  } else {
+    querySurgeWindow.set(key, { count: 1, windowStart });
+  }
+}
+
+// Flush surge data every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  const currentWindow = Math.floor(now / SURGE_WINDOW_MS) * SURGE_WINDOW_MS;
+  const entries: Array<{ endpoint: string; count: number; windowStart: string; windowEnd: string }> = [];
+
+  for (const [key, entry] of querySurgeWindow.entries()) {
+    // Only flush completed windows (not the current one)
+    if (entry.windowStart < currentWindow) {
+      const [endpoint] = key.split(':');
+      entries.push({
+        endpoint,
+        count: entry.count,
+        windowStart: new Date(entry.windowStart).toISOString(),
+        windowEnd: new Date(entry.windowStart + SURGE_WINDOW_MS).toISOString(),
+      });
+      querySurgeWindow.delete(key);
+    }
+  }
+
+  if (entries.length > 0) {
+    appendJsonl(QUERY_SURGE_LOG, {
+      timestamp: new Date().toISOString(),
+      windows: entries,
+      total_endpoints: entries.length,
+      peak: entries.reduce((max, e) => e.count > max.count ? e : max, entries[0]),
+    });
+    logger.info({ windows: entries.length }, 'Query surge data flushed to JSONL');
+  }
+}, SURGE_WINDOW_MS);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -255,6 +323,7 @@ async function buildSmartMoneyFlow(): Promise<SmartMoneyResponse> {
 
 router.get('/smart-money-flow', softGate(), async (_req: Request, res: Response) => {
   try {
+    trackQuerySurge('/smart-money-flow');
     const now = Date.now();
     if (smartMoneyCache.entry && now < smartMoneyCache.entry.expiresAt) {
       res.json(cloneJson(smartMoneyCache.entry.data));
@@ -263,6 +332,18 @@ router.get('/smart-money-flow', softGate(), async (_req: Request, res: Response)
 
     const data = await buildSmartMoneyFlow();
     smartMoneyCache.entry = { data, expiresAt: now + CACHE_TTL_MS };
+
+    // Log snapshot as native proprietary data
+    appendJsonl(SMART_MONEY_LOG, {
+      timestamp: data.timestamp,
+      signal_count: data.signals.length,
+      top_signal: data.signals[0]?.asset || null,
+      top_strength: data.signals[0]?.signal_strength || 0,
+      dominant_flow: data.market_summary.dominant_flow,
+      sources_ok: data.metadata.sources_ok,
+      latency_ms: data.metadata.latency_ms,
+    });
+
     res.json(cloneJson(data));
   } catch (err) {
     logger.error({ err }, 'smart-money-flow endpoint failed');
@@ -461,6 +542,7 @@ async function buildRiskRadar(): Promise<RiskRadarResponse> {
 
 router.get('/risk-radar', softGate(), async (_req: Request, res: Response) => {
   try {
+    trackQuerySurge('/risk-radar');
     const now = Date.now();
     if (riskRadarCache.entry && now < riskRadarCache.entry.expiresAt) {
       res.json(cloneJson(riskRadarCache.entry.data));
@@ -469,6 +551,21 @@ router.get('/risk-radar', softGate(), async (_req: Request, res: Response) => {
 
     const data = await buildRiskRadar();
     riskRadarCache.entry = { data, expiresAt: now + CACHE_TTL_MS };
+
+    // Log snapshot as native proprietary data
+    appendJsonl(RISK_RADAR_LOG, {
+      timestamp: data.timestamp,
+      risk_score: data.risk_score,
+      risk_level: data.risk_level,
+      funding_risk: data.components.funding_risk.score,
+      sentiment_risk: data.components.sentiment_risk.score,
+      whale_risk: data.components.whale_risk.score,
+      tvl_risk: data.components.tvl_risk.score,
+      correlation_risk: data.components.correlation_risk.score,
+      sources_ok: data.metadata.sources_ok,
+      actionable: data.actionable,
+    });
+
     res.json(cloneJson(data));
   } catch (err) {
     logger.error({ err }, 'risk-radar endpoint failed');
