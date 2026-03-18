@@ -5,7 +5,7 @@ import path from 'path';
 import logger from '../../config/logger';
 import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
 
-export type BotIndexApiPlan = 'free' | 'basic' | 'pro' | 'starter';
+export type BotIndexApiPlan = 'free' | 'basic' | 'pro' | 'starter' | 'sentinel' | 'enterprise';
 
 export interface ApiKeyLedgerEntry {
   email: string;
@@ -307,9 +307,14 @@ loadLedger();
       entry.dailyLimit = 10;
       updated++;
     }
+    // Sentinel and enterprise get unlimited (no daily limit)
+    if ((entry.plan === 'sentinel' || entry.plan === 'enterprise') && entry.dailyLimit) {
+      delete entry.dailyLimit;
+      updated++;
+    }
   }
   if (updated > 0) {
-    logger.info({ updated }, 'Backfilled free-tier API keys with 10 req/day limit');
+    logger.info({ updated }, 'Backfilled API key daily limits');
     scheduleLedgerFlush();
   }
 })();

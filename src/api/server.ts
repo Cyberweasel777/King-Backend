@@ -25,6 +25,7 @@ import agorionRouter from './routes/agorion';
 import botindexMemeRouter from './routes/botindex-meme';
 import botindexStablecoinRouter from './routes/botindex-stablecoin';
 import botindexSynthesisRouter from './routes/botindex-synthesis';
+import botindexSentinelRouter from './routes/botindex-sentinel';
 import { initDb } from '../shared/payments/database';
 import logger from '../config/logger';
 
@@ -179,6 +180,9 @@ app.use('/api/botindex', anonRateLimit([
 // Synthesis endpoints (cross-source intelligence — smart-money-flow, risk-radar)
 app.use('/api/botindex', botindexSynthesisRouter);
 
+// Sentinel Intelligence (premium predictive signals — $49.99/mo)
+app.use('/api/botindex', botindexSentinelRouter);
+
 // Receipt and trust-layer endpoints
 app.use('/api/botindex/receipts', receiptsRouter);
 app.use('/api/botindex/.well-known', receiptsRouter);
@@ -266,6 +270,12 @@ async function start() {
   // Start market surge monitor (broad crypto spike detection)
   const { startMarketSurgeMonitor } = await import('../services/botindex/market-surge-monitor');
   startMarketSurgeMonitor();
+
+  // Start Sentinel personal alert feed (Andrew's private intelligence brief every 15 min)
+  const { sendPersonalSentinelAlert } = await import('../services/botindex/sentinel/signals');
+  setInterval(() => { void sendPersonalSentinelAlert(); }, 15 * 60 * 1000);
+  // First personal alert after 60 seconds
+  setTimeout(() => { void sendPersonalSentinelAlert(); }, 60_000);
   
   app.listen(PORT, () => {
     logger.info(

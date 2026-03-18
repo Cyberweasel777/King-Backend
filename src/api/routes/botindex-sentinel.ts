@@ -1,0 +1,171 @@
+/**
+ * Sentinel Intelligence Routes — Premium predictive signal endpoints.
+ *
+ * Gated to Sentinel tier ($49.99/mo) API keys only.
+ * Serves both human-readable and machine-consumable formats.
+ */
+
+import { Request, Response, Router } from 'express';
+import { extractApiKey, getApiKeyEntry } from '../middleware/apiKeyAuth';
+import logger from '../../config/logger';
+import { getCachedSentinelReport, type SentinelReport } from '../../services/botindex/sentinel/signals';
+
+const router = Router();
+
+const REGISTER_URL = 'https://api.botindex.dev/api/botindex/keys/register?plan=sentinel';
+
+function isSentinelAuthorized(req: Request): boolean {
+  const key = extractApiKey(req);
+  if (!key) return false;
+  const entry = getApiKeyEntry(key);
+  if (!entry || entry.status !== 'active') return false;
+  return entry.plan === 'sentinel' || entry.plan === 'enterprise';
+}
+
+function buildUpgradeResponse() {
+  return {
+    error: 'sentinel_required',
+    message: 'Sentinel Intelligence requires a Sentinel-tier API key.',
+    upgrade: {
+      url: REGISTER_URL,
+      plan: 'sentinel',
+      price: '$49.99/mo',
+      includes: [
+        'All Pro features (500 req/day, all endpoints)',
+        'Predictive intelligence signals (proprietary behavioral models)',
+        'Cross-source convergence analysis (8+ data sources)',
+        'Real-time spike/dump Telegram & webhook alerts',
+        'Historical signal backtest API (after 30 days)',
+        'Network Momentum Index (proprietary)',
+        'Smart Flow Divergence detection',
+        'Risk Cascade Score',
+        'DeepSeek-powered market narrative synthesis',
+      ],
+    },
+    teaser: {
+      message: 'Here\'s what Sentinel is analyzing right now:',
+      sources: ['Hyperliquid whale positions', 'Funding rate arbitrage', 'Fear & Greed Index', 'CoinGecko trending', 'DeFiLlama TVL flows', 'Social sentiment (Reddit/GitHub)', 'Proprietary network momentum', 'DeepSeek convergence synthesis'],
+      sample_signal_types: ['dump_warning', 'pump_signal', 'risk_cascade', 'momentum_surge', 'whale_divergence', 'sentiment_shift'],
+    },
+  };
+}
+
+// Human-readable HTML dashboard
+function renderHtmlReport(report: SentinelReport): string {
+  const alertColors = { GREEN: '#22c55e', YELLOW: '#eab308', ORANGE: '#f97316', RED: '#ef4444' };
+  const alertColor = alertColors[report.alert_level] || '#6b7280';
+
+  const signalRows = report.signals.map(s => {
+    const typeEmoji = {
+      dump_warning: '🔻', pump_signal: '🚀', risk_cascade: '⚠️',
+      momentum_surge: '📈', momentum_decay: '📉', sentiment_shift: '🔄', whale_divergence: '🐋',
+    }[s.type] || '•';
+    const dirColor = s.direction === 'bullish' ? '#22c55e' : s.direction === 'bearish' ? '#ef4444' : '#6b7280';
+
+    return `<tr>
+      <td>${typeEmoji} ${s.type.replace('_', ' ')}</td>
+      <td><b>${s.asset}</b></td>
+      <td><span style="color:${dirColor}">${s.direction.toUpperCase()}</span></td>
+      <td>${s.strength}/100</td>
+      <td>${s.confidence}</td>
+      <td>${s.narrative}</td>
+      <td><i>${s.actionable}</i></td>
+    </tr>`;
+  }).join('');
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sentinel Intelligence</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:20px}
+.container{max-width:1100px;margin:0 auto}
+h1{color:#f8fafc;font-size:1.8rem}
+.regime{display:inline-block;padding:6px 16px;border-radius:6px;background:${alertColor};color:#000;font-weight:700;font-size:1.1rem}
+.synthesis{background:#1e293b;padding:16px;border-radius:8px;margin:16px 0;font-size:1rem;line-height:1.6;border-left:4px solid ${alertColor}}
+table{width:100%;border-collapse:collapse;margin:16px 0}
+th{text-align:left;padding:8px;border-bottom:2px solid #334155;color:#94a3b8;font-size:.85rem;text-transform:uppercase}
+td{padding:8px;border-bottom:1px solid #1e293b;font-size:.9rem}
+tr:hover{background:#1e293b}
+.meta{color:#64748b;font-size:.8rem;margin-top:20px}
+.refresh{color:#38bdf8;text-decoration:none;font-size:.85rem}
+</style></head><body>
+<div class="container">
+<h1>🛡️ Sentinel Intelligence</h1>
+<div class="regime">${report.alert_level} — ${report.market_regime.replace('_', ' ').toUpperCase()}</div>
+<div class="synthesis">${report.synthesis}</div>
+<table><thead><tr><th>Signal</th><th>Asset</th><th>Direction</th><th>Strength</th><th>Confidence</th><th>Analysis</th><th>Action</th></tr></thead>
+<tbody>${signalRows}</tbody></table>
+<div class="meta">
+Sources: ${report.metadata.sources_ok}/8 OK | DeepSeek: ${report.metadata.deepseek_used ? '✅' : '❌'} | Latency: ${report.metadata.latency_ms}ms | Updated: ${report.timestamp}
+<br><a class="refresh" href="/api/botindex/sentinel/signals">↻ Refresh</a>
+</div></div></body></html>`;
+}
+
+// GET /sentinel/signals — main intelligence endpoint (JSON or HTML)
+router.get('/sentinel/signals', async (req: Request, res: Response) => {
+  // Check authorization
+  if (!isSentinelAuthorized(req)) {
+    const accept = req.headers.accept || '';
+
+    // HTML response for browsers
+    if (accept.includes('text/html')) {
+      const upgrade = buildUpgradeResponse();
+      res.status(403).send(`<!DOCTYPE html><html><head><title>Sentinel — Upgrade Required</title>
+<style>body{font-family:system-ui;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+.card{background:#1e293b;padding:40px;border-radius:12px;max-width:600px;text-align:center}
+h1{color:#f59e0b}a{color:#38bdf8}ul{text-align:left;line-height:2}</style></head><body>
+<div class="card"><h1>🛡️ Sentinel Intelligence</h1>
+<p>Predictive signals powered by proprietary behavioral models.</p>
+<p><b>$49.99/mo</b></p>
+<ul>${upgrade.upgrade.includes.map(i => `<li>${i}</li>`).join('')}</ul>
+<p><a href="${REGISTER_URL}">Upgrade to Sentinel →</a></p>
+</div></body></html>`);
+      return;
+    }
+
+    // JSON response for APIs/bots
+    res.status(403).json(buildUpgradeResponse());
+    return;
+  }
+
+  try {
+    const report = await getCachedSentinelReport();
+    const accept = req.headers.accept || '';
+
+    if (accept.includes('text/html')) {
+      res.type('html').send(renderHtmlReport(report));
+    } else {
+      res.json(report);
+    }
+  } catch (err) {
+    logger.error({ err }, 'Sentinel signals endpoint failed');
+    res.status(500).json({ error: 'sentinel_error', message: err instanceof Error ? err.message : 'Unknown error' });
+  }
+});
+
+// GET /sentinel/status — public status (shows alert level without full signals)
+router.get('/sentinel/status', async (_req: Request, res: Response) => {
+  try {
+    const report = await getCachedSentinelReport();
+    res.json({
+      timestamp: report.timestamp,
+      alert_level: report.alert_level,
+      market_regime: report.market_regime,
+      signal_count: report.signals.length,
+      top_signal: report.signals[0] ? {
+        type: report.signals[0].type,
+        asset: report.signals[0].asset,
+        direction: report.signals[0].direction,
+        strength: report.signals[0].strength,
+      } : null,
+      upgrade: {
+        url: REGISTER_URL,
+        message: 'Full signals available with Sentinel plan ($49.99/mo)',
+      },
+    });
+  } catch (err) {
+    logger.error({ err }, 'Sentinel status endpoint failed');
+    res.status(500).json({ error: 'sentinel_status_error' });
+  }
+});
+
+export default router;

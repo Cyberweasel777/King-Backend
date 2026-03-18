@@ -24,7 +24,7 @@ const ADMIN_ID = process.env.ADMIN_ID || '8063432083';
 
 const registerSchema = z.object({
   email: z.string().email(),
-  plan: z.enum(['basic', 'pro', 'starter']).optional(),
+  plan: z.enum(['basic', 'pro', 'starter', 'sentinel']).optional(),
 });
 
 function getStripeClient(): Stripe {
@@ -41,6 +41,14 @@ function getPlanPriceId(plan: BotIndexApiPlan): string {
     throw new Error('Free plan does not require a Stripe price ID');
   }
 
+  if (plan === 'sentinel') {
+    const sentinel = process.env.BOTINDEX_STRIPE_PRICE_SENTINEL;
+    if (!sentinel) {
+      throw new Error('Missing Stripe price ID for sentinel plan (BOTINDEX_STRIPE_PRICE_SENTINEL)');
+    }
+    return sentinel;
+  }
+
   const starter = process.env.BOTINDEX_STRIPE_PRICE_STARTER;
   if (!starter) {
     throw new Error('Missing Stripe price ID for paid plans (BOTINDEX_STRIPE_PRICE_STARTER)');
@@ -52,6 +60,7 @@ function getPlanPriceId(plan: BotIndexApiPlan): string {
 function resolvePlanFromSession(session: Stripe.Checkout.Session): BotIndexApiPlan {
   const plan = session.metadata?.plan;
   if (plan === 'free') return 'free';
+  if (plan === 'sentinel') return 'sentinel';
   return 'pro';
 }
 
@@ -75,9 +84,11 @@ router.get('/register', async (req: Request, res: Response) => {
     const planParam = req.query.plan;
     const plan: BotIndexApiPlan = (planParam === 'free')
       ? 'free'
-      : (planParam === 'pro' || planParam === 'basic' || planParam === 'starter')
-        ? 'pro'
-        : 'free';
+      : (planParam === 'sentinel')
+        ? 'sentinel'
+        : (planParam === 'pro' || planParam === 'basic' || planParam === 'starter')
+          ? 'pro'
+          : 'free';
 
     if (plan === 'free') {
       trackFunnelEvent('register_page_hit', 'free');
