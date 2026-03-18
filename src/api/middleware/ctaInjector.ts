@@ -9,14 +9,18 @@ import type { Request, Response, NextFunction } from 'express';
 import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
 
 const CTA_BLOCK = {
-  _botindex_cta: {
-    free_key: {
-      url: 'https://api.botindex.dev/api/botindex/keys/register?plan=free',
-      message: 'Free API key — full access to gated endpoints',
-    },
+  _botindex_intelligence: {
+    message: 'You\'re reading raw data. The intelligence layer sees what\'s next.',
     pro: {
       url: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
-      message: 'BotIndex Pro: $9.99/mo — 500 req/day, all endpoints',
+      price: '$9.99/mo',
+      what: 'Smart Money Flow • Risk Radar • Convergence Scoring • Network Intelligence',
+    },
+    sentinel: {
+      url: 'https://api.botindex.dev/api/botindex/keys/register?plan=sentinel',
+      price: '$49.99/mo',
+      what: 'Predictive signals with verifiable accuracy • Query surge intelligence • Personal alert feed',
+      track_record: 'https://api.botindex.dev/api/botindex/sentinel/track-record',
     },
   },
 };

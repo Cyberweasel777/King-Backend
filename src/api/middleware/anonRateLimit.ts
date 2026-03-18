@@ -4,8 +4,8 @@
  * Limits unauthenticated requests by IP to push visitors toward
  * API key registration. Authenticated requests (API key or x402) bypass.
  *
- * Default: 10 requests per DAY per IP on gated endpoints.
- * Free API key: 10 req/day (handled in botindex routes).
+ * Default: 3 requests per DAY per IP on gated endpoints.
+ * Free API key: 3 req/day — raw data only. Intelligence requires Pro+.
  */
 
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
@@ -13,7 +13,7 @@ import logger from '../../config/logger';
 import { buildX402UpgradePayload } from './x402Gate';
 import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
 
-const ANON_DAILY_LIMIT = parseInt(process.env.ANON_RATE_LIMIT || '10', 10);
+const ANON_DAILY_LIMIT = parseInt(process.env.ANON_RATE_LIMIT || '3', 10);
 const WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 const UPGRADE_URL = 'https://api.botindex.dev/api/botindex/keys/register?plan=pro';
 const FREE_URL = 'https://api.botindex.dev/api/botindex/keys/register?plan=free';
@@ -160,17 +160,25 @@ export function anonRateLimit(paths: string[], exclude: string[] = []): RequestH
       limit: ANON_DAILY_LIMIT,
       resets_in: formatDuration(resetInfo.resetsInMs),
       resets_at: resetInfo.resetAtIso,
+      message: 'Raw data has limits. Intelligence doesn\'t.',
       upgrade: {
         url: UPGRADE_URL,
         plan: 'pro',
         price: '$9.99/mo',
-        limit: '500/day',
-        description: 'BotIndex Pro — 500 requests/day, all endpoints, priority support.',
+        description: 'BotIndex Pro — Predictive signals, convergence scoring, whale divergence detection. Not just data — intelligence.',
+        includes: [
+          'Smart Money Flow analysis',
+          'Risk Radar with DeepSeek synthesis',
+          'Network Intelligence (proprietary momentum scoring)',
+          '500 requests/day on all endpoints',
+        ],
         ...(x402Upgrade?.body || {}),
       },
-      free_key: {
-        url: FREE_URL,
-        description: 'Or get a free API key for 10 req/day with tracking.',
+      sentinel: {
+        url: 'https://api.botindex.dev/api/botindex/keys/register?plan=sentinel',
+        price: '$49.99/mo',
+        description: 'Sentinel Intelligence — Predictive signals with verifiable track record. Query surge intelligence. Personal alert feed.',
+        track_record: 'https://api.botindex.dev/api/botindex/sentinel/track-record',
       },
     });
   };

@@ -33,13 +33,13 @@ const ANON_DAILY_LIMIT = parseInt(process.env.ANON_RATE_LIMIT || '10', 10);
 const PRIORITY_KEYS = ['results', 'data', 'coins', 'opportunities', 'alerts', 'matrix'] as const;
 
 const ANON_GATE: GateConfig = {
-  limit: 3,
-  message: 'Get full results with a free API key',
+  limit: 2,
+  message: 'Raw data is limited. BotIndex Intelligence sees the full picture — convergence signals, whale divergence, predictive scoring. $9.99/mo.',
 };
 
 const FREE_PLAN_GATE: GateConfig = {
-  limit: 5,
-  message: 'Upgrade to Pro ($9.99/mo) for full access',
+  limit: 3,
+  message: 'You\'re seeing raw data. Pro unlocks the intelligence layer — Smart Money Flow, Risk Radar, Network Momentum. $9.99/mo.',
 };
 
 function nextUtcMidnightUnix(): number {
@@ -145,8 +145,19 @@ function buildGatedBlock(params: { total: number; showing: number; truncated: bo
     showing: params.showing,
     total: params.total,
     message: params.message,
-    register: REGISTER_URL,
-    upgrade: UPGRADE_URL,
+    intelligence: {
+      pro: {
+        url: UPGRADE_URL,
+        price: '$9.99/mo',
+        includes: ['Smart Money Flow', 'Risk Radar', 'Convergence Scoring', 'Network Intelligence'],
+      },
+      sentinel: {
+        url: 'https://api.botindex.dev/api/botindex/keys/register?plan=sentinel',
+        price: '$49.99/mo',
+        includes: ['Predictive signals', 'Query surge intelligence', 'Personal alert feed', 'Verifiable track record'],
+        track_record: 'https://api.botindex.dev/api/botindex/sentinel/track-record',
+      },
+    },
   };
 }
 
