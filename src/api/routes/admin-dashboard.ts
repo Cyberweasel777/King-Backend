@@ -153,6 +153,16 @@ router.get('/', (req: Request, res: Response) => {
           </table>
         </div>
         
+        <h2>🤖 Agorion Registry</h2>
+        \${t.agorion?
+          '<div class="grid">'+
+            '<div class="card"><h3>Total Providers</h3><div class="v">'+t.agorion.totalProviders+'</div></div>'+
+            '<div class="card"><h3>Healthy</h3><div class="v '+(t.agorion.healthyProviders>0?'green':'yellow')+'">'+t.agorion.healthyProviders+'</div></div>'+
+            Object.entries(t.agorion.bySource||{}).map(([src,ct])=>'<div class="card"><h3>'+src+'</h3><div class="v">'+ct+'</div></div>').join('')+
+          '</div>'
+          :'<div class="card" style="color:#888">Agorion data unavailable on this machine</div>'
+        }
+        
         <h2>⚙️ Config</h2>
         <div class="card">
           <table>
