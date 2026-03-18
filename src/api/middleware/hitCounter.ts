@@ -22,12 +22,110 @@ type PersistedData = {
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const HITS_FILE = path.join(DATA_DIR, 'hits.json');
 const QUERY_SURGE_FILE = path.join(DATA_DIR, 'query-surge-history.jsonl');
+const SURGE_ALERTS_FILE = path.join(DATA_DIR, 'surge-alerts-history.jsonl');
 const FLUSH_INTERVAL_MS = 60_000; // 60 seconds
 const SURGE_WINDOW_MS = 5 * 60 * 1000; // 5-minute windows
+const SPIKE_MULTIPLIER = 3; // 3x average = spike
+const MIN_SPIKE_COUNT = 10; // minimum absolute hits to trigger (avoid noise on low-traffic endpoints)
+const ROLLING_WINDOWS = 12; // 1 hour of history (12 x 5-min windows)
+const TELEGRAM_CHAT_ID = process.env.SURGE_ALERT_CHAT_ID || '8063432083';
+const TELEGRAM_BOT_TOKEN = process.env.BOTINDEX_BOT_TOKEN || '';
 
 // Per-endpoint request counts in 5-minute windows for surge detection
 const surgeWindows = new Map<string, number>();
 let currentSurgeWindowStart = Math.floor(Date.now() / SURGE_WINDOW_MS) * SURGE_WINDOW_MS;
+
+// Rolling average tracker: endpoint -> array of recent window counts
+const rollingHistory = new Map<string, number[]>();
+
+// Cooldown: don't alert for same endpoint more than once per 30 min
+const alertCooldowns = new Map<string, number>();
+const ALERT_COOLDOWN_MS = 30 * 60 * 1000;
+
+async function sendTelegramAlert(message: string): Promise<void> {
+  if (!TELEGRAM_BOT_TOKEN) {
+    logger.warn('No BOTINDEX_BOT_TOKEN set — skipping surge alert');
+    return;
+  }
+  try {
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: message,
+        parse_mode: 'HTML',
+        disable_notification: false,
+      }),
+    });
+    if (!res.ok) {
+      logger.warn({ status: res.status }, 'Telegram surge alert send failed');
+    }
+  } catch (err) {
+    logger.warn({ err }, 'Telegram surge alert error');
+  }
+}
+
+function detectAndAlertSpikes(windows: Array<{ endpoint: string; count: number }>): void {
+  const now = Date.now();
+  const spikes: Array<{ endpoint: string; count: number; average: number; multiplier: number }> = [];
+
+  for (const { endpoint, count } of windows) {
+    // Update rolling history
+    const history = rollingHistory.get(endpoint) || [];
+    history.push(count);
+    if (history.length > ROLLING_WINDOWS) history.shift();
+    rollingHistory.set(endpoint, history);
+
+    // Need at least 3 windows of history to compare
+    if (history.length < 3) continue;
+
+    // Calculate average excluding current window
+    const pastWindows = history.slice(0, -1);
+    const avg = pastWindows.reduce((a, b) => a + b, 0) / pastWindows.length;
+
+    // Check for spike
+    if (count >= MIN_SPIKE_COUNT && avg > 0 && count >= avg * SPIKE_MULTIPLIER) {
+      // Check cooldown
+      const lastAlert = alertCooldowns.get(endpoint) || 0;
+      if (now - lastAlert < ALERT_COOLDOWN_MS) continue;
+
+      const multiplier = Math.round((count / avg) * 10) / 10;
+      spikes.push({ endpoint, count, average: Math.round(avg * 10) / 10, multiplier });
+      alertCooldowns.set(endpoint, now);
+    }
+  }
+
+  if (spikes.length === 0) return;
+
+  // Log to file
+  try {
+    fs.appendFileSync(SURGE_ALERTS_FILE, JSON.stringify({
+      timestamp: new Date().toISOString(),
+      spikes,
+    }) + '\n');
+  } catch {
+    // Non-fatal
+  }
+
+  // Build and send Telegram alert
+  const lines = spikes.map(s =>
+    `• <b>${s.endpoint}</b>: ${s.count} hits (${s.multiplier}x avg of ${s.average})`
+  );
+
+  const message = [
+    '🚨 <b>BotIndex Query Surge Alert</b>',
+    '',
+    ...lines,
+    '',
+    `Window: ${new Date(currentSurgeWindowStart).toISOString().slice(11, 16)} UTC`,
+    'Developers are moving. Check what tokens/endpoints are spiking.',
+  ].join('\n');
+
+  void sendTelegramAlert(message);
+  logger.info({ spikes: spikes.length }, 'Query surge alert fired');
+}
 
 function flushSurgeWindow(): void {
   const now = Date.now();
@@ -60,6 +158,9 @@ function flushSurgeWindow(): void {
   } catch {
     // Non-fatal
   }
+
+  // Detect spikes and alert
+  detectAndAlertSpikes(windows);
 
   surgeWindows.clear();
   currentSurgeWindowStart = newWindowStart;
