@@ -9,6 +9,7 @@ import { Request, Response, Router } from 'express';
 import { extractApiKey, getApiKeyEntry } from '../middleware/apiKeyAuth';
 import logger from '../../config/logger';
 import { getCachedSentinelReport, type SentinelReport } from '../../services/botindex/sentinel/signals';
+import { getCachedNetworkIntelligence, type NetworkIntelligenceReport } from '../../services/botindex/sentinel/network-intelligence';
 
 const router = Router();
 
@@ -167,5 +168,113 @@ router.get('/sentinel/status', async (_req: Request, res: Response) => {
     res.status(500).json({ error: 'sentinel_status_error' });
   }
 });
+
+// GET /sentinel/network-intelligence — proprietary ecosystem scoring
+router.get('/sentinel/network-intelligence', async (req: Request, res: Response) => {
+  if (!isSentinelAuthorized(req)) {
+    const accept = req.headers.accept || '';
+    if (accept.includes('text/html')) {
+      res.status(403).send(`<!DOCTYPE html><html><head><title>Network Intelligence — Upgrade Required</title>
+<style>body{font-family:system-ui;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+.card{background:#1e293b;padding:40px;border-radius:12px;max-width:600px;text-align:center}
+h1{color:#f59e0b}a{color:#38bdf8}ul{text-align:left;line-height:2}</style></head><body>
+<div class="card"><h1>📡 Network Intelligence Index</h1>
+<p>Proprietary ecosystem momentum scoring across 8 networks.</p>
+<p><b>$49.99/mo</b> — included with Sentinel plan</p>
+<ul><li>Real-time convergence scoring across crypto ecosystems</li>
+<li>Momentum tracking (7-day trend velocity)</li>
+<li>Multi-source signal fusion (proprietary network analysis)</li>
+<li>Historical trend data for backtesting</li></ul>
+<p><a href="${REGISTER_URL}">Upgrade to Sentinel →</a></p>
+</div></body></html>`);
+      return;
+    }
+    res.status(403).json({
+      error: 'sentinel_required',
+      message: 'Network Intelligence Index requires a Sentinel-tier API key.',
+      upgrade: { url: REGISTER_URL, plan: 'sentinel', price: '$49.99/mo' },
+      teaser: {
+        message: 'Proprietary ecosystem momentum scoring across 8 networks.',
+        ecosystems_tracked: ['Zora', 'Hyperliquid', 'Base', 'Solana', 'Ethereum L1', 'Uniswap', 'Aave', 'Pump.fun'],
+      },
+    });
+    return;
+  }
+
+  try {
+    const report = await getCachedNetworkIntelligence();
+    const accept = req.headers.accept || '';
+
+    if (accept.includes('text/html')) {
+      res.type('html').send(renderNetworkIntelHtml(report));
+    } else {
+      res.json(report);
+    }
+  } catch (err) {
+    logger.error({ err }, 'Network Intelligence endpoint failed');
+    res.status(500).json({ error: 'network_intelligence_error', message: err instanceof Error ? err.message : 'Unknown error' });
+  }
+});
+
+// GET /sentinel/network-intelligence/rankings — public teaser (just rankings, no details)
+router.get('/sentinel/network-intelligence/rankings', async (_req: Request, res: Response) => {
+  try {
+    const report = await getCachedNetworkIntelligence();
+    res.json({
+      timestamp: report.timestamp,
+      rankings: report.rankings,
+      hottest: report.hottest,
+      biggest_mover: report.biggest_mover,
+      upgrade: {
+        url: REGISTER_URL,
+        message: 'Full ecosystem breakdown available with Sentinel plan ($49.99/mo)',
+      },
+    });
+  } catch (err) {
+    logger.error({ err }, 'Network Intelligence rankings failed');
+    res.status(500).json({ error: 'rankings_error' });
+  }
+});
+
+function renderNetworkIntelHtml(report: NetworkIntelligenceReport): string {
+  const rows = report.ecosystems.map(e => {
+    const trendEmoji = { surging: '🚀', growing: '📈', stable: '➡️', declining: '📉', dormant: '💤' }[e.trend];
+    const scoreColor = e.score >= 70 ? '#22c55e' : e.score >= 40 ? '#eab308' : '#ef4444';
+    const momColor = e.momentum_7d > 0 ? '#22c55e' : e.momentum_7d < 0 ? '#ef4444' : '#6b7280';
+
+    return `<tr>
+      <td><b>${e.ecosystem}</b></td>
+      <td style="color:${scoreColor};font-weight:700">${e.score}/100</td>
+      <td>${trendEmoji} ${e.trend}</td>
+      <td style="color:${momColor}">${e.momentum_7d > 0 ? '+' : ''}${e.momentum_7d}%</td>
+      <td>${e.components.github_velocity}</td>
+      <td>${e.components.package_adoption}</td>
+      <td>${e.components.tooling_growth}</td>
+      <td>${e.components.community_size}</td>
+    </tr>`;
+  }).join('');
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Network Intelligence Index</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{font-family:system-ui;background:#0f172a;color:#e2e8f0;margin:0;padding:20px}
+.container{max-width:1200px;margin:0 auto}
+h1{color:#f8fafc;font-size:1.8rem}
+.hot{background:#1e293b;padding:16px;border-radius:8px;margin:16px 0;border-left:4px solid #f59e0b}
+table{width:100%;border-collapse:collapse;margin:16px 0}
+th{text-align:left;padding:8px;border-bottom:2px solid #334155;color:#94a3b8;font-size:.8rem;text-transform:uppercase}
+td{padding:8px;border-bottom:1px solid #1e293b;font-size:.9rem}
+tr:hover{background:#1e293b}
+.meta{color:#64748b;font-size:.8rem;margin-top:20px}
+</style></head><body>
+<div class="container">
+<h1>📡 Network Intelligence Index</h1>
+<div class="hot">🔥 <b>Hottest:</b> ${report.hottest} | 🔄 <b>Biggest Mover:</b> ${report.biggest_mover}</div>
+<table><thead><tr><th>Ecosystem</th><th>Score</th><th>Trend</th><th>7d Momentum</th><th>Code Velocity</th><th>Package Adoption</th><th>Tooling</th><th>Community</th></tr></thead>
+<tbody>${rows}</tbody></table>
+<div class="meta">
+Sources: ${report.metadata.sources_ok}/${report.metadata.sources_queried} | Latency: ${report.metadata.latency_ms}ms | Updated: ${report.timestamp}
+</div></div></body></html>`;
+}
 
 export default router;

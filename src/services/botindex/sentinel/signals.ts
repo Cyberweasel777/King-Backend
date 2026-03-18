@@ -377,6 +377,18 @@ export async function sendPersonalSentinelAlert(): Promise<void> {
       lines.push('');
     }
 
+    // Add Network Intelligence rankings
+    try {
+      const { getCachedNetworkIntelligence } = await import('./network-intelligence');
+      const intel = await getCachedNetworkIntelligence();
+      lines.push('📡 <b>Network Intelligence</b>');
+      for (const r of intel.rankings.slice(0, 5)) {
+        const trendEmoji = { surging: '🚀', growing: '📈', stable: '➡️', declining: '📉', dormant: '💤' }[r.trend] || '•';
+        lines.push(`  ${trendEmoji} ${r.ecosystem}: ${r.score}/100`);
+      }
+      lines.push('');
+    } catch { /* non-fatal — network intel may not be ready */ }
+
     lines.push(`Sources: ${report.metadata.sources_ok}/8 | DeepSeek: ${report.metadata.deepseek_used ? '✅' : '❌'}`);
 
     const message = lines.join('\n');
