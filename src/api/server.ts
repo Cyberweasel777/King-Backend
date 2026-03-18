@@ -24,6 +24,7 @@ import docsRouter from './routes/docs';
 import agorionRouter from './routes/agorion';
 import botindexMemeRouter from './routes/botindex-meme';
 import botindexStablecoinRouter from './routes/botindex-stablecoin';
+import botindexSynthesisRouter from './routes/botindex-synthesis';
 import { initDb } from '../shared/payments/database';
 import logger from '../config/logger';
 
@@ -170,6 +171,9 @@ app.use('/api/botindex', anonRateLimit([
   '/alpha-scan',
   '/zora/relay',
 ]));
+
+// Synthesis endpoints (cross-source intelligence — smart-money-flow, risk-radar)
+app.use('/api/botindex', botindexSynthesisRouter);
 
 // Receipt and trust-layer endpoints
 app.use('/api/botindex/receipts', receiptsRouter);
