@@ -1,4 +1,6 @@
 import express, { Router, Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import Stripe from 'stripe';
 import { z } from 'zod';
 import logger from '../../config/logger';
@@ -21,6 +23,9 @@ const SUCCESS_URL = 'https://api.botindex.dev/api/botindex/keys/success?session_
 const CANCEL_URL = 'https://api.botindex.dev/api/botindex/keys/cancel';
 const PORTAL_RETURN_URL = 'https://api.botindex.dev/api/botindex/keys/cancel';
 const ADMIN_ID = process.env.ADMIN_ID || '8063432083';
+const DATA_DIR = process.env.API_KEY_DATA_DIR || '/data';
+const API_KEYS_FILE = path.join(DATA_DIR, 'api-keys.json');
+const FUNNEL_FILE = path.join(DATA_DIR, 'conversion-funnel.json');
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -77,6 +82,32 @@ async function resolveEmailFromSession(stripe: Stripe, session: Stripe.Checkout.
   }
   return customer.email || null;
 }
+
+function readJson<T>(file: string, fallback: T): T {
+  try {
+    if (!fs.existsSync(file)) return fallback;
+    const raw = fs.readFileSync(file, 'utf-8');
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+type PersistedKeyEntry = {
+  plan?: string;
+  status?: string;
+  email?: string;
+  createdAt?: string;
+  lastUsedAt?: string;
+  totalRequests?: number;
+  stripeCustomerId?: string;
+};
+
+type PersistedFunnelEvent = {
+  type?: string;
+  plan?: string;
+  ts?: string;
+};
 
 // GET /register — browser-friendly: redirects straight to Stripe Checkout
 router.get('/register', async (req: Request, res: Response) => {
@@ -304,6 +335,9 @@ router.get('/register', async (req: Request, res: Response) => {
     const priceId = getPlanPriceId(plan);
 
     trackFunnelEvent('register_page_hit', plan);
+    if (plan === 'sentinel') {
+      logger.info({ truth: 'SENTINEL_REGISTER_HIT', plan, channel: 'web_get' }, 'Single source of truth event');
+    }
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -320,6 +354,9 @@ router.get('/register', async (req: Request, res: Response) => {
     }
 
     trackFunnelEvent('checkout_session_created', plan);
+    if (plan === 'sentinel') {
+      logger.info({ truth: 'SENTINEL_CHECKOUT_CREATED', plan, channel: 'web_get', sessionId: session.id }, 'Single source of truth event');
+    }
     trackRealtimeFunnelEvent('checkout_redirect', {
       plan: typeof req.query.plan === 'string' ? req.query.plan : plan,
     });
@@ -343,7 +380,8 @@ router.post('/register', async (req: Request, res: Response) => {
 
   try {
     const stripe = getStripeClient();
-    const plan: BotIndexApiPlan = 'pro';
+    const requestedPlan = parsed.data.plan;
+    const plan: BotIndexApiPlan = requestedPlan === 'sentinel' ? 'sentinel' : 'pro';
     const priceId = getPlanPriceId(plan);
 
     trackFunnelEvent('register_page_hit', plan);
@@ -367,6 +405,9 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     trackFunnelEvent('checkout_session_created', plan);
+    if (plan === 'sentinel') {
+      logger.info({ truth: 'SENTINEL_CHECKOUT_CREATED', plan, channel: 'api_post', sessionId: session.id }, 'Single source of truth event');
+    }
     trackRealtimeFunnelEvent('key_issued_paid', { plan, source: 'api' });
 
     res.json({
@@ -409,6 +450,9 @@ router.get('/success', async (req: Request, res: Response) => {
 
     const plan = resolvePlanFromSession(session);
     trackFunnelEvent('checkout_completed', plan);
+    if (plan === 'sentinel') {
+      logger.info({ truth: 'SENTINEL_CHECKOUT_COMPLETED', plan, sessionId, customerId, email }, 'Single source of truth event');
+    }
 
     const apiKey = generateApiKey();
     const entry = createApiKeyEntry({
@@ -421,6 +465,9 @@ router.get('/success', async (req: Request, res: Response) => {
       entry.dailyLimit = 500;
     }
     trackFunnelEvent('api_key_issued', plan);
+    if (plan === 'sentinel') {
+      logger.info({ truth: 'SENTINEL_KEY_ISSUED', plan, sessionId, apiKeyPrefix: apiKey.slice(0, 16), email }, 'Single source of truth event');
+    }
 
     try {
       await sendApiKeyEmail({ to: email, apiKey, plan });
@@ -579,6 +626,102 @@ router.get('/admin/funnel', (req: Request, res: Response) => {
   }
 
   res.json(getFunnelStats());
+});
+
+// Single Source of Truth endpoint for commercial state
+router.get('/admin/truth', async (req: Request, res: Response) => {
+  const adminId = typeof req.query.adminId === 'string' ? req.query.adminId : '';
+  if (adminId !== ADMIN_ID) {
+    res.status(403).json({ error: 'forbidden', message: 'Invalid adminId' });
+    return;
+  }
+
+  const keys = readJson<Record<string, PersistedKeyEntry>>(API_KEYS_FILE, {});
+  const funnel = readJson<{ events: PersistedFunnelEvent[] }>(FUNNEL_FILE, { events: [] });
+  const keyEntries = Object.entries(keys);
+
+  const keysByPlan: Record<string, number> = {};
+  let activeKeys = 0;
+  for (const [, entry] of keyEntries) {
+    const plan = entry.plan || 'unknown';
+    keysByPlan[plan] = (keysByPlan[plan] || 0) + 1;
+    if ((entry.totalRequests || 0) > 0) activeKeys++;
+  }
+
+  const byTypePlan: Record<string, Record<string, number>> = {};
+  for (const e of funnel.events || []) {
+    const type = e.type || 'unknown';
+    const plan = e.plan || 'unknown';
+    if (!byTypePlan[type]) byTypePlan[type] = {};
+    byTypePlan[type][plan] = (byTypePlan[type][plan] || 0) + 1;
+  }
+
+  const sentinelFunnel = {
+    registerHits: byTypePlan.register_page_hit?.sentinel || 0,
+    checkoutCreated: byTypePlan.checkout_session_created?.sentinel || 0,
+    checkoutCompleted: byTypePlan.checkout_completed?.sentinel || 0,
+    keysIssued: byTypePlan.api_key_issued?.sentinel || 0,
+  };
+
+  let stripeSummary: {
+    charges30d: number;
+    sentinelCharges30d: number;
+    activeSubscriptions: number;
+    activeSentinelSubscriptions: number;
+  } | null = null;
+
+  try {
+    const stripe = getStripeClient();
+    const since30d = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000);
+    const charges = await stripe.charges.list({ limit: 100, created: { gte: since30d } });
+    const subscriptions = await stripe.subscriptions.list({ limit: 100, status: 'active' });
+
+    const sentinelPriceId = process.env.BOTINDEX_STRIPE_PRICE_SENTINEL;
+
+    const activeSentinelSubscriptions = subscriptions.data.filter((s) =>
+      s.items.data.some((i) => i.price.id === sentinelPriceId || i.price.metadata?.tier === 'sentinel')
+    ).length;
+
+    const sentinelCharges30d = charges.data.filter((c) =>
+      c.description?.toLowerCase().includes('sentinel') ||
+      c.billing_details?.email?.toLowerCase().includes('sentinel')
+    ).length;
+
+    stripeSummary = {
+      charges30d: charges.data.length,
+      sentinelCharges30d,
+      activeSubscriptions: subscriptions.data.length,
+      activeSentinelSubscriptions,
+    };
+  } catch (err) {
+    logger.warn({ err }, 'Failed to query Stripe for admin truth endpoint');
+  }
+
+  res.json({
+    timestamp: new Date().toISOString(),
+    singleSource: 'admin/truth',
+    offering: {
+      sentinelConfigured: !!process.env.BOTINDEX_STRIPE_PRICE_SENTINEL,
+      sentinelPriceId: process.env.BOTINDEX_STRIPE_PRICE_SENTINEL || null,
+      proPriceId: process.env.BOTINDEX_STRIPE_PRICE_STARTER || null,
+      registrationUrl: 'https://api.botindex.dev/api/botindex/keys/register?plan=sentinel',
+    },
+    keys: {
+      total: keyEntries.length,
+      activeKeys,
+      byPlan: keysByPlan,
+    },
+    funnel: {
+      totalEvents: (funnel.events || []).length,
+      byTypePlan,
+      sentinel: sentinelFunnel,
+      lastEventAt: ((funnel.events || [])[((funnel.events || []).length - 1)]?.ts) || null,
+    },
+    stripe: stripeSummary,
+    truthEvents: {
+      grepHint: 'grep -E "SENTINEL_(REGISTER_HIT|CHECKOUT_CREATED|CHECKOUT_COMPLETED|KEY_ISSUED)"',
+    },
+  });
 });
 
 router.get('/admin/keys', (req: Request, res: Response) => {
