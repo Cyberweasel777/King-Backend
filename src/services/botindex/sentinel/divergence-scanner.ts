@@ -244,24 +244,50 @@ async function getDevActivity(): Promise<DevActivity[]> {
 interface FearData {
   fngValue: number; // 0-100
   fngClassification: string;
-  btcPriceChange24h: number | null;
-  ethPriceChange24h: number | null;
+  assetPriceChanges: Map<string, { change24h: number; change7d: number }>;
 }
 
+// Map our asset tickers to CoinGecko IDs
+const ASSET_TO_COINGECKO: Record<string, string> = {
+  BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana', KAS: 'kaspa',
+  STX: 'blockstack', ORDI: 'ordi', BABY: 'babylon',
+  HYPE: 'hyperliquid', PURR: 'purr-2', ZORA: 'zora-2',
+  AAVE: 'aave', UNI: 'uniswap', LINK: 'chainlink',
+  ARB: 'arbitrum', OP: 'optimism', POL: 'matic-network',
+  BASE: 'coinbase-wrapped-btc', // BASE doesn't have a direct token on CG
+};
+
 async function getFearSignals(): Promise<FearData | null> {
-  const [fng, btcData, ethData] = await Promise.all([
+  // Fetch Fear & Greed + all asset prices in one batch
+  const cgIds = [...new Set(Object.values(ASSET_TO_COINGECKO))].join(',');
+
+  const [fng, priceData] = await Promise.all([
     safeFetchJson<{ data: Array<{ value: string; value_classification: string }> }>('https://api.alternative.me/fng/?limit=1'),
-    safeFetchJson<Record<string, { usd_24h_change?: number }>>('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true'),
-    safeFetchJson<Record<string, { usd_24h_change?: number }>>('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd&include_24hr_change=true'),
+    safeFetchJson<Record<string, { usd_24h_change?: number; usd_24h_vol?: number }>>(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${cgIds}&vs_currencies=usd&include_24hr_change=true`
+    ),
   ]);
 
   if (!fng?.data?.[0]) return null;
 
+  // Also get 7d changes from /coins/markets
+  const marketsData = await safeFetchJson<Array<{ id: string; price_change_percentage_7d_in_currency?: number; price_change_percentage_24h?: number }>>(
+    `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${cgIds}&sparkline=false&price_change_percentage=7d`
+  );
+
+  const assetPriceChanges = new Map<string, { change24h: number; change7d: number }>();
+
+  for (const [ticker, cgId] of Object.entries(ASSET_TO_COINGECKO)) {
+    const price24h = priceData?.[cgId]?.usd_24h_change ?? 0;
+    const market = marketsData?.find(m => m.id === cgId);
+    const price7d = market?.price_change_percentage_7d_in_currency ?? 0;
+    assetPriceChanges.set(ticker, { change24h: price24h, change7d: price7d });
+  }
+
   return {
     fngValue: parseInt(fng.data[0].value, 10),
     fngClassification: fng.data[0].value_classification,
-    btcPriceChange24h: btcData?.bitcoin?.usd_24h_change ?? null,
-    ethPriceChange24h: ethData?.ethereum?.usd_24h_change ?? null,
+    assetPriceChanges,
   };
 }
 
@@ -281,11 +307,15 @@ function detectDivergences(
       const whalePositions = whaleData?.positions.filter(p => p.coin === asset) || [];
       const totalWhaleValue = whalePositions.reduce((s, p) => s + p.positionValue, 0);
 
+      const hasWhaleData = whalePositions.length > 0;
       const whaleScore =
         whaleDir === 'accumulating' ? 80 :
-        whaleDir === 'distributing' ? 20 : 50;
+        whaleDir === 'distributing' ? 20 :
+        hasWhaleData ? 50 : 0; // 0 = no data, not "neutral"
       const whaleEvidence: string[] = [];
-      if (whaleDir !== 'neutral') {
+      if (!hasWhaleData) {
+        whaleEvidence.push(`No whale position data for ${asset} on Hyperliquid`);
+      } else if (whaleDir !== 'neutral') {
         whaleEvidence.push(`Whale net flow: ${whaleDir} ($${(totalWhaleValue / 1e6).toFixed(1)}M)`);
       }
       if (whalePositions.length > 0) {
@@ -304,33 +334,50 @@ function detectDivergences(
         `${dev.stars.toLocaleString()} GitHub stars`,
       ];
 
-      // Fear signal (global + asset-specific)
+      // Fear signal (global Fear & Greed + per-asset price action)
       let fearScore = 50;
       const fearEvidence: string[] = [];
       let fearDir: 'fearful' | 'greedy' | 'neutral' = 'neutral';
 
       if (fearData) {
-        fearEvidence.push(`Fear & Greed: ${fearData.fngValue}/100 (${fearData.fngClassification})`);
+        // Base fear from global F&G (weighted 40%)
+        let baseFear = 50;
+        if (fearData.fngValue <= 25) baseFear = 85;
+        else if (fearData.fngValue <= 40) baseFear = 70;
+        else if (fearData.fngValue >= 75) baseFear = 20;
+        else if (fearData.fngValue >= 60) baseFear = 35;
 
-        if (fearData.fngValue <= 25) { fearScore = 90; fearDir = 'fearful'; }
-        else if (fearData.fngValue <= 40) { fearScore = 70; fearDir = 'fearful'; }
-        else if (fearData.fngValue >= 75) { fearScore = 20; fearDir = 'greedy'; }
-        else if (fearData.fngValue >= 60) { fearScore = 35; fearDir = 'greedy'; }
+        fearEvidence.push(`F&G: ${fearData.fngValue}/100 (${fearData.fngClassification})`);
 
-        if (asset === 'BTC' && fearData.btcPriceChange24h !== null) {
-          fearEvidence.push(`BTC 24h: ${fearData.btcPriceChange24h > 0 ? '+' : ''}${fearData.btcPriceChange24h.toFixed(1)}%`);
-          if (fearData.btcPriceChange24h < -5) fearScore = Math.min(95, fearScore + 15);
+        // Per-asset price action (weighted 60%)
+        const assetPrice = fearData.assetPriceChanges.get(asset);
+        let priceFear = 50;
+        if (assetPrice) {
+          const { change24h, change7d } = assetPrice;
+          fearEvidence.push(`${asset} 24h: ${change24h > 0 ? '+' : ''}${change24h.toFixed(1)}% | 7d: ${change7d > 0 ? '+' : ''}${change7d.toFixed(1)}%`);
+
+          // Price declining = more fear for this asset
+          if (change7d < -20) priceFear = 95;
+          else if (change7d < -10) priceFear = 85;
+          else if (change7d < -5) priceFear = 75;
+          else if (change24h < -5) priceFear = 70;
+          else if (change7d > 20) priceFear = 15;
+          else if (change7d > 10) priceFear = 25;
+          else if (change7d > 5) priceFear = 35;
         }
-        if (asset === 'ETH' && fearData.ethPriceChange24h !== null) {
-          fearEvidence.push(`ETH 24h: ${fearData.ethPriceChange24h > 0 ? '+' : ''}${fearData.ethPriceChange24h.toFixed(1)}%`);
-          if (fearData.ethPriceChange24h < -5) fearScore = Math.min(95, fearScore + 15);
-        }
+
+        fearScore = Math.round(baseFear * 0.4 + priceFear * 0.6);
+
+        if (fearScore >= 65) fearDir = 'fearful';
+        else if (fearScore <= 35) fearDir = 'greedy';
+        else fearDir = 'neutral';
       }
 
       // ACCUMULATION DIVERGENCE: whales buying + devs building + fear growing
+      // Require actual whale data (score > 0) for full divergence
       const isAccumulation = whaleScore >= 65 && devScore >= 65 && fearScore >= 65;
       // DISTRIBUTION DIVERGENCE: whales dumping + devs leaving + greed growing
-      const isDistribution = whaleScore <= 35 && devScore <= 35 && fearScore <= 35;
+      const isDistribution = whaleScore > 0 && whaleScore <= 35 && devScore <= 35 && fearScore <= 35;
 
       if (isAccumulation || isDistribution) {
         const convergenceStrength = isAccumulation
@@ -350,20 +397,26 @@ function detectDivergences(
         });
       }
 
-      // PARTIAL DIVERGENCES (2 of 3 aligned — still worth flagging)
-      const partialAccum = (whaleScore >= 65 && devScore >= 65 && fearScore < 65)
-        || (whaleScore >= 65 && fearScore >= 65 && devScore < 65)
-        || (devScore >= 65 && fearScore >= 65 && whaleScore < 65);
+      // PARTIAL DIVERGENCES (2 of 3 aligned — only flag if at least one has REAL data, not defaults)
+      const whaleAligned = whaleScore >= 65;
+      const devAligned = devScore >= 65;
+      const fearAligned = fearScore >= 65;
+      const alignedCount = [whaleAligned, devAligned, fearAligned].filter(Boolean).length;
+      const partialAccum = alignedCount === 2 && !isAccumulation;
 
-      if (partialAccum && !isAccumulation) {
+      // Only flag partial divergences when fear is asset-specific (not just global F&G)
+      // and whale data is either confirmed or explicitly missing
+      if (partialAccum) {
         const aligned: string[] = [];
         const missing: string[] = [];
-        if (whaleScore >= 65) aligned.push('whales accumulating'); else missing.push('whale confirmation');
-        if (devScore >= 65) aligned.push('devs building'); else missing.push('dev momentum');
-        if (fearScore >= 65) aligned.push('fear present'); else missing.push('fear signal');
+        if (whaleAligned) aligned.push('whales accumulating'); else missing.push(hasWhaleData ? 'whale conviction' : 'whale data (not on HL)');
+        if (devAligned) aligned.push('devs building'); else missing.push('dev momentum');
+        if (fearAligned) aligned.push('fear present'); else missing.push('fear signal');
 
         const convergenceStrength = Math.round((whaleScore + devScore + fearScore) / 3);
-        if (convergenceStrength >= 55) {
+        // Require higher bar: 60+ for partial (was 55), and don't alert on no-whale-data partials unless fear+dev are both strong
+        const minThreshold = hasWhaleData ? 55 : 65;
+        if (convergenceStrength >= minThreshold) {
           divergences.push({
             asset,
             type: 'accumulation_divergence',
