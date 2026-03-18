@@ -217,24 +217,28 @@ async function fetchAgorionToolCount(keywords: string[]): Promise<number> {
 
 function computeScore(raw: EcosystemSignal['raw']): { score: number; components: EcosystemSignal['components'] } {
   // GitHub velocity: based on recent commits + stars + forks
+  // Scale: 10 active repos = 80, 1000+ stars = solid, 500+ forks = solid
   const githubVelocity = Math.min(100, Math.round(
-    (Math.min(raw.github_recent_commits, 50) / 50) * 40 +
-    (Math.min(raw.github_stars, 5000) / 5000) * 30 +
-    (Math.min(raw.github_forks, 2000) / 2000) * 30
+    (Math.min(raw.github_recent_commits, 20) / 20) * 40 +
+    (Math.min(raw.github_stars, 2000) / 2000) * 30 +
+    (Math.min(raw.github_forks, 500) / 500) * 30
   ));
 
-  // Package adoption: based on npm weekly downloads (log scale)
+  // Package adoption: based on npm weekly downloads
+  // 100 = 10, 1K = 30, 10K = 50, 100K = 70, 1M = 90, 10M = 100
   const packageAdoption = raw.npm_weekly_downloads > 0
-    ? Math.min(100, Math.round(Math.log10(raw.npm_weekly_downloads) * 20))
+    ? Math.min(100, Math.round(
+        Math.log10(raw.npm_weekly_downloads) * 14.3
+      ))
     : 0;
 
-  // Tooling growth: MCP tool count
-  const toolingGrowth = Math.min(100, raw.mcp_tool_count * 10);
+  // Tooling growth: MCP tool count (1 tool = 15, 5 = 75, 7+ = 100)
+  const toolingGrowth = Math.min(100, raw.mcp_tool_count * 15);
 
   // Community size: contributors + open issues
   const communitySize = Math.min(100, Math.round(
-    (Math.min(raw.github_contributors, 200) / 200) * 50 +
-    (Math.min(raw.github_open_issues, 500) / 500) * 50
+    (Math.min(raw.github_contributors, 100) / 100) * 50 +
+    (Math.min(raw.github_open_issues, 200) / 200) * 50
   ));
 
   const score = Math.round(
@@ -311,8 +315,8 @@ async function buildEcosystemSignal(def: EcosystemDef): Promise<EcosystemSignal>
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const recentCommits = allRepos.filter(r => r.pushed_at > thirtyDaysAgo).length;
 
-  // Estimate contributors from forks (rough proxy without per-repo API calls)
-  const estimatedContributors = Math.min(allRepos.length * 5, totalForks);
+  // Estimate contributors: use unique forks as proxy, scaled by active repos
+  const estimatedContributors = Math.round(totalForks * 0.15) + allRepos.length;
 
   const totalNpmDownloads = npmResults.reduce((sum, r) => sum + r.weekly_downloads, 0);
 
