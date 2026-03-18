@@ -153,6 +153,25 @@ router.get('/', (req: Request, res: Response) => {
           </table>
         </div>
         
+        <h2>📢 Monetization Prompts (persisted)</h2>
+        \${(()=>{
+          const m=t.monetizationPrompts||{};
+          const rows=[
+            ['429 Rate Limit Walls','anon_rate_limit_429'],
+            ['Soft-Gate Truncations','soft_gate_truncated'],
+            ['CTA Blocks Injected','cta_injected'],
+            ['Paywall Hits','paywall_hit'],
+            ['Upgrade CTA Shown','upgrade_cta_shown'],
+            ['Checkout Redirects','checkout_redirect'],
+          ];
+          return '<div class="card"><table><thead><tr><th>Event</th><th>Total</th><th>Last 24h</th><th>Last Hour</th></tr></thead><tbody>'+
+            rows.map(([label,key])=>{
+              const s=m[key]||{total:0,last24h:0,lastHour:0};
+              return '<tr><td>'+label+'</td><td style="font-weight:700">'+s.total+'</td><td>'+s.last24h+'</td><td>'+s.lastHour+'</td></tr>';
+            }).join('')+
+            '</tbody></table></div>';
+        })()}
+        
         <h2>🤖 Agorion Registry</h2>
         \${t.agorion?
           '<div class="grid">'+

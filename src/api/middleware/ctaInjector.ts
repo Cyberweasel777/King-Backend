@@ -6,6 +6,7 @@
  */
 
 import type { Request, Response, NextFunction } from 'express';
+import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
 
 const CTA_BLOCK = {
   _botindex_cta: {
@@ -28,6 +29,7 @@ export function ctaInjector(): (req: Request, res: Response, next: NextFunction)
       // Only inject into object responses (not arrays, strings, etc.)
       if (body && typeof body === 'object' && !Array.isArray(body) && !body.error) {
         Object.assign(body, CTA_BLOCK);
+        trackFunnelEvent('cta_injected', { path: _req.path });
       }
       return originalJson(body);
     };

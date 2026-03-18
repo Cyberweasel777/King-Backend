@@ -14,7 +14,7 @@ import {
   updateApiKeyWallet,
 } from '../middleware/apiKeyAuth';
 import { getFunnelStats, trackFunnelEvent } from '../../services/botindex/conversion-funnel';
-import { trackFunnelEvent as trackRealtimeFunnelEvent } from '../../services/botindex/funnel-tracker';
+import { trackFunnelEvent as trackRealtimeFunnelEvent, getFunnelSummary as getRealtimeFunnelSummary } from '../../services/botindex/funnel-tracker';
 import { sendApiKeyEmail } from '../../services/botindex/key-delivery-email';
 
 const router = Router();
@@ -738,6 +738,7 @@ router.get('/admin/truth', async (req: Request, res: Response) => {
     },
     stripe: stripeSummary,
     agorion: agorionStats,
+    monetizationPrompts: getRealtimeFunnelSummary(),
     truthEvents: {
       grepHint: 'grep -E "SENTINEL_(REGISTER_HIT|CHECKOUT_CREATED|CHECKOUT_COMPLETED|KEY_ISSUED)"',
     },

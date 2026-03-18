@@ -1,3 +1,10 @@
+import fs from 'fs';
+import path from 'path';
+
+const DATA_DIR = process.env.API_KEY_DATA_DIR || '/data';
+const FUNNEL_LEDGER_FILE = path.join(DATA_DIR, 'funnel-tracker-ledger.json');
+const FLUSH_INTERVAL_MS = 30_000; // flush to disk every 30s
+
 export interface FunnelEvent {
   step: string;
   timestamp: string;
@@ -17,6 +24,9 @@ const KNOWN_STEPS = [
   'upgrade_cta_shown',
   'checkout_redirect',
   'stripe_webhook_received',
+  'anon_rate_limit_429',
+  'soft_gate_truncated',
+  'cta_injected',
 ] as const;
 
 type StepSummary = { total: number; last24h: number; lastHour: number };
@@ -24,6 +34,66 @@ type StepSummary = { total: number; last24h: number; lastHour: number };
 const events: FunnelEvent[] = [];
 const totalByStep = new Map<string, number>();
 const firstAuthSeenKeys = new Set<string>();
+let dirty = false;
+
+// --- Persistence ---
+
+interface LedgerSnapshot {
+  totalByStep: Record<string, number>;
+  events: FunnelEvent[];
+  savedAt: string;
+}
+
+function loadFromDisk(): void {
+  try {
+    if (!fs.existsSync(FUNNEL_LEDGER_FILE)) return;
+    const raw = fs.readFileSync(FUNNEL_LEDGER_FILE, 'utf-8');
+    const snap: LedgerSnapshot = JSON.parse(raw);
+
+    if (snap.totalByStep) {
+      for (const [step, count] of Object.entries(snap.totalByStep)) {
+        totalByStep.set(step, count);
+      }
+    }
+
+    if (Array.isArray(snap.events)) {
+      for (const e of snap.events.slice(-MAX_EVENTS)) {
+        events.push(e);
+      }
+    }
+  } catch {
+    // non-fatal — start fresh
+  }
+}
+
+function flushToDisk(): void {
+  if (!dirty) return;
+  try {
+    const snap: LedgerSnapshot = {
+      totalByStep: Object.fromEntries(totalByStep),
+      events: events.slice(-MAX_EVENTS),
+      savedAt: new Date().toISOString(),
+    };
+    const tmp = FUNNEL_LEDGER_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(snap), 'utf-8');
+    fs.renameSync(tmp, FUNNEL_LEDGER_FILE);
+    dirty = false;
+  } catch {
+    // non-fatal — will retry next interval
+  }
+}
+
+// Load on module init
+loadFromDisk();
+
+// Periodic flush
+setInterval(flushToDisk, FLUSH_INTERVAL_MS).unref();
+
+// Flush on graceful shutdown
+process.on('SIGTERM', () => { flushToDisk(); });
+process.on('SIGINT', () => { flushToDisk(); });
+
+// --- Core API ---
 
 function normalizeLimit(limit?: number): number {
   if (!Number.isFinite(limit)) return 20;
@@ -69,6 +139,7 @@ export function trackFunnelEvent(step: string, metadata?: Record<string, any>): 
   }
 
   totalByStep.set(step, (totalByStep.get(step) || 0) + 1);
+  dirty = true;
 }
 
 export function getFunnelSummary(): { [step: string]: StepSummary } {

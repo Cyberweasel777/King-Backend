@@ -1,5 +1,6 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { extractApiKey, getApiKeyEntry } from './apiKeyAuth';
+import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
 
 type GateConfig = {
   limit: number;
@@ -261,6 +262,7 @@ export function softGate(): RequestHandler {
         return originalJson(body);
       }
 
+      trackFunnelEvent('soft_gate_truncated', { path: req.path, gateTier: gate === ANON_GATE ? 'anon' : 'free' });
       return originalJson(applyGate(body, gate));
     };
 

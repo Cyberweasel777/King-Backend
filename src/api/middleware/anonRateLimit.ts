@@ -11,6 +11,7 @@
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import logger from '../../config/logger';
 import { buildX402UpgradePayload } from './x402Gate';
+import { trackFunnelEvent } from '../../services/botindex/funnel-tracker';
 
 const ANON_DAILY_LIMIT = parseInt(process.env.ANON_RATE_LIMIT || '10', 10);
 const WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -150,6 +151,8 @@ export function anonRateLimit(paths: string[], exclude: string[] = []): RequestH
       { ip, path: req.path, isAnon: true, used: entry.count, limit: ANON_DAILY_LIMIT },
       'Anonymous request blocked — daily limit exceeded'
     );
+
+    trackFunnelEvent('anon_rate_limit_429', { ip, path: req.path, used: entry.count });
 
     res.status(429).json({
       error: 'daily_limit_exceeded',
