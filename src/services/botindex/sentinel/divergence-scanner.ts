@@ -151,7 +151,10 @@ interface DevActivity {
 }
 
 const ECOSYSTEM_ASSET_MAP: Array<{ name: string; assets: string[]; orgs: string[]; repos: string[]; npm: string[] }> = [
-  { name: 'Bitcoin', assets: ['BTC'], orgs: ['bitcoin', 'bitcoin-core'], repos: ['AstarNetwork/astar-frame', 'nicklash/bitcoinj'], npm: ['bitcoinjs-lib', '@scure/btc-signer'] },
+  { name: 'Bitcoin', assets: ['BTC'], orgs: ['bitcoin', 'bitcoin-core'], repos: [], npm: ['bitcoinjs-lib', '@scure/btc-signer'] },
+  { name: 'Stacks', assets: ['STX'], orgs: ['stacks-network'], repos: ['hirosystems/stacks.js', 'hirosystems/clarinet'], npm: ['@stacks/transactions', '@stacks/connect', '@stacks/stacking'] },
+  { name: 'Ordinals', assets: ['ORDI'], orgs: [], repos: ['ordinals/ord'], npm: [] },
+  { name: 'Babylon', assets: ['BABY'], orgs: ['babylonlabs-io'], repos: [], npm: [] },
   { name: 'Ethereum', assets: ['ETH'], orgs: ['ethereum'], repos: ['foundry-rs/foundry', 'OpenZeppelin/openzeppelin-contracts'], npm: ['ethers', 'viem'] },
   { name: 'Solana', assets: ['SOL'], orgs: ['solana-labs'], repos: ['coral-xyz/anchor'], npm: ['@solana/web3.js', '@coral-xyz/anchor'] },
   { name: 'Kaspa', assets: ['KAS'], orgs: ['kaspanet'], repos: [], npm: ['kaspa'] },
