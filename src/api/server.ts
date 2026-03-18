@@ -286,6 +286,10 @@ async function start() {
   setInterval(() => { void resolvePredictions(); }, 6 * 60 * 60 * 1000);
   // First resolution pass after 5 minutes
   setTimeout(() => { void resolvePredictions(); }, 5 * 60 * 1000);
+
+  // Start Telegram subscriber bot (polls for /subscribe commands)
+  const { startTelegramBot } = await import('../services/botindex/sentinel/telegram-subscribers');
+  startTelegramBot();
   
   app.listen(PORT, () => {
     logger.info(

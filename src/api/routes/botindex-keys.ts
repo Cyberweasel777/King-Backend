@@ -510,18 +510,27 @@ router.get('/success', async (req: Request, res: Response) => {
     <div class="success-msg">✅ Subscription active — 500 requests/day</div>
     <div class="key-box" id="keyBox" onclick="copyKey()">${apiKey}</div>
     <div class="warning">⚠️ Save this key now. It won't be shown again.</div>
-    <h2>Try it now</h2>
+
+    <h2>📲 Get Intelligence on Telegram</h2>
+    <div class="step" style="background: #22d3ee10; border: 1px solid #22d3ee30;">
+      <strong>Step 1:</strong> Open <a href="https://t.me/BotIndexHacks_Bot" target="_blank" style="color: #22d3ee;">@BotIndexHacks_Bot</a> on Telegram<br><br>
+      <strong>Step 2:</strong> Send this command:<br>
+      <code>/subscribe ${apiKey}</code><br><br>
+      <strong>Done!</strong> You'll receive intelligence alerts every 15 minutes when signals are active.
+    </div>
+
+    <h2>Or use the API</h2>
     <div class="step">
-      <strong>🐋 Whale Alerts</strong><br>
-      <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/hyperliquid/whale-alerts</code>
+      <strong>🧠 Smart Money Flow</strong><br>
+      <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/synthesis/smart-money-flow</code>
     </div>
     <div class="step">
-      <strong>📊 Market Signals</strong><br>
-      <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/v1/signals</code>
+      <strong>🎯 Risk Radar</strong><br>
+      <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/synthesis/risk-radar</code>
     </div>
     <div class="step">
-      <strong>💰 Funding Arb</strong><br>
-      <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/hyperliquid/funding-arb</code>
+      <strong>📡 Network Intelligence</strong><br>
+      <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/sentinel/network-intelligence/rankings</code>
     </div>
   </div>
   <script>

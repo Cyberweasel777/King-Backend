@@ -346,7 +346,7 @@ export async function getCachedSentinelReport(): Promise<SentinelReport> {
   return JSON.parse(JSON.stringify(report));
 }
 
-// ── Personal Alert Feed (Andrew only) ──────────────────────────────────
+// ── Alert Feed (all subscribers) ───────────────────────────────────────
 
 export async function sendPersonalSentinelAlert(): Promise<void> {
   if (!TELEGRAM_BOT_TOKEN) return;
@@ -401,26 +401,20 @@ export async function sendPersonalSentinelAlert(): Promise<void> {
 
     const message = lines.join('\n');
 
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: ANDREW_CHAT_ID,
-        text: message,
-        parse_mode: 'HTML',
-      }),
-    });
+    // Broadcast to all subscribers (Andrew + paid users)
+    const { broadcastAlert } = await import('./telegram-subscribers');
+    const sent = await broadcastAlert(message, 'pro');
 
     appendJsonl(SENTINEL_ALERTS_LOG, {
       timestamp: report.timestamp,
       alert_level: report.alert_level,
       regime: report.market_regime,
       signals_count: report.signals.length,
-      sent_to: 'andrew_personal',
+      sent_to: sent,
     });
 
-    logger.info({ alert_level: report.alert_level, signals: report.signals.length }, 'Personal sentinel alert sent');
+    logger.info({ alert_level: report.alert_level, signals: report.signals.length, sent_to: sent }, 'Sentinel alert broadcast');
   } catch (err) {
-    logger.error({ err }, 'Personal sentinel alert failed');
+    logger.error({ err }, 'Sentinel alert broadcast failed');
   }
 }
