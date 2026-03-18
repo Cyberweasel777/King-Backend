@@ -1,243 +1,142 @@
-# BotIndex — AI-Native Signal Intelligence API
+# BotIndex — Crypto Market Intelligence API
 
-> **Three ways in.** No signup form. No dashboard. Just data.
+> **Raw data is a commodity. Intelligence isn't.**
 
-**Live:** [king-backend.fly.dev](https://king-backend.fly.dev/health)
+BotIndex synthesizes whale positions, developer activity, funding rates, and behavioral demand signals into predictive intelligence. Not another data aggregator — a convergence engine.
 
----
-
-## Try It Now (30 seconds)
-
-```bash
-# Free — see all endpoints and pricing
-curl https://king-backend.fly.dev/api/botindex/v1/
-
-# Free — live Zora trending coins
-curl https://king-backend.fly.dev/api/botindex/zora/trending-coins
-
-# Free — Hyperliquid funding rate arbitrage
-curl https://king-backend.fly.dev/api/botindex/hyperliquid/funding-arb
-```
+**Live:** [botindex.dev](https://botindex.dev) · **API:** [api.botindex.dev](https://api.botindex.dev/api/botindex/sentinel/track-record) · **Track Record:** [Live prediction accuracy](https://api.botindex.dev/api/botindex/sentinel/track-record)
 
 ---
 
-## Get Access (Pick One)
+## What Makes This Different
 
-### Option 1: API Key — 500 free requests/month
+Everyone has CoinGecko data. Nobody has this:
 
-```bash
-# Register with your email, get a key instantly
-curl -X POST https://king-backend.fly.dev/api/botindex/v1/keys/register \
-  -H "Content-Type: application/json" \
-  -d '{"email": "you@example.com"}'
+| Signal | What It Is | Why It Matters |
+|--------|-----------|----------------|
+| **Convergence Scoring** | Multi-source synthesis across whale, dev, and fear signals | Catches moves before single-source indicators |
+| **Whale Divergence** | Real-time Hyperliquid position tracking | Know when smart money loads while retail sells |
+| **Network Intelligence** | Ecosystem development velocity + package adoption scoring | Infrastructure momentum predicts price momentum |
+| **Query Surge Intelligence** | What 19K+ daily API consumers are searching for | Developer demand is a leading indicator |
+| **Predictive Signals** | DeepSeek-synthesized signals with entry price logging | Every prediction verified at 24h/72h/7d |
+| **Risk Radar** | Composite scoring: funding + liquidations + fear + flows | One number for the market regime |
 
-# → { "apiKey": "bi_live_abc123...", "tier": "free", "monthlyLimit": 500 }
+---
 
-# Use it on any endpoint
-curl -H "X-API-Key: bi_live_abc123..." \
-  https://king-backend.fly.dev/api/botindex/v1/signals
-
-# Check your usage anytime
-curl -H "X-API-Key: bi_live_abc123..." \
-  https://king-backend.fly.dev/api/botindex/v1/keys/info
-```
-
-### Option 2: Wallet Trial — 50 free requests
-
-No email needed. Send your wallet address, get 50 premium requests.
+## Try It (30 seconds)
 
 ```bash
-curl -H "X-Wallet: 0xYOUR_WALLET_ADDRESS" \
-  https://king-backend.fly.dev/api/botindex/v1/signals
-# → X-BotIndex-Free-Remaining: 49
-```
+# See what we track (free, 3 requests/day)
+curl https://api.botindex.dev/api/botindex/zora/trending-coins
 
-### Option 3: x402 Pay-Per-Request — Unlimited
+# See what we know (Pro, $9.99/mo)
+curl -H "X-API-Key: YOUR_KEY" \
+  https://api.botindex.dev/api/botindex/synthesis/smart-money-flow
 
-After free tiers, pay $0.01–$0.10 per request in USDC on Base. No subscriptions, no billing dashboard. Your wallet is your identity.
-
-```bash
-curl https://king-backend.fly.dev/api/botindex/x402/correlation-leaders
-# → 402 with payment instructions
+# See what's next (Sentinel, $49.99/mo)
+curl -H "X-API-Key: YOUR_SENTINEL_KEY" \
+  https://api.botindex.dev/api/botindex/sentinel/signals
 ```
 
 ---
 
-## What Is This?
+## Pricing
 
-BotIndex is a headless API built for AI agents and bots — not humans. It aggregates signal intelligence across multiple verticals and sells it per-request via x402 (HTTP 402 Payment Required).
+| Tier | Price | What You Get |
+|------|-------|-------------|
+| **Explorer** | Free | 3 req/day. Raw data only. Truncated results. |
+| **Pro Intelligence** | $9.99/mo | 500 req/day. Smart Money Flow, Risk Radar, convergence scoring, Network Intelligence. Full data. |
+| **Sentinel** | $49.99/mo | Unlimited. Predictive signals with verifiable accuracy. Query surge intelligence. Personal Telegram alerts. |
 
-Your wallet is your identity. Payment is auth. No accounts, no rate limit tiers, no OAuth.
+```bash
+# Get a free key
+curl "https://api.botindex.dev/api/botindex/keys/register?plan=free"
 
-### Domains
+# Get Pro
+curl "https://api.botindex.dev/api/botindex/keys/register?plan=pro"
 
-| Domain | What It Does | Pricing |
-|--------|-------------|---------|
-| **Sports** | Live odds, line movements, player correlations, DFS optimizer, arb scanner | $0.02–$0.10/req |
-| **Crypto** | Token universe, price data, correlation matrices | $0.02–$0.05/req |
-| **Zora** | Trending coins, volume velocity, holder analytics | Free preview |
-| **Hyperliquid** | Funding rate arb, cross-exchange correlations | Free preview |
-| **Genesis** | Metaplex launches on Solana, active/graduated tokens | $0.02/req |
-| **Commerce** | Cross-protocol merchant comparison (ACP vs UCP vs x402) | $0.01–$0.05/req |
-| **Signals** | Aggregated premium feed, agent traces, dashboards | $0.05–$0.50/req |
+# Get Sentinel
+curl "https://api.botindex.dev/api/botindex/keys/register?plan=sentinel"
+```
+
+---
+
+## Verifiable Track Record
+
+Every prediction is logged with a timestamped entry price. Resolutions checked at 24h, 72h, and 7 days. No cherrypicking. No hindsight.
+
+**→ [View live track record](https://api.botindex.dev/api/botindex/sentinel/track-record)**
+
+---
+
+## Intelligence Endpoints
+
+### Pro ($9.99/mo)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /synthesis/smart-money-flow` | Whale accumulation + funding rate convergence |
+| `GET /synthesis/risk-radar` | Composite market risk score with DeepSeek synthesis |
+| `GET /sentinel/network-intelligence/rankings` | Ecosystem momentum scores (8 ecosystems) |
+| `GET /sentinel/query-intelligence` | What API consumers are searching for (teaser) |
+
+### Sentinel ($49.99/mo)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /sentinel/signals` | Full predictive signal report with narratives |
+| `GET /sentinel/track-record` | Prediction accuracy stats (public) |
+| `GET /sentinel/query-intelligence` | Full endpoint-level query intelligence |
+| `GET /sentinel/network-intelligence` | Detailed ecosystem scoring with components |
+
+### Free (3/day, raw data)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /zora/trending-coins` | Zora trending coins |
+| `GET /hyperliquid/whale-alerts` | Whale position alerts |
+| `GET /hyperliquid/funding-arb` | Funding rate arbitrage |
+| `GET /hyperliquid/correlation-matrix` | Token correlation matrix |
+| `GET /sentinel/status` | Current alert level (teaser) |
+
+All endpoints prefixed with `/api/botindex/`.
 
 ---
 
 ## For AI Agents (MCP)
-
-Install the MCP server to give your agent direct access:
-
-```bash
-npm install botindex-mcp-server
-```
-
-Or add to your Claude Desktop / Cursor config:
 
 ```json
 {
   "mcpServers": {
     "botindex": {
       "command": "npx",
-      "args": ["botindex-mcp-server"]
+      "args": ["-y", "botindex-mcp"],
+      "env": { "BOTINDEX_API_KEY": "your_key" }
     }
   }
 }
 ```
 
-**Registries:** [npm](https://npmjs.com/package/botindex-mcp-server) · [Anthropic MCP Registry](https://github.com/anthropics/mcp-registry)
-
 ---
 
-## x402 Payment Flow
+## Coverage
 
-```
-Agent → GET /api/botindex/v1/sports/odds
-     ← 402 Payment Required
-       { amount: "0.02", currency: "USDC", network: "base", recipient: "0x7E6C..." }
+**16 assets under divergence monitoring:**
+BTC, ETH, SOL, KAS, STX, ORDI, BABY, HYPE, PURR, ZORA, AAVE, UNI, LINK, ARB, OP, POL
 
-Agent → GET /api/botindex/v1/sports/odds
-        + x402 payment header (signed USDC transfer)
-     ← 200 OK + data
-```
+**8 ecosystem momentum scores:**
+Ethereum, Solana, Uniswap, Hyperliquid, Base, Aave, Zora, Pump.fun
 
-### JavaScript (automatic payments)
-
-```typescript
-import { wrapAxios } from "@x402/axios";
-import axios from "axios";
-
-const client = wrapAxios(axios, "YOUR_PRIVATE_KEY");
-
-const { data } = await client.get(
-  "https://king-backend.fly.dev/api/botindex/v1/sports/correlations"
-);
-```
-
-### Python
-
-```python
-from x402.client import x402_request
-
-data = x402_request(
-    "https://king-backend.fly.dev/api/botindex/v1/sports/correlations",
-    private_key="YOUR_PRIVATE_KEY"
-)
-```
-
----
-
-## Free Endpoints (No Payment Required)
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/botindex/v1/` | Full endpoint catalog with pricing |
-| `GET /api/botindex/health` | Health check |
-| `GET /api/botindex/zora/trending-coins` | Zora trending coins (live data) |
-| `GET /api/botindex/hyperliquid/funding-arb` | HL funding rate arb signals |
-| `GET /.well-known/ai-plugin.json` | Agent discovery manifest |
-
----
-
-## Full Endpoint Reference
-
-<details>
-<summary>Sports ($0.02–$0.10)</summary>
-
-| Endpoint | Price | Description |
-|----------|-------|-------------|
-| `/v1/sports/odds` | $0.02 | Live odds (NFL, NBA, UFC, NHL) |
-| `/v1/sports/lines` | $0.02 | Line movements + sharp action flags |
-| `/v1/sports/props` | $0.02 | Prop bet movements with confidence |
-| `/v1/sports/correlations` | $0.05 | Player correlation matrix for DFS |
-| `/v1/sports/optimizer` | $0.10 | Correlation-adjusted DFS lineup optimizer |
-| `/v1/sports/arb` | $0.05 | Cross-platform arbitrage scanner |
-
-</details>
-
-<details>
-<summary>Crypto ($0.02–$0.05)</summary>
-
-| Endpoint | Price | Description |
-|----------|-------|-------------|
-| `/v1/crypto/tokens` | $0.02 | Token universe with price data |
-| `/v1/crypto/graduating` | $0.02 | Catapult→Hyperliquid graduation signals |
-| `/x402/correlation-leaders` | $0.05 | Top correlated token pairs |
-
-</details>
-
-<details>
-<summary>Solana / Genesis ($0.02)</summary>
-
-| Endpoint | Price | Description |
-|----------|-------|-------------|
-| `/v1/solana/launches` | $0.02 | Metaplex Genesis launches |
-| `/v1/solana/active` | $0.02 | Active Genesis launches only |
-
-</details>
-
-<details>
-<summary>Commerce ($0.01–$0.05)</summary>
-
-| Endpoint | Price | Description |
-|----------|-------|-------------|
-| `/v1/commerce/protocols` | $0.01 | Protocol directory with fees |
-| `/v1/commerce/compare?q=<query>` | $0.05 | Cross-protocol merchant comparison |
-
-</details>
-
-<details>
-<summary>Premium ($0.05–$0.50)</summary>
-
-| Endpoint | Price | Description |
-|----------|-------|-------------|
-| `/v1/trace/:agentId` | $0.05 | Agent reasoning trace |
-| `/v1/signals` | $0.10 | Aggregated signals feed |
-| `/v1/agent/:id/history` | $0.25 | Historical analysis |
-| `/v1/dashboard` | $0.50 | Full premium dashboard |
-
-</details>
-
----
-
-## Architecture
-
-```
-king-backend.fly.dev
-├── /api/botindex/     ← BotIndex signal intelligence (x402)
-├── /api/memeradar/    ← Token radar (x402)
-├── /api/arbwatch/     ← Arbitrage monitor (x402)
-└── /api/skinsignal/   ← CS2 skin market signals (x402)
-```
-
-Shared backend. Each app gets its own route namespace. x402 middleware gates premium endpoints. Free endpoints serve as proof-of-value.
+**Signal refresh:** Every 15 minutes. Divergence scan every 30 minutes.
 
 ---
 
 ## Links
 
+- **Landing:** [botindex.dev](https://botindex.dev)
+- **Track Record:** [api.botindex.dev/api/botindex/sentinel/track-record](https://api.botindex.dev/api/botindex/sentinel/track-record)
 - **MCP Server:** [npmjs.com/package/botindex-mcp-server](https://npmjs.com/package/botindex-mcp-server)
-- **x402 Protocol:** [github.com/coinbase/x402](https://github.com/coinbase/x402)
-- **Agent Discovery:** [king-backend.fly.dev/.well-known/ai-plugin.json](https://king-backend.fly.dev/.well-known/ai-plugin.json)
+- **AAR Trust Layer:** [aar.botindex.dev](https://aar.botindex.dev)
 
 ---
 
