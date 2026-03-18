@@ -5,6 +5,8 @@
  * Serves both human-readable and machine-consumable formats.
  */
 
+import fs from 'fs';
+import path from 'path';
 import { Request, Response, Router } from 'express';
 import { extractApiKey, getApiKeyEntry } from '../middleware/apiKeyAuth';
 import logger from '../../config/logger';
@@ -276,5 +278,130 @@ tr:hover{background:#1e293b}
 Sources: ${report.metadata.sources_ok}/${report.metadata.sources_queried} | Latency: ${report.metadata.latency_ms}ms | Updated: ${report.timestamp}
 </div></div></body></html>`;
 }
+
+// ── Track Record (PUBLIC — this is the proof) ────────────────────────
+
+router.get('/sentinel/track-record', async (_req: Request, res: Response) => {
+  try {
+    const { getTrackRecord } = await import('../../services/botindex/sentinel/prediction-tracker');
+    const record = getTrackRecord();
+
+    const wantsHtml = _req.headers.accept?.includes('text/html');
+    if (wantsHtml) {
+      const accuracyStr = record.accuracy !== null ? `${record.accuracy.toFixed(1)}%` : 'Collecting data...';
+      const assetRows = Object.entries(record.byAsset)
+        .sort((a, b) => b[1].total - a[1].total)
+        .map(([asset, s]) => `<tr><td>${asset}</td><td>${s.total}</td><td>${s.correct}</td><td>${s.accuracy.toFixed(1)}%</td></tr>`)
+        .join('');
+      const recentRows = record.recentPredictions.slice(-10).reverse()
+        .map(p => `<tr><td>${new Date(p.timestamp).toLocaleString()}</td><td>${p.asset}</td><td>${p.signal_type}</td><td>${p.direction}</td><td>${p.strength}/100</td><td>$${p.entry_price_usd?.toFixed(2) || '?'}</td></tr>`)
+        .join('');
+
+      res.setHeader('Content-Type', 'text/html');
+      res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Sentinel Track Record</title>
+<style>
+body{font-family:system-ui;background:#0f172a;color:#e2e8f0;margin:0;padding:20px}
+.container{max-width:1000px;margin:0 auto}
+h1{color:#f8fafc} h2{color:#a78bfa;margin-top:24px}
+.big{font-size:64px;font-weight:800;text-align:center;padding:20px;color:${record.accuracy && record.accuracy >= 60 ? '#10b981' : record.accuracy && record.accuracy >= 50 ? '#f59e0b' : '#ef4444'}}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center}
+.stat{background:#1e293b;padding:16px;border-radius:8px}
+.stat .n{font-size:24px;font-weight:700;color:#fff}
+.stat .l{font-size:12px;color:#64748b;text-transform:uppercase}
+table{width:100%;border-collapse:collapse;margin:16px 0}
+th{text-align:left;padding:8px;border-bottom:2px solid #334155;color:#94a3b8;font-size:.8rem;text-transform:uppercase}
+td{padding:8px;border-bottom:1px solid #1e293b;font-size:.9rem}
+.note{text-align:center;color:#64748b;font-size:.9rem;margin:20px}
+</style></head><body><div class="container">
+<h1>🎯 Sentinel Intelligence — Track Record</h1>
+<div class="big">${accuracyStr}</div>
+<div class="note">24-hour prediction accuracy across all signals</div>
+<div class="stats">
+<div class="stat"><div class="n">${record.totalPredictions}</div><div class="l">Total Predictions</div></div>
+<div class="stat"><div class="n">${record.resolved}</div><div class="l">Resolved</div></div>
+<div class="stat"><div class="n" style="color:#10b981">${record.correct}</div><div class="l">Correct</div></div>
+<div class="stat"><div class="n">${record.pending}</div><div class="l">Pending</div></div>
+</div>
+<h2>By Asset</h2>
+<table><thead><tr><th>Asset</th><th>Predictions</th><th>Correct</th><th>Accuracy</th></tr></thead><tbody>${assetRows || '<tr><td colspan="4" style="color:#64748b">Accumulating data...</td></tr>'}</tbody></table>
+<h2>Recent Predictions</h2>
+<table><thead><tr><th>Time</th><th>Asset</th><th>Signal</th><th>Direction</th><th>Strength</th><th>Entry Price</th></tr></thead><tbody>${recentRows || '<tr><td colspan="6" style="color:#64748b">No predictions yet...</td></tr>'}</tbody></table>
+<div class="note">Data collection started ${record.recentPredictions[0]?.timestamp ? new Date(record.recentPredictions[0].timestamp).toLocaleDateString() : 'today'}. Track record builds over 30-90 days.</div>
+</div></body></html>`);
+      return;
+    }
+
+    res.json(record);
+  } catch (err) {
+    logger.error({ err }, 'Track record endpoint failed');
+    res.status(500).json({ error: 'track_record_error' });
+  }
+});
+
+// ── Query Surge Intelligence (PUBLIC teaser, full for Sentinel) ──────
+
+router.get('/sentinel/query-intelligence', async (req: Request, res: Response) => {
+  try {
+    const surgeFile = path.join(process.env.DATA_DIR || '/data', 'query-surge-history.jsonl');
+    if (!fs.existsSync(surgeFile)) {
+      res.json({ signals: [], message: 'Query intelligence is accumulating data.' });
+      return;
+    }
+
+    const lines = fs.readFileSync(surgeFile, 'utf-8').trim().split('\n').filter(Boolean);
+    const entries = lines.slice(-288).map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+
+    // Aggregate endpoint hit patterns
+    const endpointCounts: Record<string, { total: number; spikes: number; lastSeen: string }> = {};
+    for (const entry of entries) {
+      if (!entry.windows) continue;
+      for (const w of entry.windows) {
+        const ep = w.endpoint || 'unknown';
+        if (!endpointCounts[ep]) endpointCounts[ep] = { total: 0, spikes: 0, lastSeen: '' };
+        endpointCounts[ep].total += w.count || 0;
+        if (w.isSpike) endpointCounts[ep].spikes++;
+        endpointCounts[ep].lastSeen = w.windowStart || entry.timestamp || '';
+      }
+    }
+
+    const ranked = Object.entries(endpointCounts)
+      .map(([endpoint, stats]) => ({ endpoint, ...stats }))
+      .sort((a, b) => b.total - a.total);
+
+    const isSentinel = isSentinelAuthorized(req);
+
+    if (!isSentinel) {
+      // Public teaser — show top 3 only, hide endpoint names
+      const teaser = ranked.slice(0, 3).map((r, i) => ({
+        rank: i + 1,
+        category: r.endpoint.includes('zora') ? 'NFT/Meme' : r.endpoint.includes('hyperliquid') ? 'DeFi/Perps' : r.endpoint.includes('crypto') ? 'Crypto' : 'Other',
+        interest_level: r.total > 1000 ? 'EXTREME' : r.total > 100 ? 'HIGH' : 'MODERATE',
+        spike_count: r.spikes,
+      }));
+
+      res.json({
+        query_intelligence: teaser,
+        total_categories_tracked: ranked.length,
+        data_window: `${entries.length} snapshots (~${Math.round(entries.length * 5 / 60)}h)`,
+        message: 'Full endpoint-level query intelligence available with Sentinel tier.',
+        upgrade: { url: REGISTER_URL, price: '$49.99/mo' },
+      });
+      return;
+    }
+
+    // Full Sentinel response
+    res.json({
+      query_intelligence: ranked,
+      total_endpoints: ranked.length,
+      total_requests_tracked: ranked.reduce((s, r) => s + r.total, 0),
+      total_spikes: ranked.reduce((s, r) => s + r.spikes, 0),
+      data_window: `${entries.length} snapshots (~${Math.round(entries.length * 5 / 60)}h)`,
+      insight: ranked[0] ? `Highest demand: ${ranked[0].endpoint} with ${ranked[0].total} requests and ${ranked[0].spikes} spike events` : 'Insufficient data',
+    });
+  } catch (err) {
+    logger.error({ err }, 'Query intelligence endpoint failed');
+    res.status(500).json({ error: 'query_intelligence_error' });
+  }
+});
 
 export default router;

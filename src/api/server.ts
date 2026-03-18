@@ -280,6 +280,12 @@ async function start() {
   // Start Divergence Scanner (whales holding + devs building + fear growing)
   const { startDivergenceScanner } = await import('../services/botindex/sentinel/divergence-scanner');
   startDivergenceScanner();
+
+  // Resolve predictions every 6 hours (check which predictions were right/wrong)
+  const { resolvePredictions } = await import('../services/botindex/sentinel/prediction-tracker');
+  setInterval(() => { void resolvePredictions(); }, 6 * 60 * 60 * 1000);
+  // First resolution pass after 5 minutes
+  setTimeout(() => { void resolvePredictions(); }, 5 * 60 * 1000);
   
   app.listen(PORT, () => {
     logger.info(

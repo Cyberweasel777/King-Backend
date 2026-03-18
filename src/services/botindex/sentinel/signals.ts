@@ -325,6 +325,14 @@ export async function buildSentinelReport(): Promise<SentinelReport> {
     latency_ms: report.metadata.latency_ms,
   });
 
+  // Log verifiable predictions with entry prices
+  try {
+    const { logPredictions } = await import('./prediction-tracker');
+    await logPredictions(report.signals);
+  } catch (err) {
+    logger.warn({ err }, 'Prediction logging failed (non-fatal)');
+  }
+
   return report;
 }
 
