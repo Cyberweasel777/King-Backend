@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import Stripe from 'stripe';
 import { z } from 'zod';
+import { trackEvent } from '../../config/posthog';
 import logger from '../../config/logger';
 import {
   BotIndexApiPlan,
@@ -188,6 +189,7 @@ router.get('/register', async (req: Request, res: Response) => {
       // Free tier: 10 req/day
       entry.dailyLimit = 10;
       trackFunnelEvent('api_key_issued', 'free');
+      trackEvent(emailParam || req.ip || 'anonymous', 'key_issued', { plan: 'free' });
       trackRealtimeFunnelEvent('key_issued', { plan: 'free', keyPrefix: apiKey.slice(0, 8) });
 
       // Send key to email as backup
@@ -465,6 +467,7 @@ router.get('/success', async (req: Request, res: Response) => {
       entry.dailyLimit = 500;
     }
     trackFunnelEvent('api_key_issued', plan);
+    trackEvent(email || 'anonymous', 'key_issued', { plan, source: 'stripe_checkout' });
     if (plan === 'sentinel') {
       logger.info({ truth: 'SENTINEL_KEY_ISSUED', plan, sessionId, apiKeyPrefix: apiKey.slice(0, 16), email }, 'Single source of truth event');
     }

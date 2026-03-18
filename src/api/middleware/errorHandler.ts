@@ -4,6 +4,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../../utils/logger';
+import { Sentry } from '../../config/sentry';
 
 export function errorHandler(
   err: Error,
@@ -11,6 +12,7 @@ export function errorHandler(
   res: Response,
   next: NextFunction
 ) {
+  Sentry.captureException(err, { extra: { path: req.path, method: req.method } });
   logger.error({ err, path: req.path, method: req.method }, 'Unhandled error');
   
   res.status(500).json({

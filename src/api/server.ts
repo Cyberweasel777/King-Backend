@@ -28,6 +28,9 @@ import botindexSynthesisRouter from './routes/botindex-synthesis';
 import botindexSentinelRouter from './routes/botindex-sentinel';
 import { initDb } from '../shared/payments/database';
 import logger from '../config/logger';
+import { initSentry, Sentry } from '../config/sentry';
+import { initPostHog, shutdownPostHog } from '../config/posthog';
+import { initUpstash } from '../config/upstash';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -263,6 +266,11 @@ app.use((req, res) => {
 });
 
 async function start() {
+  // Initialize observability + infra
+  initSentry();
+  initPostHog();
+  initUpstash();
+
   // Initialize database
   await initDb();
   await initReceiptSigning();
@@ -304,7 +312,14 @@ async function start() {
 }
 
 start().catch((error) => {
+  Sentry.captureException(error);
   logger.error({ err: error }, 'Failed to start API server');
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  await shutdownPostHog();
+  process.exit(0);
 });
 
 if (process.env.ZORA_ALPHA_BOT_TOKEN) {
