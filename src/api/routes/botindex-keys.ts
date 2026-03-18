@@ -697,6 +697,25 @@ router.get('/admin/truth', async (req: Request, res: Response) => {
     logger.warn({ err }, 'Failed to query Stripe for admin truth endpoint');
   }
 
+  // Agorion registry stats
+  let agorionStats: { totalProviders: number; healthyProviders: number; bySource: Record<string, number> } | null = null;
+  try {
+    const agorionFile = path.join(DATA_DIR, 'agorion-registry.json');
+    if (fs.existsSync(agorionFile)) {
+      const raw = fs.readFileSync(agorionFile, 'utf-8');
+      const parsed = JSON.parse(raw);
+      const providers = Array.isArray(parsed) ? parsed : (parsed.providers || []);
+      const bySource: Record<string, number> = {};
+      let healthy = 0;
+      for (const p of providers) {
+        const src = p.source || 'unknown';
+        bySource[src] = (bySource[src] || 0) + 1;
+        if ((p.health?.status || p.status) === 'healthy') healthy++;
+      }
+      agorionStats = { totalProviders: providers.length, healthyProviders: healthy, bySource };
+    }
+  } catch { /* non-fatal */ }
+
   res.json({
     timestamp: new Date().toISOString(),
     singleSource: 'admin/truth',
@@ -718,6 +737,7 @@ router.get('/admin/truth', async (req: Request, res: Response) => {
       lastEventAt: ((funnel.events || [])[((funnel.events || []).length - 1)]?.ts) || null,
     },
     stripe: stripeSummary,
+    agorion: agorionStats,
     truthEvents: {
       grepHint: 'grep -E "SENTINEL_(REGISTER_HIT|CHECKOUT_CREATED|CHECKOUT_COMPLETED|KEY_ISSUED)"',
     },

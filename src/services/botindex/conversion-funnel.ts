@@ -11,6 +11,8 @@ export type FunnelEventType =
 type FunnelEvent = {
   type: FunnelEventType;
   ts: string;
+  // legacy compatibility for old snapshots
+  timestamp?: string;
   plan?: 'free' | 'basic' | 'pro' | 'starter' | 'sentinel' | 'enterprise';
 };
 
@@ -31,7 +33,12 @@ function load(): void {
     const raw = fs.readFileSync(FILE, 'utf-8');
     const parsed = JSON.parse(raw) as FunnelStore;
     if (Array.isArray(parsed.events)) {
-      store.events = parsed.events.slice(-MAX_EVENTS);
+      // normalize legacy entries that used `timestamp` instead of `ts`
+      const normalized = parsed.events.map((e) => ({
+        ...e,
+        ts: e.ts || e.timestamp || new Date().toISOString(),
+      }));
+      store.events = normalized.slice(-MAX_EVENTS);
     }
   } catch (err) {
     logger.warn({ err }, 'Failed to load conversion funnel ledger');
