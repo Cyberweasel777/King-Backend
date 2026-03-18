@@ -263,6 +263,10 @@ async function start() {
   await initDb();
   await initReceiptSigning();
   
+  // Start market surge monitor (broad crypto spike detection)
+  const { startMarketSurgeMonitor } = await import('../services/botindex/market-surge-monitor');
+  startMarketSurgeMonitor();
+  
   app.listen(PORT, () => {
     logger.info(
       {
