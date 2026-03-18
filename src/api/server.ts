@@ -276,6 +276,10 @@ async function start() {
   setInterval(() => { void sendPersonalSentinelAlert(); }, 15 * 60 * 1000);
   // First personal alert after 60 seconds
   setTimeout(() => { void sendPersonalSentinelAlert(); }, 60_000);
+
+  // Start Divergence Scanner (whales holding + devs building + fear growing)
+  const { startDivergenceScanner } = await import('../services/botindex/sentinel/divergence-scanner');
+  startDivergenceScanner();
   
   app.listen(PORT, () => {
     logger.info(
