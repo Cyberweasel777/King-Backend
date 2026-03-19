@@ -336,7 +336,26 @@ td{padding:8px;border-bottom:1px solid #1e293b;font-size:.9rem}
     // Gate detailed signals behind Sentinel auth
     const isSentinel = isSentinelAuthorized(_req);
     if (!isSentinel) {
-      // Public: stats only, no signal details
+      // Public: stats + redacted teasers (no narrative, no entry price, no strength)
+      const teaserPredictions = record.recentPredictions.slice(-5).reverse().map(p => ({
+        timestamp: p.timestamp,
+        asset: p.asset,
+        signal_type: p.signal_type,
+        direction: p.direction,
+        strength: '🔒',
+        narrative: '🔒 Available with Sentinel tier',
+        entry_price_usd: null,
+        resolved: p.resolved,
+      }));
+      const teaserResolutions = record.recentResolutions.slice(-3).reverse().map(r => ({
+        asset: r.asset,
+        direction_predicted: r.direction_predicted,
+        correct_24h: r.correct_24h,
+        pct_change_24h: r.pct_change_24h ? `${r.pct_change_24h > 0 ? '+' : ''}${r.pct_change_24h.toFixed(1)}%` : null,
+        entry_price: null,
+        price_at_24h: null,
+        timestamp: r.timestamp,
+      }));
       res.json({
         totalPredictions: record.totalPredictions,
         resolved: record.resolved,
@@ -346,9 +365,9 @@ td{padding:8px;border-bottom:1px solid #1e293b;font-size:.9rem}
         accuracy: record.accuracy,
         byAsset: record.byAsset,
         byType: record.byType,
-        recentPredictions: [],
-        recentResolutions: [],
-        message: 'Live signals and resolution details available with Sentinel tier.',
+        recentPredictions: teaserPredictions,
+        recentResolutions: teaserResolutions,
+        message: 'Full signal details (narratives, entry prices, strength scores) available with Sentinel tier.',
         upgrade: { url: 'https://api.botindex.dev/api/botindex/keys/register?plan=sentinel', price: '$49.99/mo', trial: '7-day free trial' },
       });
       return;
