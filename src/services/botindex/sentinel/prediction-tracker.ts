@@ -283,6 +283,10 @@ export function getTrackRecord(): {
     for (const l of lines) { try { resolutions.push(JSON.parse(l)); } catch { /* skip */ } }
   }
 
+  // Build prediction lookup
+  const predMap = new Map<string, Prediction>();
+  for (const p of predictions) predMap.set(p.id, p);
+
   // Filter out excluded signal types from resolution counts
   const EXCLUDED_TYPES_SET = new Set(['pump_signal']);
   const scorableResolutions = resolutions.filter(r => {
@@ -297,10 +301,6 @@ export function getTrackRecord(): {
 
   const byAsset: Record<string, { total: number; correct: number; accuracy: number }> = {};
   const byType: Record<string, { total: number; correct: number; accuracy: number }> = {};
-
-  // Build prediction lookup
-  const predMap = new Map<string, Prediction>();
-  for (const p of predictions) predMap.set(p.id, p);
 
   // Signal types excluded from public track record (broken/disabled)
   const EXCLUDED_TYPES = new Set(['pump_signal']);
