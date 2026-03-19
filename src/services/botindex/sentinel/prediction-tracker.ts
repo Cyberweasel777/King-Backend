@@ -77,6 +77,49 @@ function appendJsonl(filePath: string, data: unknown): void {
   try { fs.appendFileSync(filePath, JSON.stringify(data) + '\n'); } catch { /* non-fatal */ }
 }
 
+const ADMIN_CHAT_ID = process.env.ADMIN_TELEGRAM_CHAT_ID || '8063432083';
+const TELEGRAM_BOT_TOKEN = process.env.BOTINDEX_BOT_TOKEN || '';
+
+async function sendWinAlert(pred: Prediction, currentPrice: number | null, pctChange: number): Promise<void> {
+  if (!TELEGRAM_BOT_TOKEN) return;
+
+  const direction = pred.direction === 'bullish' ? '📈 BULLISH' : pred.direction === 'bearish' ? '📉 BEARISH' : '➡️ NEUTRAL';
+  const arrow = pctChange > 0 ? '↑' : '↓';
+  const emoji = '🎯';
+
+  const message = [
+    `${emoji} WIN ALERT — Signal confirmed!`,
+    ``,
+    `${direction} ${pred.asset} call was CORRECT`,
+    `Signal: ${pred.signal_type.replace(/_/g, ' ')}`,
+    `Strength: ${pred.strength}/100`,
+    ``,
+    `Entry: $${pred.entry_price_usd?.toLocaleString('en-US', { maximumFractionDigits: 2 })}`,
+    `Now: $${currentPrice?.toLocaleString('en-US', { maximumFractionDigits: 2 })}`,
+    `Move: ${arrow} ${Math.abs(pctChange).toFixed(2)}%`,
+    ``,
+    `"${pred.narrative}"`,
+    ``,
+    `Signal time: ${pred.timestamp}`,
+    `Track record: botindex.dev/sentinel/track-record`,
+    ``,
+    `📸 Screenshot this for social proof!`,
+  ].join('\n');
+
+  const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: ADMIN_CHAT_ID, text: message, parse_mode: 'HTML' }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Telegram sendMessage failed (${res.status}): ${body}`);
+  }
+
+  logger.info({ asset: pred.asset, direction: pred.direction, pctChange, strength: pred.strength }, 'Win alert sent to admin');
+}
+
 /**
  * Log a prediction for every signal in a Sentinel report.
  * Call this after buildSentinelReport().
@@ -200,6 +243,13 @@ export async function resolvePredictions(): Promise<{ resolved: number; total: n
     appendJsonl(RESOLUTIONS_LOG, resolution);
     existingIds.add(pred.id);
     resolved++;
+
+    // WIN ALERT: notify Andrew when a high-strength signal resolves correctly with a meaningful move
+    if (correct === true && pred.strength >= 65 && pctChange !== null && Math.abs(pctChange) >= 1.5) {
+      sendWinAlert(pred, currentPrice, pctChange).catch(err =>
+        logger.warn({ err: err instanceof Error ? err.message : String(err) }, 'Win alert failed')
+      );
+    }
   }
 
   return { resolved, total: lines.length };
