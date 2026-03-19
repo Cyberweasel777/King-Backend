@@ -288,6 +288,7 @@ router.get('/sentinel/track-record', async (_req: Request, res: Response) => {
 
     const wantsHtml = _req.headers.accept?.includes('text/html');
     if (wantsHtml) {
+      const isSentinelHtml = isSentinelAuthorized(_req);
       const accuracyStr = record.accuracy !== null
         ? `${record.accuracy.toFixed(1)}%`
         : (record.totalPredictions > 0 && record.resolved === 0 ? 'Resolving in ~6h' : 'Collecting data...');
@@ -295,9 +296,26 @@ router.get('/sentinel/track-record', async (_req: Request, res: Response) => {
         .sort((a, b) => b[1].total - a[1].total)
         .map(([asset, s]) => `<tr><td>${asset}</td><td>${s.total}</td><td>${s.correct}</td><td>${s.accuracy.toFixed(1)}%</td></tr>`)
         .join('');
-      const recentRows = record.recentPredictions.slice(-10).reverse()
+      const typeRows = Object.entries(record.byType)
+        .sort((a, b) => b[1].accuracy - a[1].accuracy)
+        .map(([type, s]) => `<tr><td>${type}</td><td>${s.total}</td><td>${s.correct}</td><td>${s.accuracy.toFixed(1)}%</td></tr>`)
+        .join('');
+
+      // Teaser rows: show asset + signal type + direction, lock the rest
+      const teaserRows = record.recentPredictions.slice(-5).reverse()
+        .map(p => `<tr><td>${new Date(p.timestamp).toLocaleString()}</td><td>${p.asset}</td><td>${p.signal_type}</td><td>${p.direction}</td><td>🔒</td><td>🔒</td></tr>`)
+        .join('');
+      const fullRows = record.recentPredictions.slice(-10).reverse()
         .map(p => `<tr><td>${new Date(p.timestamp).toLocaleString()}</td><td>${p.asset}</td><td>${p.signal_type}</td><td>${p.direction}</td><td>${p.strength}/100</td><td>$${p.entry_price_usd?.toFixed(2) || '?'}</td></tr>`)
         .join('');
+      const recentRows = isSentinelHtml ? fullRows : teaserRows;
+
+      const ctaHtml = isSentinelHtml ? '' : `
+<div style="text-align:center;margin:32px 0;padding:24px;background:linear-gradient(135deg,#7c3aed22,#a78bfa22);border:1px solid #7c3aed44;border-radius:12px">
+  <p style="font-size:1.1rem;color:#a78bfa;margin:0 0 8px">🔒 Full signal details — narratives, entry prices, strength scores</p>
+  <a href="https://api.botindex.dev/api/botindex/keys/register?plan=sentinel" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:1rem">Start 7-Day Free Trial →</a>
+  <p style="color:#64748b;font-size:.8rem;margin:8px 0 0">$49.99/mo after trial · Cancel anytime</p>
+</div>`;
 
       res.setHeader('Content-Type', 'text/html');
       res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Sentinel Track Record</title>
@@ -324,10 +342,13 @@ td{padding:8px;border-bottom:1px solid #1e293b;font-size:.9rem}
 <div class="stat"><div class="n" style="color:#10b981">${record.correct}</div><div class="l">Correct</div></div>
 <div class="stat"><div class="n">${record.pending}</div><div class="l">Pending</div></div>
 </div>
+<h2>By Signal Type</h2>
+<table><thead><tr><th>Signal</th><th>Resolved</th><th>Correct</th><th>Accuracy</th></tr></thead><tbody>${typeRows || '<tr><td colspan="4" style="color:#64748b">Accumulating data...</td></tr>'}</tbody></table>
 <h2>By Asset</h2>
-<table><thead><tr><th>Asset</th><th>Predictions</th><th>Correct</th><th>Accuracy</th></tr></thead><tbody>${assetRows || '<tr><td colspan="4" style="color:#64748b">Accumulating data...</td></tr>'}</tbody></table>
-<h2>Recent Predictions</h2>
+<table><thead><tr><th>Asset</th><th>Resolved</th><th>Correct</th><th>Accuracy</th></tr></thead><tbody>${assetRows || '<tr><td colspan="4" style="color:#64748b">Accumulating data...</td></tr>'}</tbody></table>
+<h2>Recent Signals</h2>
 <table><thead><tr><th>Time</th><th>Asset</th><th>Signal</th><th>Direction</th><th>Strength</th><th>Entry Price</th></tr></thead><tbody>${recentRows || '<tr><td colspan="6" style="color:#64748b">No predictions yet...</td></tr>'}</tbody></table>
+${ctaHtml}
 <div class="note">Data collection started ${record.recentPredictions[0]?.timestamp ? new Date(record.recentPredictions[0].timestamp).toLocaleDateString() : 'today'}. Track record builds over 30-90 days.</div>
 </div></body></html>`);
       return;
