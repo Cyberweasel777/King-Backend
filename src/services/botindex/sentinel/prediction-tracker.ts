@@ -283,8 +283,16 @@ export function getTrackRecord(): {
     for (const l of lines) { try { resolutions.push(JSON.parse(l)); } catch { /* skip */ } }
   }
 
-  const correct = resolutions.filter(r => r.correct_24h === true).length;
-  const incorrect = resolutions.filter(r => r.correct_24h === false).length;
+  // Filter out excluded signal types from resolution counts
+  const EXCLUDED_TYPES_SET = new Set(['pump_signal']);
+  const scorableResolutions = resolutions.filter(r => {
+    const pred = predMap.get(r.prediction_id);
+    const type = pred?.signal_type || 'unknown';
+    return !EXCLUDED_TYPES_SET.has(type);
+  });
+
+  const correct = scorableResolutions.filter(r => r.correct_24h === true).length;
+  const incorrect = scorableResolutions.filter(r => r.correct_24h === false).length;
   const resolvedCount = correct + incorrect;
 
   const byAsset: Record<string, { total: number; correct: number; accuracy: number }> = {};
@@ -294,13 +302,20 @@ export function getTrackRecord(): {
   const predMap = new Map<string, Prediction>();
   for (const p of predictions) predMap.set(p.id, p);
 
+  // Signal types excluded from public track record (broken/disabled)
+  const EXCLUDED_TYPES = new Set(['pump_signal']);
+
   for (const r of resolutions) {
     // Only aggregate scored outcomes (exclude null/unscorable resolutions)
     if (r.correct_24h === null) continue;
 
     const pred = predMap.get(r.prediction_id);
-    const asset = normalizeAsset(r.asset);
     const type = pred?.signal_type || 'unknown';
+
+    // Skip excluded signal types entirely
+    if (EXCLUDED_TYPES.has(type)) continue;
+
+    const asset = normalizeAsset(r.asset);
 
     if (!byAsset[asset]) byAsset[asset] = { total: 0, correct: 0, accuracy: 0 };
     byAsset[asset].total++;
