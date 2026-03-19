@@ -4,6 +4,7 @@ import logger from '../../config/logger';
 
 export type FunnelEventType =
   | 'register_page_hit'
+  | 'sentinel_interstitial_shown'
   | 'checkout_session_created'
   | 'checkout_completed'
   | 'api_key_issued';
