@@ -253,6 +253,7 @@ RULES:
 - IMPORTANT: whale_divergence direction = whale's bet direction, NOT current price direction
 - Network momentum surges indicate pre-move developer interest
 - Be specific about assets. "BTC" not "the market"
+- ASSET DIVERSITY: Do NOT only generate BTC and ETH signals. Look at trending tokens, TVL movers, and funding rate data for altcoins (SOL, AVAX, LINK, DOGE, etc). At least 1-2 signals per batch MUST be for non-BTC/ETH assets when the data supports it.
 - Be direct. No hedging language. State the signal clearly.
 - If data is insufficient, lower confidence, don't hallucinate signals`;
 
