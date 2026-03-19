@@ -19,6 +19,7 @@ import path from 'path';
 import logger from '../../../config/logger';
 import { getHyperliquidWhaleAlerts } from '../hyperliquid/whale-alerts';
 import { getFundingArbOpportunities } from '../hyperliquid/funding-arb';
+import { getTrending } from '../coingecko-cache';
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const SENTINEL_LOG = path.join(DATA_DIR, 'sentinel-signals.jsonl');
@@ -129,7 +130,7 @@ async function collectAllData(): Promise<CollectedData> {
     getHyperliquidWhaleAlerts().then(d => { sourcesOk++; return d; }).catch(() => null),
     getFundingArbOpportunities().then(d => { sourcesOk++; return d; }).catch(() => null),
     safeFetchJson<{ data: Array<{ value: string; value_classification: string }> }>('https://api.alternative.me/fng/?limit=1', 'fear-greed'),
-    safeFetchJson<{ coins: Array<{ item: { name: string; symbol: string; market_cap_rank: number; data?: { price_change_percentage_24h?: Record<string, number> } } }> }>('https://api.coingecko.com/api/v3/search/trending', 'coingecko-trending'),
+    getTrending() as Promise<{ coins: Array<{ item: { name: string; symbol: string; market_cap_rank: number; data?: { price_change_percentage_24h?: Record<string, number> } } }> } | null>,
     safeFetchJson<Array<{ name: string; symbol: string; tvl: number; change_1d: number }>>('https://api.llama.fi/protocols', 'defillama'),
     // SearXNG for npm/GitHub sentiment (lightweight query)
     safeFetchJson<{ results?: Array<{ title: string; content: string }> }>('http://127.0.0.1:8888/search?q=crypto+crash+dump+warning+2026&format=json&categories=general&engines=reddit,google&language=en', 'searxng-sentiment'),

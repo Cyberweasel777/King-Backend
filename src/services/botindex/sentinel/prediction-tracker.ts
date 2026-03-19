@@ -12,20 +12,11 @@
 import fs from 'fs';
 import path from 'path';
 import logger from '../../../config/logger';
+import { ASSET_TO_COINGECKO, getPrice, getPrices } from '../coingecko-cache';
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const PREDICTIONS_LOG = path.join(DATA_DIR, 'sentinel-predictions.jsonl');
 const RESOLUTIONS_LOG = path.join(DATA_DIR, 'sentinel-resolutions.jsonl');
-const FETCH_TIMEOUT_MS = 10_000;
-
-// CoinGecko IDs for price snapshots
-const ASSET_TO_COINGECKO: Record<string, string> = {
-  BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana', KAS: 'kaspa',
-  STX: 'blockstack', ORDI: 'ordi', BABY: 'babylon', HYPE: 'hyperliquid',
-  PURR: 'purr-2', ZORA: 'zora-2', AAVE: 'aave', UNI: 'uniswap',
-  LINK: 'chainlink', ARB: 'arbitrum', OP: 'optimism', POL: 'matic-network',
-  BASE: 'base', PUMP: 'pump-fun',
-};
 
 export interface Prediction {
   id: string;
@@ -65,20 +56,6 @@ function appendJsonl(filePath: string, data: unknown): void {
   try { fs.appendFileSync(filePath, JSON.stringify(data) + '\n'); } catch { /* non-fatal */ }
 }
 
-async function fetchPrice(asset: string): Promise<number | null> {
-  const cgId = ASSET_TO_COINGECKO[asset.toUpperCase()];
-  if (!cgId) return null;
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=usd`, { signal: controller.signal });
-    clearTimeout(timer);
-    if (!res.ok) return null;
-    const data = await res.json() as Record<string, { usd: number }>;
-    return data[cgId]?.usd ?? null;
-  } catch { return null; }
-}
-
 /**
  * Log a prediction for every signal in a Sentinel report.
  * Call this after buildSentinelReport().
@@ -98,12 +75,8 @@ export async function logPredictions(signals: Array<{
 
   // Batch price fetches — deduplicate assets
   const assets = [...new Set(signals.map(s => s.asset.toUpperCase()))];
-  const prices: Record<string, number | null> = {};
-  for (const asset of assets) {
-    prices[asset] = await fetchPrice(asset);
-    // Brief delay to avoid CoinGecko rate limits
-    await new Promise(r => setTimeout(r, 200));
-  }
+  const scorableAssets = assets.filter(asset => !!ASSET_TO_COINGECKO[asset]);
+  const prices = await getPrices(scorableAssets);
 
   for (const signal of signals) {
     const entryPrice = prices[signal.asset.toUpperCase()] ?? null;
@@ -134,9 +107,9 @@ export async function logPredictions(signals: Array<{
   }
 
   if (logged > 0) {
-    logger.info({ count: logged, skippedUnscorable, assets }, 'Predictions logged with entry prices');
+    logger.info({ count: logged, skippedUnscorable, assets: scorableAssets }, 'Predictions logged with entry prices');
   } else if (skippedUnscorable > 0) {
-    logger.info({ skippedUnscorable, assets }, 'Skipped unscorable predictions with missing entry prices');
+    logger.info({ skippedUnscorable, assets: scorableAssets }, 'Skipped unscorable predictions with missing entry prices');
   }
   return logged;
 }
@@ -171,8 +144,7 @@ export async function resolvePredictions(): Promise<{ resolved: number; total: n
     const resolveAt6h = predictionTimestamp + (6 * 60 * 60 * 1000);
     if (now < resolveAt6h) continue; // Not ready yet
 
-    const currentPrice = await fetchPrice(pred.asset);
-    await new Promise(r => setTimeout(r, 200)); // Rate limit
+    const currentPrice = await getPrice(pred.asset);
 
     const entryPrice = pred.entry_price_usd;
     const pctChange = (entryPrice && currentPrice) ? ((currentPrice - entryPrice) / entryPrice) * 100 : null;

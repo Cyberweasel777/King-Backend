@@ -16,6 +16,7 @@
 import fs from 'fs';
 import path from 'path';
 import logger from '../../../config/logger';
+import { ASSET_TO_COINGECKO, getPrices } from '../coingecko-cache';
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const DIVERGENCE_LOG = path.join(DATA_DIR, 'divergence-signals.jsonl');
@@ -247,41 +248,42 @@ interface FearData {
   assetPriceChanges: Map<string, { change24h: number; change7d: number }>;
 }
 
-// Map our asset tickers to CoinGecko IDs
-const ASSET_TO_COINGECKO: Record<string, string> = {
-  BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana', KAS: 'kaspa',
-  STX: 'blockstack', ORDI: 'ordi', BABY: 'babylon',
-  HYPE: 'hyperliquid', PURR: 'purr-2', ZORA: 'zora-2',
-  AAVE: 'aave', UNI: 'uniswap', LINK: 'chainlink',
-  ARB: 'arbitrum', OP: 'optimism', POL: 'matic-network',
-  BASE: 'coinbase-wrapped-btc', // BASE doesn't have a direct token on CG
-};
-
 async function getFearSignals(): Promise<FearData | null> {
-  // Fetch Fear & Greed + all asset prices in one batch
-  const cgIds = [...new Set(Object.values(ASSET_TO_COINGECKO))].join(',');
+  const tickerAliases: Record<string, string> = { MATIC: 'POL' };
+  const trackedTickers = [...new Set([...Object.keys(ASSET_TO_COINGECKO), ...Object.keys(tickerAliases)])];
+  const canonicalTickers = [...new Set(
+    trackedTickers
+      .map(ticker => tickerAliases[ticker] || ticker)
+      .filter(ticker => !!ASSET_TO_COINGECKO[ticker])
+  )];
+  const cgIds = [...new Set(canonicalTickers.map(ticker => ASSET_TO_COINGECKO[ticker]))].join(',');
 
-  const [fng, priceData] = await Promise.all([
+  const [fng, currentPrices, marketsData] = await Promise.all([
     safeFetchJson<{ data: Array<{ value: string; value_classification: string }> }>('https://api.alternative.me/fng/?limit=1'),
-    safeFetchJson<Record<string, { usd_24h_change?: number; usd_24h_vol?: number }>>(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${cgIds}&vs_currencies=usd&include_24hr_change=true`
+    getPrices(canonicalTickers),
+    safeFetchJson<Array<{ id: string; price_change_percentage_7d_in_currency?: number; price_change_percentage_24h?: number }>>(
+      `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${cgIds}&sparkline=false&price_change_percentage=7d`
     ),
   ]);
 
   if (!fng?.data?.[0]) return null;
 
-  // Also get 7d changes from /coins/markets
-  const marketsData = await safeFetchJson<Array<{ id: string; price_change_percentage_7d_in_currency?: number; price_change_percentage_24h?: number }>>(
-    `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${cgIds}&sparkline=false&price_change_percentage=7d`
-  );
-
   const assetPriceChanges = new Map<string, { change24h: number; change7d: number }>();
+  const marketsById = new Map((marketsData || []).map(m => [m.id, m]));
 
-  for (const [ticker, cgId] of Object.entries(ASSET_TO_COINGECKO)) {
-    const price24h = priceData?.[cgId]?.usd_24h_change ?? 0;
-    const market = marketsData?.find(m => m.id === cgId);
-    const price7d = market?.price_change_percentage_7d_in_currency ?? 0;
-    assetPriceChanges.set(ticker, { change24h: price24h, change7d: price7d });
+  for (const ticker of trackedTickers) {
+    const canonical = tickerAliases[ticker] || ticker;
+    const cgId = ASSET_TO_COINGECKO[canonical];
+    if (!cgId) continue;
+    const market = marketsById.get(cgId);
+    const hasPrice = currentPrices[canonical] !== null && currentPrices[canonical] !== undefined;
+    if (!market && !hasPrice) {
+      assetPriceChanges.set(ticker, { change24h: 0, change7d: 0 });
+      continue;
+    }
+    const change24h = market?.price_change_percentage_24h ?? 0;
+    const change7d = market?.price_change_percentage_7d_in_currency ?? 0;
+    assetPriceChanges.set(ticker, { change24h, change7d });
   }
 
   return {

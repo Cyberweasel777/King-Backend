@@ -13,6 +13,7 @@
 import fs from 'fs';
 import path from 'path';
 import logger from '../../config/logger';
+import { getTrending, isTrendingFresh } from './coingecko-cache';
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const MARKET_SURGE_LOG = path.join(DATA_DIR, 'market-surge-history.jsonl');
@@ -177,10 +178,7 @@ async function scanDexScreenerGainers(): Promise<MarketSurge[]> {
 async function scanCoinGeckoTrending(): Promise<MarketSurge[]> {
   const surges: MarketSurge[] = [];
 
-  const trending = await safeFetchJson<CoinGeckoTrending>(
-    'https://api.coingecko.com/api/v3/search/trending',
-    'coingecko-trending'
-  );
+  const trending = await getTrending() as CoinGeckoTrending | null;
 
   if (trending?.coins) {
     const currentTrending = new Set<string>();
@@ -194,6 +192,7 @@ async function scanCoinGeckoTrending(): Promise<MarketSurge[]> {
 
       // Detect NEW entries in trending (weren't there last check)
       if (!previousTrendingSet.has(key)) {
+        if (!isTrendingFresh()) return surges;
         const priceChange24h = item.data?.price_change_percentage_24h?.usd;
         surges.push({
           token: item.name,
