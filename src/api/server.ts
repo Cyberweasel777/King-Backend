@@ -298,6 +298,10 @@ async function start() {
   // Start Telegram subscriber bot (polls for /subscribe commands)
   const { startTelegramBot } = await import('../services/botindex/sentinel/telegram-subscribers');
   startTelegramBot();
+
+  // Start delayed public Telegram relay for Sentinel signals
+  const { startPublicRelay } = await import('../services/botindex/sentinel/public-channel-relay');
+  startPublicRelay();
   
   app.listen(PORT, () => {
     logger.info(

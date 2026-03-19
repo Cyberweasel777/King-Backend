@@ -45,6 +45,7 @@
     "pino": "^8.17.2",
     "pino-pretty": "^10.3.1",
     "posthog-node": "^5.28.4",
+    "sharp": "^0.34.5",
     "stripe": "^17.0.0",
     "telegraf": "^4.15.3",
     "tweetnacl": "^1.0.3",

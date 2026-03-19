@@ -19,7 +19,8 @@ import path from 'path';
 import logger from '../../../config/logger';
 import { getHyperliquidWhaleAlerts } from '../hyperliquid/whale-alerts';
 import { getFundingArbOpportunities } from '../hyperliquid/funding-arb';
-import { getTrending } from '../coingecko-cache';
+import { getTrending, getPrices } from '../coingecko-cache';
+import { queueSignalForRelay } from './public-channel-relay';
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const SENTINEL_LOG = path.join(DATA_DIR, 'sentinel-signals.jsonl');
@@ -405,6 +406,23 @@ export async function sendPersonalSentinelAlert(): Promise<void> {
     // Broadcast to all subscribers (Andrew + paid users)
     const { broadcastAlert } = await import('./telegram-subscribers');
     const sent = await broadcastAlert(message, 'pro');
+
+    // Queue stronger signals for delayed public relay (supplementary channel)
+    const publicRelayCandidates = report.signals.filter(s => s.strength >= 60);
+    if (publicRelayCandidates.length > 0) {
+      const prices = await getPrices(publicRelayCandidates.map(s => s.asset));
+      for (const signal of publicRelayCandidates) {
+        queueSignalForRelay({
+          asset: signal.asset,
+          signal_type: signal.type,
+          direction: signal.direction,
+          strength: signal.strength,
+          narrative: signal.narrative,
+          entry_price_usd: prices[signal.asset.toUpperCase()] ?? null,
+          timestamp: report.timestamp,
+        });
+      }
+    }
 
     appendJsonl(SENTINEL_ALERTS_LOG, {
       timestamp: report.timestamp,
