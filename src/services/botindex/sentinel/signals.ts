@@ -247,8 +247,10 @@ OUTPUT FORMAT (strict JSON, no markdown):
 
 RULES:
 - Generate 3-7 signals, ranked by strength
-- Flag dump_warning signals when: extreme greed + whale concentration + high funding rates converge
-- Flag pump_signal when: extreme fear + whale accumulation + social bearishness peak (contrarian)
+- Flag dump_warning signals when: extreme greed + whale concentration + high funding rates converge (BEARISH)
+- Flag pump_signal when: extreme fear + whale accumulation + social bearishness peak (contrarian BULLISH) — ONLY if price has already dropped >5% in 24h and fear index is below 25. Do NOT flag pump_signal in a slow bleed or sideways market.
+- whale_divergence: when whale positions DIVERGE from price action. If whales are long while price drops, direction is BULLISH (smart money accumulating). If whales are short while price rises, direction is BEARISH. The direction should match WHERE THE WHALE IS POSITIONED, not the current price trend.
+- IMPORTANT: whale_divergence direction = whale's bet direction, NOT current price direction
 - Network momentum surges indicate pre-move developer interest
 - Be specific about assets. "BTC" not "the market"
 - Be direct. No hedging language. State the signal clearly.
