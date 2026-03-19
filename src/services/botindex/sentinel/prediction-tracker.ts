@@ -18,6 +18,27 @@ const DATA_DIR = process.env.DATA_DIR || '/data';
 const PREDICTIONS_LOG = path.join(DATA_DIR, 'sentinel-predictions.jsonl');
 const RESOLUTIONS_LOG = path.join(DATA_DIR, 'sentinel-resolutions.jsonl');
 
+const ASSET_ALIASES: Record<string, string> = {
+  'HYPERLIQUID (HYPE)': 'HYPE',
+  'KATANA (KAT)': 'KAT',
+  'LOMBARD (BARD)': 'BARD',
+  'RIVER (RIVER)': 'RIVER',
+  'WATERNEURON (WTN)': 'WTN',
+};
+
+function normalizeAsset(raw: string): string {
+  const cleaned = (raw || '').toUpperCase().trim();
+  if (!cleaned) return cleaned;
+
+  if (ASSET_ALIASES[cleaned]) return ASSET_ALIASES[cleaned];
+
+  // Pull ticker from parenthesis patterns, e.g. "KATANA (KAT)"
+  const paren = cleaned.match(/\(([A-Z0-9_\-]{2,12})\)/);
+  if (paren?.[1]) return paren[1];
+
+  return cleaned;
+}
+
 export interface Prediction {
   id: string;
   timestamp: string;
@@ -73,14 +94,15 @@ export async function logPredictions(signals: Array<{
   let skippedUnscorable = 0;
   const now = new Date();
 
-  // Batch price fetches — deduplicate assets
-  const assets = [...new Set(signals.map(s => s.asset.toUpperCase()))];
+  // Batch price fetches — deduplicate normalized assets
+  const assets = [...new Set(signals.map(s => normalizeAsset(s.asset)))];
   const scorableAssets = assets.filter(asset => !!ASSET_TO_COINGECKO[asset]);
   const prices = await getPrices(scorableAssets);
 
   for (const signal of signals) {
-    const entryPrice = prices[signal.asset.toUpperCase()] ?? null;
-    if (entryPrice === null) {
+    const normalizedAsset = normalizeAsset(signal.asset);
+    const entryPrice = prices[normalizedAsset] ?? null;
+    if (entryPrice === null || !ASSET_TO_COINGECKO[normalizedAsset]) {
       skippedUnscorable++;
       continue;
     }
@@ -88,7 +110,7 @@ export async function logPredictions(signals: Array<{
     const prediction: Prediction = {
       id: signal.id || `pred-${now.getTime()}-${logged}`,
       timestamp: now.toISOString(),
-      asset: signal.asset.toUpperCase(),
+      asset: normalizedAsset,
       signal_type: signal.type,
       direction: signal.direction as Prediction['direction'],
       strength: signal.strength,
@@ -144,7 +166,8 @@ export async function resolvePredictions(): Promise<{ resolved: number; total: n
     const resolveAt6h = predictionTimestamp + (6 * 60 * 60 * 1000);
     if (now < resolveAt6h) continue; // Not ready yet
 
-    const currentPrice = await getPrice(pred.asset);
+    const normalizedAsset = normalizeAsset(pred.asset);
+    const currentPrice = await getPrice(normalizedAsset);
 
     const entryPrice = pred.entry_price_usd;
     const pctChange = (entryPrice && currentPrice) ? ((currentPrice - entryPrice) / entryPrice) * 100 : null;
@@ -160,7 +183,7 @@ export async function resolvePredictions(): Promise<{ resolved: number; total: n
     const resolution: Resolution = {
       prediction_id: pred.id,
       timestamp: new Date().toISOString(),
-      asset: pred.asset,
+      asset: normalizedAsset,
       direction_predicted: pred.direction,
       entry_price: entryPrice,
       price_at_24h: currentPrice,
@@ -222,8 +245,11 @@ export function getTrackRecord(): {
   for (const p of predictions) predMap.set(p.id, p);
 
   for (const r of resolutions) {
+    // Only aggregate scored outcomes (exclude null/unscorable resolutions)
+    if (r.correct_24h === null) continue;
+
     const pred = predMap.get(r.prediction_id);
-    const asset = r.asset;
+    const asset = normalizeAsset(r.asset);
     const type = pred?.signal_type || 'unknown';
 
     if (!byAsset[asset]) byAsset[asset] = { total: 0, correct: 0, accuracy: 0 };

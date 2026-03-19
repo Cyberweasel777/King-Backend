@@ -408,7 +408,7 @@ export async function sendPersonalSentinelAlert(): Promise<void> {
     const sent = await broadcastAlert(message, 'pro');
 
     // Queue stronger signals for delayed public relay (supplementary channel)
-    const publicRelayCandidates = report.signals.filter(s => s.strength >= 60);
+    const publicRelayCandidates = report.signals.filter(s => s.strength >= 70);
     if (publicRelayCandidates.length > 0) {
       const prices = await getPrices(publicRelayCandidates.map(s => s.asset));
       for (const signal of publicRelayCandidates) {
