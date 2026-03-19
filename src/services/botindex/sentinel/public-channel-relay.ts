@@ -104,12 +104,9 @@ async function relayQueuedSignal(queueId: string): Promise<void> {
       throw new Error('Public relay disabled: missing BOTINDEX_BOT_TOKEN or BOTINDEX_PUBLIC_CHANNEL_ID');
     }
 
-    const card = await generateSignalCard(queued.signal);
     const caption = buildCaption(queued.signal);
 
-    await sendPhotoToChannel(card, caption);
-    sentPhoto = true;
-
+    // Text-only relay — signal cards don't render text on Alpine/Fly (no system fonts for SVG)
     await sendTextToChannel(caption);
     sentText = true;
 
