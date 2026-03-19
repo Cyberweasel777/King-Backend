@@ -37,6 +37,7 @@ export interface Prediction {
   confidence: string;
   narrative: string;
   entry_price_usd: number | null;
+  resolve_at_6h: string;
   resolve_at_24h: string;
   resolve_at_72h: string;
   resolve_at_7d: string;
@@ -92,6 +93,7 @@ export async function logPredictions(signals: Array<{
   narrative: string;
 }>): Promise<number> {
   let logged = 0;
+  let skippedUnscorable = 0;
   const now = new Date();
 
   // Batch price fetches — deduplicate assets
@@ -104,6 +106,12 @@ export async function logPredictions(signals: Array<{
   }
 
   for (const signal of signals) {
+    const entryPrice = prices[signal.asset.toUpperCase()] ?? null;
+    if (entryPrice === null) {
+      skippedUnscorable++;
+      continue;
+    }
+
     const prediction: Prediction = {
       id: signal.id || `pred-${now.getTime()}-${logged}`,
       timestamp: now.toISOString(),
@@ -113,7 +121,8 @@ export async function logPredictions(signals: Array<{
       strength: signal.strength,
       confidence: signal.confidence,
       narrative: signal.narrative,
-      entry_price_usd: prices[signal.asset.toUpperCase()] ?? null,
+      entry_price_usd: entryPrice,
+      resolve_at_6h: new Date(now.getTime() + 6 * 60 * 60 * 1000).toISOString(),
       resolve_at_24h: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
       resolve_at_72h: new Date(now.getTime() + 72 * 60 * 60 * 1000).toISOString(),
       resolve_at_7d: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -125,7 +134,9 @@ export async function logPredictions(signals: Array<{
   }
 
   if (logged > 0) {
-    logger.info({ count: logged, assets }, 'Predictions logged with entry prices');
+    logger.info({ count: logged, skippedUnscorable, assets }, 'Predictions logged with entry prices');
+  } else if (skippedUnscorable > 0) {
+    logger.info({ skippedUnscorable, assets }, 'Skipped unscorable predictions with missing entry prices');
   }
   return logged;
 }
@@ -155,8 +166,10 @@ export async function resolvePredictions(): Promise<{ resolved: number; total: n
     try { pred = JSON.parse(line); } catch { continue; }
     if (existingIds.has(pred.id)) continue;
 
-    const resolveAt24h = new Date(pred.resolve_at_24h).getTime();
-    if (now < resolveAt24h) continue; // Not ready yet
+    const predictionTimestamp = new Date(pred.timestamp).getTime();
+    if (!Number.isFinite(predictionTimestamp)) continue;
+    const resolveAt6h = predictionTimestamp + (6 * 60 * 60 * 1000);
+    if (now < resolveAt6h) continue; // Not ready yet
 
     const currentPrice = await fetchPrice(pred.asset);
     await new Promise(r => setTimeout(r, 200)); // Rate limit

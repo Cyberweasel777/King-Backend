@@ -289,11 +289,11 @@ async function start() {
   const { startDivergenceScanner } = await import('../services/botindex/sentinel/divergence-scanner');
   startDivergenceScanner();
 
-  // Resolve predictions every 6 hours (check which predictions were right/wrong)
+  // Resolve predictions every hour (check which predictions were right/wrong)
   const { resolvePredictions } = await import('../services/botindex/sentinel/prediction-tracker');
-  setInterval(() => { void resolvePredictions(); }, 6 * 60 * 60 * 1000);
-  // First resolution pass after 5 minutes
-  setTimeout(() => { void resolvePredictions(); }, 5 * 60 * 1000);
+  setInterval(() => { void resolvePredictions(); }, 60 * 60 * 1000);
+  // First resolution pass after 2 minutes
+  setTimeout(() => { void resolvePredictions(); }, 2 * 60 * 1000);
 
   // Start Telegram subscriber bot (polls for /subscribe commands)
   const { startTelegramBot } = await import('../services/botindex/sentinel/telegram-subscribers');

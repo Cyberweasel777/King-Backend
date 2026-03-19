@@ -288,7 +288,9 @@ router.get('/sentinel/track-record', async (_req: Request, res: Response) => {
 
     const wantsHtml = _req.headers.accept?.includes('text/html');
     if (wantsHtml) {
-      const accuracyStr = record.accuracy !== null ? `${record.accuracy.toFixed(1)}%` : 'Collecting data...';
+      const accuracyStr = record.accuracy !== null
+        ? `${record.accuracy.toFixed(1)}%`
+        : (record.totalPredictions > 0 && record.resolved === 0 ? 'Resolving in ~6h' : 'Collecting data...');
       const assetRows = Object.entries(record.byAsset)
         .sort((a, b) => b[1].total - a[1].total)
         .map(([asset, s]) => `<tr><td>${asset}</td><td>${s.total}</td><td>${s.correct}</td><td>${s.accuracy.toFixed(1)}%</td></tr>`)
