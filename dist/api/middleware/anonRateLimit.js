@@ -6,7 +6,7 @@
  * API key registration. Authenticated requests (API key or x402) bypass.
  *
  * Default: 3 requests per DAY per IP on gated endpoints.
- * Free API key: 3 req/day (handled in botindex routes).
+ * Free API key: 3 req/day — raw data only. Intelligence requires Pro+.
  */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -16,8 +16,11 @@ exports.anonRateLimit = anonRateLimit;
 exports.getAnonRateLimitStats = getAnonRateLimitStats;
 const logger_1 = __importDefault(require("../../config/logger"));
 const x402Gate_1 = require("./x402Gate");
+const funnel_tracker_1 = require("../../services/botindex/funnel-tracker");
 const ANON_DAILY_LIMIT = parseInt(process.env.ANON_RATE_LIMIT || '3', 10);
 const WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+const UPGRADE_URL = 'https://api.botindex.dev/api/botindex/keys/register?plan=pro';
+const FREE_URL = 'https://api.botindex.dev/api/botindex/keys/register?plan=free';
 const ipWindows = new Map();
 // Cleanup stale entries every 30 minutes
 setInterval(() => {
@@ -34,6 +37,31 @@ function getClientIp(req) {
         return forwarded.split(',')[0]?.trim() || 'unknown';
     }
     return req.ip || req.socket.remoteAddress || 'unknown';
+}
+function getUtcMidnightMs(nowMs) {
+    const now = new Date(nowMs);
+    return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+}
+function getResetInfo(nowMs) {
+    const resetAtMs = getUtcMidnightMs(nowMs) + WINDOW_MS;
+    return {
+        resetAtMs,
+        resetAtUnix: Math.floor(resetAtMs / 1000),
+        resetAtIso: new Date(resetAtMs).toISOString(),
+        resetsInMs: Math.max(0, resetAtMs - nowMs),
+    };
+}
+function formatDuration(ms) {
+    let seconds = Math.floor(ms / 1000);
+    const hours = Math.floor(seconds / 3600);
+    seconds -= hours * 3600;
+    const minutes = Math.floor(seconds / 60);
+    seconds -= minutes * 60;
+    if (hours > 0)
+        return `${hours}h ${minutes}m ${seconds}s`;
+    if (minutes > 0)
+        return `${minutes}m ${seconds}s`;
+    return `${seconds}s`;
 }
 /**
  * Rate limit anonymous requests. Place AFTER optionalApiKey middleware.
@@ -72,28 +100,60 @@ function anonRateLimit(paths, exclude = []) {
             return;
         }
         const ip = getClientIp(req);
-        logger_1.default.info({ ip, path: req.path, isAnon: true }, 'Anonymous request blocked — API key required');
+        const now = Date.now();
+        const dayStartMs = getUtcMidnightMs(now);
+        const resetInfo = getResetInfo(now);
+        const current = ipWindows.get(ip);
+        const entry = current && current.windowStartMs === dayStartMs
+            ? current
+            : { windowStartMs: dayStartMs, count: 0 };
+        entry.count += 1;
+        ipWindows.set(ip, entry);
         const requestUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
         const x402Upgrade = (0, x402Gate_1.buildX402UpgradePayload)(requestUrl);
         if (x402Upgrade) {
             res.setHeader('payment-required', x402Upgrade.header);
         }
-        res.status(401).json({
-            error: 'api_key_required',
-            message: 'An API key is required to access BotIndex endpoints. Get one free in 10 seconds, or pay per call with x402 (no key needed).',
-            get_key: {
-                url: 'https://api.botindex.dev/api/botindex/keys/register?plan=free',
-                method: 'GET',
-                description: 'Free API key — 3 req/day, instant activation.',
-            },
+        const remaining = Math.max(0, ANON_DAILY_LIMIT - entry.count);
+        res.setHeader('X-RateLimit-Limit', String(ANON_DAILY_LIMIT));
+        res.setHeader('X-RateLimit-Remaining', String(remaining));
+        res.setHeader('X-RateLimit-Reset', String(resetInfo.resetAtUnix));
+        res.setHeader('X-Upgrade-URL', UPGRADE_URL);
+        if (entry.count <= ANON_DAILY_LIMIT) {
+            logger_1.default.info({ ip, path: req.path, isAnon: true, used: entry.count, remaining }, 'Anonymous request allowed under daily limit');
+            // Mark this request as trial-authenticated so x402-gated routes can proceed.
+            req.__freeTrialAuthenticated = true;
+            next();
+            return;
+        }
+        logger_1.default.info({ ip, path: req.path, isAnon: true, used: entry.count, limit: ANON_DAILY_LIMIT }, 'Anonymous request blocked — daily limit exceeded');
+        (0, funnel_tracker_1.trackFunnelEvent)('anon_rate_limit_429', { ip, path: req.path, used: entry.count });
+        res.status(429).json({
+            error: 'daily_limit_exceeded',
+            used: entry.count,
+            limit: ANON_DAILY_LIMIT,
+            resets_in: formatDuration(resetInfo.resetsInMs),
+            resets_at: resetInfo.resetAtIso,
+            message: 'Raw data has limits. Intelligence doesn\'t.',
             upgrade: {
-                pro: {
-                    url: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
-                    description: 'Pro plan — unlimited requests, $29/mo via Stripe',
-                },
+                url: UPGRADE_URL,
+                plan: 'pro',
+                price: '$9.99/mo',
+                description: 'BotIndex Pro — Predictive signals, convergence scoring, whale divergence detection. Not just data — intelligence.',
+                includes: [
+                    'Smart Money Flow analysis',
+                    'Risk Radar with DeepSeek synthesis',
+                    'Network Intelligence (proprietary momentum scoring)',
+                    '500 requests/day on all endpoints',
+                ],
                 ...(x402Upgrade?.body || {}),
             },
-            header: 'X-API-Key: <your-key>',
+            sentinel: {
+                url: 'https://api.botindex.dev/api/botindex/keys/register?plan=sentinel',
+                price: '$49.99/mo',
+                description: 'Sentinel Intelligence — Predictive signals with verifiable track record. Query surge intelligence. Personal alert feed.',
+                track_record: 'https://api.botindex.dev/api/botindex/sentinel/track-record',
+            },
         });
     };
 }

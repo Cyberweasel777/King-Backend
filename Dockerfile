@@ -13,6 +13,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
 COPY --from=builder /app/dist/ ./dist/
+# Copy non-TS assets needed at runtime
+COPY src/services/botindex/sentinel/botindex-logo.png ./dist/services/botindex/sentinel/botindex-logo.png
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs

@@ -20,7 +20,12 @@ function load() {
         const raw = fs_1.default.readFileSync(FILE, 'utf-8');
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed.events)) {
-            store.events = parsed.events.slice(-MAX_EVENTS);
+            // normalize legacy entries that used `timestamp` instead of `ts`
+            const normalized = parsed.events.map((e) => ({
+                ...e,
+                ts: e.ts || e.timestamp || new Date().toISOString(),
+            }));
+            store.events = normalized.slice(-MAX_EVENTS);
         }
     }
     catch (err) {

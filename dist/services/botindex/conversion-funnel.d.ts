@@ -1,5 +1,5 @@
 export type FunnelEventType = 'register_page_hit' | 'checkout_session_created' | 'checkout_completed' | 'api_key_issued';
-export declare function trackFunnelEvent(type: FunnelEventType, plan?: 'free' | 'basic' | 'pro'): void;
+export declare function trackFunnelEvent(type: FunnelEventType, plan?: 'free' | 'basic' | 'pro' | 'starter' | 'sentinel' | 'enterprise'): void;
 export declare function getFunnelStats(): {
     since: string | null;
     eventsTracked: number;

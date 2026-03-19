@@ -61,15 +61,27 @@ const docs_1 = __importDefault(require("./routes/docs"));
 const agorion_1 = __importDefault(require("./routes/agorion"));
 const botindex_meme_1 = __importDefault(require("./routes/botindex-meme"));
 const botindex_stablecoin_1 = __importDefault(require("./routes/botindex-stablecoin"));
+const botindex_synthesis_1 = __importDefault(require("./routes/botindex-synthesis"));
+const botindex_sentinel_1 = __importDefault(require("./routes/botindex-sentinel"));
 const database_1 = require("../shared/payments/database");
 const logger_1 = __importDefault(require("../config/logger"));
+const sentry_1 = require("../config/sentry");
+const posthog_1 = require("../config/posthog");
+const upstash_1 = require("../config/upstash");
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 8080;
 const x402Config = (0, x402Gate_1.getX402RuntimeConfig)();
 // Always mount x402/v1 routes — individual gates pass through when x402 is disabled
 (0, botindex_1.mountBotindexX402TestRoute)();
 // Security middleware
-app.use((0, helmet_1.default)());
+app.use((0, helmet_1.default)({
+    contentSecurityPolicy: {
+        directives: {
+            ...helmet_1.default.contentSecurityPolicy.getDefaultDirectives(),
+            'form-action': ["'self'", 'https://checkout.stripe.com', 'https://api.botindex.dev'],
+        },
+    },
+}));
 app.use((0, cors_1.default)());
 // Stripe webhook needs raw body
 app.use('/api/:app/payments/webhook', express_1.default.raw({ type: 'application/json' }));
@@ -140,7 +152,8 @@ app.use('/api', admin_hits_1.default);
 // BotIndex API key auth (runs before free-trial/x402 route middleware)
 app.use('/api/botindex', apiKeyAuth_1.optionalApiKey);
 // Anonymous rate limiting on high-value endpoints (3 req/day without API key, 100/day with free key)
-// Excludes x402-paid endpoints — those handle access control via payment gates
+// Rate limit all BotIndex endpoints (10 req/day anonymous)
+// Soft-gated endpoints now included — bots get truncated data for 10 calls, then 429
 app.use('/api/botindex', (0, anonRateLimit_1.anonRateLimit)([
     '/signals',
     '/v1/signals',
@@ -158,13 +171,18 @@ app.use('/api/botindex', (0, anonRateLimit_1.anonRateLimit)([
     '/hyperliquid/intel',
     '/crypto/intel',
     '/doppler/intel',
-], [
+    // Previously excluded soft-gated endpoints — now rate limited too
+    '/zora/trending-coins',
+    '/hyperliquid/whale-alerts',
     '/hyperliquid/funding-arb',
     '/hyperliquid/correlation-matrix',
+    // Synthesis endpoints
+    '/smart-money-flow',
+    '/risk-radar',
+], [
+    // Only exclude x402-paid or internal endpoints
     '/hyperliquid/liquidation-heatmap',
-    '/hyperliquid/whale-alerts',
     '/hyperliquid/hip6',
-    '/zora/trending-coins',
     '/zora/new-coins',
     '/zora/creator-scores',
     '/zora/attention-momentum',
@@ -175,6 +193,10 @@ app.use('/api/botindex', (0, anonRateLimit_1.anonRateLimit)([
     '/alpha-scan',
     '/zora/relay',
 ]));
+// Synthesis endpoints (cross-source intelligence — smart-money-flow, risk-radar)
+app.use('/api/botindex', botindex_synthesis_1.default);
+// Sentinel Intelligence (premium predictive signals — $49.99/mo)
+app.use('/api/botindex', botindex_sentinel_1.default);
 // Receipt and trust-layer endpoints
 app.use('/api/botindex/receipts', receipts_1.default);
 app.use('/api/botindex/.well-known', receipts_1.default);
@@ -182,9 +204,10 @@ app.get('/api/botindex/trust', receipts_1.trustLayerHandler);
 // Premium Intel endpoints (DeepSeek-powered, $0.05/call)
 // Must run optionalApiKey + pro bypass before intel gates (mounted outside index.ts router)
 const botindex_intel_1 = __importDefault(require("./routes/botindex-intel"));
+const botindex_contact_1 = __importDefault(require("./routes/botindex-contact"));
 app.use('/api/botindex', apiKeyAuth_1.optionalApiKey, (req, _res, next) => {
     if (req.apiKeyAuth) {
-        const isPaid = req.apiKeyAuth.plan === 'pro' || req.apiKeyAuth.plan === 'basic';
+        const isPaid = req.apiKeyAuth.plan === 'pro' || req.apiKeyAuth.plan === 'basic' || req.apiKeyAuth.plan === 'starter';
         if (isPaid) {
             req.__apiKeyAuthenticated = true;
             req.__freeTrialAuthenticated = true;
@@ -195,7 +218,8 @@ app.use('/api/botindex', apiKeyAuth_1.optionalApiKey, (req, _res, next) => {
 // MCP Streamable HTTP transport (for Smithery + remote MCP clients)
 const mcp_transport_1 = __importDefault(require("./routes/mcp-transport"));
 app.use('/api/botindex', mcp_transport_1.default);
-// BotIndex Meme + Stablecoin intelligence routes
+// BotIndex Contact + Meme + Stablecoin intelligence routes
+app.use('/api/botindex/contact', express_1.default.urlencoded({ extended: true }), express_1.default.json(), botindex_contact_1.default);
 app.use('/api/botindex', botindex_meme_1.default);
 app.use('/api/botindex', botindex_stablecoin_1.default);
 // Mount all routes
@@ -243,9 +267,35 @@ app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });
 });
 async function start() {
+    // Initialize observability + infra
+    (0, sentry_1.initSentry)();
+    (0, posthog_1.initPostHog)();
+    (0, upstash_1.initUpstash)();
     // Initialize database
     await (0, database_1.initDb)();
     await (0, receiptMiddleware_1.initReceiptSigning)();
+    // Start market surge monitor (broad crypto spike detection)
+    const { startMarketSurgeMonitor } = await Promise.resolve().then(() => __importStar(require('../services/botindex/market-surge-monitor')));
+    startMarketSurgeMonitor();
+    // Start Sentinel personal alert feed (Andrew's private intelligence brief every 15 min)
+    const { sendPersonalSentinelAlert } = await Promise.resolve().then(() => __importStar(require('../services/botindex/sentinel/signals')));
+    setInterval(() => { void sendPersonalSentinelAlert(); }, 15 * 60 * 1000);
+    // First personal alert after 60 seconds
+    setTimeout(() => { void sendPersonalSentinelAlert(); }, 60_000);
+    // Start Divergence Scanner (whales holding + devs building + fear growing)
+    const { startDivergenceScanner } = await Promise.resolve().then(() => __importStar(require('../services/botindex/sentinel/divergence-scanner')));
+    startDivergenceScanner();
+    // Resolve predictions every hour (check which predictions were right/wrong)
+    const { resolvePredictions } = await Promise.resolve().then(() => __importStar(require('../services/botindex/sentinel/prediction-tracker')));
+    setInterval(() => { void resolvePredictions(); }, 60 * 60 * 1000);
+    // First resolution pass after 2 minutes
+    setTimeout(() => { void resolvePredictions(); }, 2 * 60 * 1000);
+    // Start Telegram subscriber bot (polls for /subscribe commands)
+    const { startTelegramBot } = await Promise.resolve().then(() => __importStar(require('../services/botindex/sentinel/telegram-subscribers')));
+    startTelegramBot();
+    // Start delayed public Telegram relay for Sentinel signals
+    const { startPublicRelay } = await Promise.resolve().then(() => __importStar(require('../services/botindex/sentinel/public-channel-relay')));
+    startPublicRelay();
     app.listen(PORT, () => {
         logger_1.default.info({
             port: PORT,
@@ -255,7 +305,13 @@ async function start() {
     });
 }
 start().catch((error) => {
+    sentry_1.Sentry.captureException(error);
     logger_1.default.error({ err: error }, 'Failed to start API server');
+});
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+    await (0, posthog_1.shutdownPostHog)();
+    process.exit(0);
 });
 if (process.env.ZORA_ALPHA_BOT_TOKEN) {
     Promise.resolve().then(() => __importStar(require('../services/botindex/zora/alpha-bot'))).catch((error) => {

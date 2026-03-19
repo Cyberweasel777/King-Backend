@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.optionalApiKey = exports.requireApiKey = void 0;
+exports.extractApiKey = extractApiKey;
 exports.generateApiKey = generateApiKey;
 exports.updateApiKeyWallet = updateApiKeyWallet;
 exports.createApiKeyEntry = createApiKeyEntry;
@@ -16,6 +17,7 @@ const logger_1 = __importDefault(require("../../config/logger"));
 const funnel_tracker_1 = require("../../services/botindex/funnel-tracker");
 const API_KEY_DATA_DIR = process.env.API_KEY_DATA_DIR || '/data';
 const API_KEY_DATA_FILE = path_1.default.join(API_KEY_DATA_DIR, 'api-keys.json');
+const PRO_UPGRADE_URL = 'https://api.botindex.dev/api/botindex/keys/register?plan=pro';
 const apiKeyLedger = new Map();
 let flushScheduled = false;
 function loadLedger() {
@@ -64,6 +66,10 @@ function extractApiKey(req) {
 }
 function todayUTC() {
     return new Date().toISOString().slice(0, 10);
+}
+function nextUtcMidnightMs(nowMs = Date.now()) {
+    const now = new Date(nowMs);
+    return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
 }
 function isDailyLimitExceeded(entry) {
     if (!entry.dailyLimit)
@@ -186,15 +192,30 @@ const optionalApiKey = (req, res, next) => {
             source: 'apiKeyAuth.dailyLimit',
             plan: entry.plan,
         });
+        if (entry.dailyLimit) {
+            const used = entry.dailyCount || 0;
+            const remaining = Math.max(0, entry.dailyLimit - used);
+            const resetUnix = Math.floor(nextUtcMidnightMs() / 1000);
+            res.setHeader('X-BotIndex-Daily-Used', String(used));
+            res.setHeader('X-BotIndex-Daily-Limit', String(entry.dailyLimit));
+            res.setHeader('X-BotIndex-Daily-Remaining', String(remaining));
+            res.setHeader('X-RateLimit-Limit', String(entry.dailyLimit));
+            res.setHeader('X-RateLimit-Remaining', String(remaining));
+            res.setHeader('X-RateLimit-Reset', String(resetUnix));
+            res.setHeader('X-Upgrade-URL', PRO_UPGRADE_URL);
+            if (remaining <= 1 && entry.plan !== 'pro') {
+                res.setHeader('X-BotIndex-Upgrade', PRO_UPGRADE_URL);
+            }
+        }
         res.status(429).json({
             error: 'daily_limit_exceeded',
-            message: `You've used all ${entry.dailyLimit} free requests for today. Upgrade to Pro for unlimited access, or pay per call with x402.`,
+            message: `You've used all ${entry.dailyLimit} free requests for today. Upgrade to Pro for 500 requests/day, or pay per call with x402.`,
             upgrade: {
                 pro: {
-                    url: 'https://api.botindex.dev/api/botindex/keys/register?plan=pro',
-                    price: '$29/mo',
-                    description: 'Unlimited API calls. Cancel anytime.',
-                    features: ['Unlimited requests', 'All 29 endpoints', 'Priority support', 'Webhook alerts'],
+                    url: PRO_UPGRADE_URL,
+                    price: '$9.99/mo',
+                    description: '500 requests/day. Cancel anytime.',
+                    features: ['500 requests/day', 'All endpoints', 'Priority support'],
                 },
                 ...(x402Upgrade?.body || {}),
             },
@@ -218,11 +239,16 @@ const optionalApiKey = (req, res, next) => {
     if (entry.dailyLimit) {
         const used = entry.dailyCount || 0;
         const remaining = Math.max(0, entry.dailyLimit - used);
+        const resetUnix = Math.floor(nextUtcMidnightMs() / 1000);
         res.setHeader('X-BotIndex-Daily-Used', String(used));
         res.setHeader('X-BotIndex-Daily-Limit', String(entry.dailyLimit));
         res.setHeader('X-BotIndex-Daily-Remaining', String(remaining));
-        if (remaining <= 1) {
-            res.setHeader('X-BotIndex-Upgrade', 'https://api.botindex.dev/api/botindex/keys/register?plan=pro');
+        res.setHeader('X-RateLimit-Limit', String(entry.dailyLimit));
+        res.setHeader('X-RateLimit-Remaining', String(remaining));
+        res.setHeader('X-RateLimit-Reset', String(resetUnix));
+        res.setHeader('X-Upgrade-URL', PRO_UPGRADE_URL);
+        if (remaining <= 1 && entry.plan !== 'pro') {
+            res.setHeader('X-BotIndex-Upgrade', PRO_UPGRADE_URL);
         }
     }
     next();
@@ -234,12 +260,17 @@ loadLedger();
     let updated = 0;
     for (const [, entry] of apiKeyLedger.entries()) {
         if (entry.plan === 'free' && !entry.dailyLimit) {
-            entry.dailyLimit = 3;
+            entry.dailyLimit = 10;
+            updated++;
+        }
+        // Sentinel and enterprise get unlimited (no daily limit)
+        if ((entry.plan === 'sentinel' || entry.plan === 'enterprise') && entry.dailyLimit) {
+            delete entry.dailyLimit;
             updated++;
         }
     }
     if (updated > 0) {
-        logger_1.default.info({ updated }, 'Backfilled free-tier API keys with 3 req/day limit');
+        logger_1.default.info({ updated }, 'Backfilled API key daily limits');
         scheduleLedgerFlush();
     }
 })();

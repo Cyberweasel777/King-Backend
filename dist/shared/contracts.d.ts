@@ -157,7 +157,7 @@ export declare const PaymentRailRouteContract: z.ZodObject<{
     statusPath: string;
     configPath: string;
     note?: string | undefined;
-    defaultTier?: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise" | undefined;
+    defaultTier?: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite" | undefined;
 }, {
     id: "P1" | "P2" | "P3" | "P4" | "P5";
     appId: string;
@@ -165,7 +165,7 @@ export declare const PaymentRailRouteContract: z.ZodObject<{
     statusPath: string;
     configPath: string;
     note?: string | undefined;
-    defaultTier?: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise" | undefined;
+    defaultTier?: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite" | undefined;
 }>;
 export declare const PaymentRailsExecutionContract: z.ZodObject<{
     generatedAt: z.ZodString;
@@ -184,7 +184,7 @@ export declare const PaymentRailsExecutionContract: z.ZodObject<{
         statusPath: string;
         configPath: string;
         note?: string | undefined;
-        defaultTier?: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise" | undefined;
+        defaultTier?: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite" | undefined;
     }, {
         id: "P1" | "P2" | "P3" | "P4" | "P5";
         appId: string;
@@ -192,7 +192,7 @@ export declare const PaymentRailsExecutionContract: z.ZodObject<{
         statusPath: string;
         configPath: string;
         note?: string | undefined;
-        defaultTier?: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise" | undefined;
+        defaultTier?: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite" | undefined;
     }>, "many">;
     defaults: z.ZodObject<{
         additiveOnly: z.ZodBoolean;
@@ -216,7 +216,7 @@ export declare const PaymentRailsExecutionContract: z.ZodObject<{
         statusPath: string;
         configPath: string;
         note?: string | undefined;
-        defaultTier?: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise" | undefined;
+        defaultTier?: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite" | undefined;
     }[];
     defaults: {
         additiveOnly: boolean;
@@ -232,7 +232,7 @@ export declare const PaymentRailsExecutionContract: z.ZodObject<{
         statusPath: string;
         configPath: string;
         note?: string | undefined;
-        defaultTier?: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise" | undefined;
+        defaultTier?: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite" | undefined;
     }[];
     defaults: {
         additiveOnly: boolean;
@@ -394,7 +394,7 @@ export declare const FeatureContracts: {
             statusPath: string;
             configPath: string;
             note?: string | undefined;
-            defaultTier?: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise" | undefined;
+            defaultTier?: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite" | undefined;
         }, {
             id: "P1" | "P2" | "P3" | "P4" | "P5";
             appId: string;
@@ -402,7 +402,7 @@ export declare const FeatureContracts: {
             statusPath: string;
             configPath: string;
             note?: string | undefined;
-            defaultTier?: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise" | undefined;
+            defaultTier?: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite" | undefined;
         }>, "many">;
         defaults: z.ZodObject<{
             additiveOnly: z.ZodBoolean;
@@ -426,7 +426,7 @@ export declare const FeatureContracts: {
             statusPath: string;
             configPath: string;
             note?: string | undefined;
-            defaultTier?: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise" | undefined;
+            defaultTier?: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite" | undefined;
         }[];
         defaults: {
             additiveOnly: boolean;
@@ -442,7 +442,7 @@ export declare const FeatureContracts: {
             statusPath: string;
             configPath: string;
             note?: string | undefined;
-            defaultTier?: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise" | undefined;
+            defaultTier?: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite" | undefined;
         }[];
         defaults: {
             additiveOnly: boolean;
@@ -491,7 +491,7 @@ export declare const BotCommandContract: z.ZodObject<{
     }>;
 }, "strip", z.ZodTypeAny, {
     name: string;
-    tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
+    tier: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite";
     description: string;
     response: {
         type: "text" | "image" | "markdown" | "json";
@@ -505,7 +505,7 @@ export declare const BotCommandContract: z.ZodObject<{
     }[] | undefined;
 }, {
     name: string;
-    tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
+    tier: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite";
     description: string;
     response: {
         type: "text" | "image" | "markdown" | "json";
@@ -557,7 +557,7 @@ export declare const AppFeatureConfig: z.ZodObject<{
             }>;
         }, "strip", z.ZodTypeAny, {
             name: string;
-            tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
+            tier: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite";
             description: string;
             response: {
                 type: "text" | "image" | "markdown" | "json";
@@ -571,7 +571,7 @@ export declare const AppFeatureConfig: z.ZodObject<{
             }[] | undefined;
         }, {
             name: string;
-            tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
+            tier: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite";
             description: string;
             response: {
                 type: "text" | "image" | "markdown" | "json";
@@ -585,12 +585,12 @@ export declare const AppFeatureConfig: z.ZodObject<{
             }[] | undefined;
         }>, "many">;
     }, "strip", z.ZodTypeAny, {
-        tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
+        tier: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite";
         limits: Record<string, number>;
         enabled: boolean;
         commands: {
             name: string;
-            tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
+            tier: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite";
             description: string;
             response: {
                 type: "text" | "image" | "markdown" | "json";
@@ -604,12 +604,12 @@ export declare const AppFeatureConfig: z.ZodObject<{
             }[] | undefined;
         }[];
     }, {
-        tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
+        tier: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite";
         limits: Record<string, number>;
         enabled: boolean;
         commands: {
             name: string;
-            tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
+            tier: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite";
             description: string;
             response: {
                 type: "text" | "image" | "markdown" | "json";
@@ -626,12 +626,12 @@ export declare const AppFeatureConfig: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     appId: "spreadhunter" | "deckvault" | "packpal" | "dropfarm" | "dropscout" | "launchradar" | "memeradar" | "memestock" | "nftpulse" | "pointtrack" | "rosterradar" | "skinsignal" | "socialindex" | "botindex" | "arbwatch";
     features: Record<string, {
-        tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
+        tier: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite";
         limits: Record<string, number>;
         enabled: boolean;
         commands: {
             name: string;
-            tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
+            tier: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite";
             description: string;
             response: {
                 type: "text" | "image" | "markdown" | "json";
@@ -648,12 +648,12 @@ export declare const AppFeatureConfig: z.ZodObject<{
 }, {
     appId: "spreadhunter" | "deckvault" | "packpal" | "dropfarm" | "dropscout" | "launchradar" | "memeradar" | "memestock" | "nftpulse" | "pointtrack" | "rosterradar" | "skinsignal" | "socialindex" | "botindex" | "arbwatch";
     features: Record<string, {
-        tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
+        tier: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite";
         limits: Record<string, number>;
         enabled: boolean;
         commands: {
             name: string;
-            tier: "free" | "basic" | "pro" | "starter" | "elite" | "enterprise";
+            tier: "free" | "basic" | "pro" | "starter" | "enterprise" | "elite";
             description: string;
             response: {
                 type: "text" | "image" | "markdown" | "json";

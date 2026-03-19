@@ -1,4 +1,7 @@
 import sharp from 'sharp';
+import path from 'path';
+
+const LOGO_PATH = path.join(__dirname, 'botindex-logo.png');
 
 export interface SignalCardInput {
   asset: string;
@@ -101,7 +104,7 @@ function buildSvg(signal: SignalCardInput): string {
   <rect x="42" y="36" width="1116" height="558" rx="28" fill="#0b1224" fill-opacity="0.58" stroke="#334155" stroke-opacity="0.55" filter="url(#softShadow)" />
   <rect x="42" y="36" width="1116" height="558" rx="28" fill="url(#panelGlow)" />
 
-  <text x="86" y="95" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" letter-spacing="2.2">BOTINDEX SENTINEL</text>
+  <text x="148" y="95" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" letter-spacing="2.2">BOTINDEX SENTINEL</text>
 
   <rect x="86" y="128" width="${badgeWidth}" height="52" rx="26" fill="${directionStyle.badge}" />
   <text x="112" y="161" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700">${escapeXml(badgeText)}</text>
@@ -124,5 +127,22 @@ function buildSvg(signal: SignalCardInput): string {
 
 export async function generateSignalCard(signal: SignalCardInput): Promise<Buffer> {
   const svg = buildSvg(signal);
-  return sharp(Buffer.from(svg)).png().toBuffer();
+  const svgBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
+
+  // Composite the BotIndex logo into the top-left corner
+  let logoBuffer: Buffer | null = null;
+  try {
+    logoBuffer = await sharp(LOGO_PATH)
+      .resize(52, 52, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer();
+  } catch {
+    // Logo missing or unreadable — return card without it
+    return svgBuffer;
+  }
+
+  return sharp(svgBuffer)
+    .composite([{ input: logoBuffer, top: 60, left: 86 }])
+    .png()
+    .toBuffer();
 }

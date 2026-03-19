@@ -92,7 +92,7 @@ const alphaScanGate = (0, x402Gate_1.createX402Gate)({
 let alphaScanCache = null;
 let alphaScanInFlight = null;
 function isPaidApiKey(req) {
-    return req.apiKeyAuth?.plan === 'pro' || req.apiKeyAuth?.plan === 'basic';
+    return req.apiKeyAuth?.plan === 'pro' || req.apiKeyAuth?.plan === 'basic' || req.apiKeyAuth?.plan === 'starter';
 }
 function hasFullIntelAccess(req) {
     if (isPaidApiKey(req))
@@ -102,7 +102,7 @@ function hasFullIntelAccess(req) {
         req.__freeTrialAuthenticated);
 }
 function hasFullAccess(req) {
-    const hasPaidPlan = req.apiKeyAuth?.plan === 'pro' || req.apiKeyAuth?.plan === 'basic';
+    const hasPaidPlan = req.apiKeyAuth?.plan === 'pro' || req.apiKeyAuth?.plan === 'basic' || req.apiKeyAuth?.plan === 'starter';
     const hasBypass = Boolean(req.__apiKeyAuthenticated);
     return hasPaidPlan || hasBypass;
 }

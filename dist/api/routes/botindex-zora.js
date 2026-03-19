@@ -9,6 +9,7 @@ const trending_1 = require("../../services/botindex/zora/trending");
 const creator_scores_1 = require("../../services/botindex/zora/creator-scores");
 const attention_1 = require("../../services/botindex/zora/attention");
 const response_cta_1 = require("../../shared/response-cta");
+const softGate_1 = require("../middleware/softGate");
 const router = (0, express_1.Router)();
 const METADATA = {
     protocol: 'x402',
@@ -32,7 +33,7 @@ function parseLimit(value, defaultValue = 10, maxValue = 50) {
     }
     return Math.min(parsed, maxValue);
 }
-router.get('/zora/trending-coins', async (req, res) => {
+router.get('/zora/trending-coins', (0, softGate_1.softGate)(), async (req, res) => {
     const limit = parseLimit(req.query.limit);
     if (limit === null) {
         res.status(400).json({

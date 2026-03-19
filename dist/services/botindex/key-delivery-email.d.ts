@@ -1,4 +1,4 @@
-type Plan = 'free' | 'basic' | 'pro';
+type Plan = 'free' | 'basic' | 'pro' | 'starter' | 'sentinel' | 'enterprise';
 type SendApiKeyEmailParams = {
     to: string;
     apiKey: string;

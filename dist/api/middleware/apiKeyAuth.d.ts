@@ -1,5 +1,5 @@
-import type { RequestHandler } from 'express';
-export type BotIndexApiPlan = 'free' | 'basic' | 'pro';
+import type { Request, RequestHandler } from 'express';
+export type BotIndexApiPlan = 'free' | 'basic' | 'pro' | 'starter' | 'sentinel' | 'enterprise';
 export interface ApiKeyLedgerEntry {
     email: string;
     stripeCustomerId?: string;
@@ -24,6 +24,7 @@ declare global {
         }
     }
 }
+export declare function extractApiKey(req: Request): string | null;
 export declare function generateApiKey(): string;
 export declare function updateApiKeyWallet(apiKey: string, walletAddress: string): boolean;
 export declare function createApiKeyEntry(params: {

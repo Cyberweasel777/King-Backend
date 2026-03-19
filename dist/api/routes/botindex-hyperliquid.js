@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const x402Gate_1 = require("../middleware/x402Gate");
+const softGate_1 = require("../middleware/softGate");
 const logger_1 = __importDefault(require("../../config/logger"));
 const funding_arb_1 = require("../../services/botindex/hyperliquid/funding-arb");
 const correlation_1 = require("../../services/botindex/hyperliquid/correlation");
@@ -63,7 +64,7 @@ function buildWhaleSummaryLine(data) {
     }
     return `${data.topPositions.length} whale positions worth $${formatUsdMillions(data.totalTrackedValue)}m detected. Largest: ${largest.coin} ${largest.side} $${formatUsdMillions(largest.positionValue)}m.`;
 }
-router.get('/hyperliquid/funding-arb', async (_req, res) => {
+router.get('/hyperliquid/funding-arb', (0, softGate_1.softGate)(), async (_req, res) => {
     try {
         const data = await (0, funding_arb_1.getFundingArbOpportunities)();
         const summary = buildFundingSummary(data.opportunities);
@@ -93,7 +94,7 @@ router.get('/hyperliquid/funding-arb', async (_req, res) => {
         });
     }
 });
-router.get('/hyperliquid/correlation-matrix', async (_req, res) => {
+router.get('/hyperliquid/correlation-matrix', (0, softGate_1.softGate)(), async (_req, res) => {
     try {
         const data = await (0, correlation_1.getHLCorrelationMatrix)();
         const corrSummary = buildCorrelationSummary(data.matrix);
@@ -231,7 +232,7 @@ router.get('/hyperliquid/hip6/launch-candidates', (0, x402Gate_1.createX402Gate)
     }
 });
 // --- Whale Alerts ---
-router.get('/hyperliquid/whale-alerts', async (_req, res) => {
+router.get('/hyperliquid/whale-alerts', (0, softGate_1.softGate)(), async (_req, res) => {
     try {
         const data = await (0, whale_alerts_1.getHyperliquidWhaleAlerts)();
         const whaleSummaryLine = buildWhaleSummaryLine(data);

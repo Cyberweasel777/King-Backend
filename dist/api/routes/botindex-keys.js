@@ -37,8 +37,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importStar(require("express"));
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
 const stripe_1 = __importDefault(require("stripe"));
 const zod_1 = require("zod");
+const posthog_1 = require("../../config/posthog");
 const logger_1 = __importDefault(require("../../config/logger"));
 const apiKeyAuth_1 = require("../middleware/apiKeyAuth");
 const conversion_funnel_1 = require("../../services/botindex/conversion-funnel");
@@ -49,9 +52,12 @@ const SUCCESS_URL = 'https://api.botindex.dev/api/botindex/keys/success?session_
 const CANCEL_URL = 'https://api.botindex.dev/api/botindex/keys/cancel';
 const PORTAL_RETURN_URL = 'https://api.botindex.dev/api/botindex/keys/cancel';
 const ADMIN_ID = process.env.ADMIN_ID || '8063432083';
+const DATA_DIR = process.env.API_KEY_DATA_DIR || '/data';
+const API_KEYS_FILE = path_1.default.join(DATA_DIR, 'api-keys.json');
+const FUNNEL_FILE = path_1.default.join(DATA_DIR, 'conversion-funnel.json');
 const registerSchema = zod_1.z.object({
     email: zod_1.z.string().email(),
-    plan: zod_1.z.enum(['basic', 'pro']).optional(),
+    plan: zod_1.z.enum(['basic', 'pro', 'starter', 'sentinel']).optional(),
 });
 function getStripeClient() {
     const stripeSecretKey = process.env.BOTINDEX_STRIPE_SECRET_KEY;
@@ -61,26 +67,29 @@ function getStripeClient() {
     return new stripe_1.default(stripeSecretKey, { apiVersion: '2025-02-24.acacia' });
 }
 function getPlanPriceId(plan) {
-    const basic = process.env.BOTINDEX_STRIPE_PRICE_BASIC;
-    const pro = process.env.BOTINDEX_STRIPE_PRICE_PRO;
-    const byPlan = {
-        free: undefined,
-        basic,
-        pro,
-    };
-    const priceId = byPlan[plan];
-    if (!priceId) {
-        throw new Error(`Missing Stripe price ID for plan "${plan}"`);
+    if (plan === 'free') {
+        throw new Error('Free plan does not require a Stripe price ID');
     }
-    return priceId;
+    if (plan === 'sentinel') {
+        const sentinel = process.env.BOTINDEX_STRIPE_PRICE_SENTINEL;
+        if (!sentinel) {
+            throw new Error('Missing Stripe price ID for sentinel plan (BOTINDEX_STRIPE_PRICE_SENTINEL)');
+        }
+        return sentinel;
+    }
+    const starter = process.env.BOTINDEX_STRIPE_PRICE_STARTER;
+    if (!starter) {
+        throw new Error('Missing Stripe price ID for paid plans (BOTINDEX_STRIPE_PRICE_STARTER)');
+    }
+    return starter;
 }
 function resolvePlanFromSession(session) {
     const plan = session.metadata?.plan;
-    if (plan === 'pro')
-        return 'pro';
-    if (plan === 'basic')
-        return 'basic';
-    return 'basic';
+    if (plan === 'free')
+        return 'free';
+    if (plan === 'sentinel')
+        return 'sentinel';
+    return 'pro';
 }
 async function resolveEmailFromSession(stripe, session) {
     const fromSession = session.customer_details?.email || session.metadata?.email;
@@ -95,11 +104,28 @@ async function resolveEmailFromSession(stripe, session) {
     }
     return customer.email || null;
 }
+function readJson(file, fallback) {
+    try {
+        if (!fs_1.default.existsSync(file))
+            return fallback;
+        const raw = fs_1.default.readFileSync(file, 'utf-8');
+        return JSON.parse(raw);
+    }
+    catch {
+        return fallback;
+    }
+}
 // GET /register — browser-friendly: redirects straight to Stripe Checkout
 router.get('/register', async (req, res) => {
     try {
         const planParam = req.query.plan;
-        const plan = (planParam === 'pro') ? 'pro' : (planParam === 'basic') ? 'basic' : 'free';
+        const plan = (planParam === 'free')
+            ? 'free'
+            : (planParam === 'sentinel')
+                ? 'sentinel'
+                : (planParam === 'pro' || planParam === 'basic' || planParam === 'starter')
+                    ? 'pro'
+                    : 'free';
         if (plan === 'free') {
             (0, conversion_funnel_1.trackFunnelEvent)('register_page_hit', 'free');
             const emailParam = typeof req.query.email === 'string' ? req.query.email.trim().toLowerCase() : '';
@@ -132,7 +158,7 @@ router.get('/register', async (req, res) => {
 <body>
   <div class="card">
     <h1>Get Your Free API Key</h1>
-    <p class="subtitle">3 requests/day — instant activation, no credit card.</p>
+    <p class="subtitle">10 requests/day — instant activation, no credit card.</p>
     <span class="badge">FREE TIER</span>
     <form action="/api/botindex/keys/register" method="GET">
       <input type="hidden" name="plan" value="free">
@@ -160,9 +186,10 @@ router.get('/register', async (req, res) => {
                 email: emailParam,
                 plan: 'free',
             });
-            // Free tier: 3 req/day — tight enough to taste, not enough to live on
-            entry.dailyLimit = 3;
+            // Free tier: 10 req/day
+            entry.dailyLimit = 10;
             (0, conversion_funnel_1.trackFunnelEvent)('api_key_issued', 'free');
+            (0, posthog_1.trackEvent)(emailParam || req.ip || 'anonymous', 'key_issued', { plan: 'free' });
             (0, funnel_tracker_1.trackFunnelEvent)('key_issued', { plan: 'free', keyPrefix: apiKey.slice(0, 8) });
             // Send key to email as backup
             try {
@@ -206,10 +233,15 @@ router.get('/register', async (req, res) => {
 <body>
   <div class="card" id="card">
     <h1>Your API Key</h1>
-    <p class="subtitle">BotIndex Free Tier — 3 requests per hour</p>
+    <p class="subtitle">BotIndex Free Tier — 10 requests/day</p>
     <span class="badge">FREE</span>
     <div class="key-box" id="keyBox" onclick="copyKey()">${apiKey}</div>
     <div class="warning">⚠️ Save this key now. It won't be shown again.</div>
+    <div style="background: #1a1a2e; border: 1px solid #7c3aed40; border-radius: 12px; padding: 20px; margin: 20px 0;">
+      <div style="color: #a78bfa; font-weight: 600; font-size: 15px; margin-bottom: 8px;">⚡ Need more than 10 calls/day?</div>
+      <div style="color: #a1a1aa; font-size: 13px; margin-bottom: 12px;">Pro plan: 500 req/day for $9.99/mo. Full endpoint access.</div>
+      <a href="https://api.botindex.dev/api/botindex/keys/register?plan=pro" style="display: inline-block; padding: 10px 20px; background: #7c3aed20; color: #a78bfa; border: 1px solid #7c3aed40; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600;">Upgrade to Pro — $9.99/mo →</a>
+    </div>
     <div class="next-steps">
       <h2>Try it now — paste any command</h2>
       <div class="step">
@@ -240,7 +272,7 @@ router.get('/register', async (req, res) => {
     <div class="links">
       <a href="https://botindex.dev" class="primary">Documentation</a>
       <a href="https://aar.botindex.dev" class="secondary">AAR Trust Layer</a>
-      <a href="https://api.botindex.dev/api/botindex/keys/register?plan=basic" class="secondary">Upgrade to Basic</a>
+      <a href="https://api.botindex.dev/api/botindex/keys/register?plan=pro" class="secondary">Upgrade to Pro</a>
     </div>
   </div>
   <script>
@@ -257,7 +289,7 @@ router.get('/register', async (req, res) => {
             res.json({
                 key: apiKey,
                 plan: 'free',
-                rateLimit: '3 req/day (upgrade to Pro for unlimited: $29/mo)',
+                rateLimit: '10 req/day (upgrade to Pro for 500 req/day: $9.99/mo)',
                 message: "Your API key is ready. Copy a command below and paste it in your terminal — you'll get live data in 2 seconds.",
                 quickstart: {
                     step_1: 'Copy any curl command below and paste it in your terminal',
@@ -302,6 +334,9 @@ router.get('/register', async (req, res) => {
         const stripe = getStripeClient();
         const priceId = getPlanPriceId(plan);
         (0, conversion_funnel_1.trackFunnelEvent)('register_page_hit', plan);
+        if (plan === 'sentinel') {
+            logger_1.default.info({ truth: 'SENTINEL_REGISTER_HIT', plan, channel: 'web_get' }, 'Single source of truth event');
+        }
         const session = await stripe.checkout.sessions.create({
             mode: 'subscription',
             payment_method_types: ['card'],
@@ -315,7 +350,9 @@ router.get('/register', async (req, res) => {
             return;
         }
         (0, conversion_funnel_1.trackFunnelEvent)('checkout_session_created', plan);
-        (0, funnel_tracker_1.trackFunnelEvent)('key_issued_paid', { plan });
+        if (plan === 'sentinel') {
+            logger_1.default.info({ truth: 'SENTINEL_CHECKOUT_CREATED', plan, channel: 'web_get', sessionId: session.id }, 'Single source of truth event');
+        }
         (0, funnel_tracker_1.trackFunnelEvent)('checkout_redirect', {
             plan: typeof req.query.plan === 'string' ? req.query.plan : plan,
         });
@@ -338,7 +375,8 @@ router.post('/register', async (req, res) => {
     }
     try {
         const stripe = getStripeClient();
-        const plan = parsed.data.plan || 'basic';
+        const requestedPlan = parsed.data.plan;
+        const plan = requestedPlan === 'sentinel' ? 'sentinel' : 'pro';
         const priceId = getPlanPriceId(plan);
         (0, conversion_funnel_1.trackFunnelEvent)('register_page_hit', plan);
         const session = await stripe.checkout.sessions.create({
@@ -358,6 +396,9 @@ router.post('/register', async (req, res) => {
             return;
         }
         (0, conversion_funnel_1.trackFunnelEvent)('checkout_session_created', plan);
+        if (plan === 'sentinel') {
+            logger_1.default.info({ truth: 'SENTINEL_CHECKOUT_CREATED', plan, channel: 'api_post', sessionId: session.id }, 'Single source of truth event');
+        }
         (0, funnel_tracker_1.trackFunnelEvent)('key_issued_paid', { plan, source: 'api' });
         res.json({
             checkoutUrl: session.url,
@@ -394,19 +435,98 @@ router.get('/success', async (req, res) => {
         }
         const plan = resolvePlanFromSession(session);
         (0, conversion_funnel_1.trackFunnelEvent)('checkout_completed', plan);
+        if (plan === 'sentinel') {
+            logger_1.default.info({ truth: 'SENTINEL_CHECKOUT_COMPLETED', plan, sessionId, customerId, email }, 'Single source of truth event');
+        }
         const apiKey = (0, apiKeyAuth_1.generateApiKey)();
-        (0, apiKeyAuth_1.createApiKeyEntry)({
+        const entry = (0, apiKeyAuth_1.createApiKeyEntry)({
             apiKey,
             email,
             stripeCustomerId: customerId,
             plan,
         });
+        if (plan === 'pro') {
+            entry.dailyLimit = 500;
+        }
         (0, conversion_funnel_1.trackFunnelEvent)('api_key_issued', plan);
+        (0, posthog_1.trackEvent)(email || 'anonymous', 'key_issued', { plan, source: 'stripe_checkout' });
+        if (plan === 'sentinel') {
+            logger_1.default.info({ truth: 'SENTINEL_KEY_ISSUED', plan, sessionId, apiKeyPrefix: apiKey.slice(0, 16), email }, 'Single source of truth event');
+        }
         try {
             await (0, key_delivery_email_1.sendApiKeyEmail)({ to: email, apiKey, plan });
         }
         catch (emailError) {
             logger_1.default.error({ err: emailError, email }, 'Failed to send BotIndex API key email');
+        }
+        const acceptsHtml = (req.headers.accept || '').includes('text/html');
+        if (acceptsHtml) {
+            res.setHeader('Content-Type', 'text/html');
+            res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BotIndex — Your Pro API Key</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #e5e5e5; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 24px; }
+    .card { max-width: 520px; width: 100%; border: 1px solid #27272a; border-radius: 16px; background: #18181b; padding: 32px; }
+    h1 { font-size: 24px; color: #fff; margin-bottom: 8px; }
+    .subtitle { color: #a1a1aa; font-size: 14px; margin-bottom: 24px; }
+    .key-box { background: #0a0a0a; border: 1px solid #22d3ee40; border-radius: 8px; padding: 16px; margin-bottom: 16px; word-break: break-all; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 14px; color: #22d3ee; cursor: pointer; position: relative; }
+    .key-box:hover { border-color: #22d3ee; }
+    .key-box::after { content: 'Click to copy'; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 11px; color: #71717a; font-family: -apple-system, sans-serif; }
+    .copied .key-box::after { content: 'Copied ✓'; color: #22d3ee; }
+    .badge { display: inline-block; background: #7c3aed20; color: #a78bfa; border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 500; margin-bottom: 20px; }
+    .warning { background: #f59e0b15; border: 1px solid #f59e0b30; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #fbbf24; margin-bottom: 20px; }
+    .success-msg { background: #22c55e15; border: 1px solid #22c55e30; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #22c55e; margin-bottom: 20px; }
+    .step { background: #0a0a0a; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; font-size: 13px; }
+    .step code { color: #22d3ee; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
+    h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; margin: 20px 0 12px; }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <h1>Payment Confirmed ✓</h1>
+    <p class="subtitle">Your Pro plan is active.</p>
+    <span class="badge">PRO PLAN</span>
+    <div class="success-msg">✅ Subscription active — 500 requests/day</div>
+    <div class="key-box" id="keyBox" onclick="copyKey()">${apiKey}</div>
+    <div class="warning">⚠️ Save this key now. It won't be shown again.</div>
+
+    <h2>📲 Get Intelligence on Telegram</h2>
+    <div class="step" style="background: #22d3ee10; border: 1px solid #22d3ee30;">
+      <strong>Step 1:</strong> Open <a href="https://t.me/BotIndexHacks_Bot" target="_blank" style="color: #22d3ee;">@BotIndexHacks_Bot</a> on Telegram<br><br>
+      <strong>Step 2:</strong> Send this command:<br>
+      <code>/subscribe ${apiKey}</code><br><br>
+      <strong>Done!</strong> You'll receive intelligence alerts every 15 minutes when signals are active.
+    </div>
+
+    <h2>Or use the API</h2>
+    <div class="step">
+      <strong>🧠 Smart Money Flow</strong><br>
+      <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/synthesis/smart-money-flow</code>
+    </div>
+    <div class="step">
+      <strong>🎯 Risk Radar</strong><br>
+      <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/synthesis/risk-radar</code>
+    </div>
+    <div class="step">
+      <strong>📡 Network Intelligence</strong><br>
+      <code>curl -H "X-API-Key: ${apiKey}" https://api.botindex.dev/api/botindex/sentinel/network-intelligence/rankings</code>
+    </div>
+  </div>
+  <script>
+    function copyKey() {
+      navigator.clipboard.writeText('${apiKey}');
+      document.getElementById('card').classList.add('copied');
+      setTimeout(() => document.getElementById('card').classList.remove('copied'), 2000);
+    }
+  </script>
+</body>
+</html>`);
+            return;
         }
         res.json({
             key: apiKey,
@@ -491,6 +611,106 @@ router.get('/admin/funnel', (req, res) => {
     }
     res.json((0, conversion_funnel_1.getFunnelStats)());
 });
+// Single Source of Truth endpoint for commercial state
+router.get('/admin/truth', async (req, res) => {
+    const adminId = typeof req.query.adminId === 'string' ? req.query.adminId : '';
+    if (adminId !== ADMIN_ID) {
+        res.status(403).json({ error: 'forbidden', message: 'Invalid adminId' });
+        return;
+    }
+    const keys = readJson(API_KEYS_FILE, {});
+    const funnel = readJson(FUNNEL_FILE, { events: [] });
+    const keyEntries = Object.entries(keys);
+    const keysByPlan = {};
+    let activeKeys = 0;
+    for (const [, entry] of keyEntries) {
+        const plan = entry.plan || 'unknown';
+        keysByPlan[plan] = (keysByPlan[plan] || 0) + 1;
+        if ((entry.totalRequests || 0) > 0)
+            activeKeys++;
+    }
+    const byTypePlan = {};
+    for (const e of funnel.events || []) {
+        const type = e.type || 'unknown';
+        const plan = e.plan || 'unknown';
+        if (!byTypePlan[type])
+            byTypePlan[type] = {};
+        byTypePlan[type][plan] = (byTypePlan[type][plan] || 0) + 1;
+    }
+    const sentinelFunnel = {
+        registerHits: byTypePlan.register_page_hit?.sentinel || 0,
+        checkoutCreated: byTypePlan.checkout_session_created?.sentinel || 0,
+        checkoutCompleted: byTypePlan.checkout_completed?.sentinel || 0,
+        keysIssued: byTypePlan.api_key_issued?.sentinel || 0,
+    };
+    let stripeSummary = null;
+    try {
+        const stripe = getStripeClient();
+        const since30d = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000);
+        const charges = await stripe.charges.list({ limit: 100, created: { gte: since30d } });
+        const subscriptions = await stripe.subscriptions.list({ limit: 100, status: 'active' });
+        const sentinelPriceId = process.env.BOTINDEX_STRIPE_PRICE_SENTINEL;
+        const activeSentinelSubscriptions = subscriptions.data.filter((s) => s.items.data.some((i) => i.price.id === sentinelPriceId || i.price.metadata?.tier === 'sentinel')).length;
+        const sentinelCharges30d = charges.data.filter((c) => c.description?.toLowerCase().includes('sentinel') ||
+            c.billing_details?.email?.toLowerCase().includes('sentinel')).length;
+        stripeSummary = {
+            charges30d: charges.data.length,
+            sentinelCharges30d,
+            activeSubscriptions: subscriptions.data.length,
+            activeSentinelSubscriptions,
+        };
+    }
+    catch (err) {
+        logger_1.default.warn({ err }, 'Failed to query Stripe for admin truth endpoint');
+    }
+    // Agorion registry stats
+    let agorionStats = null;
+    try {
+        const agorionFile = path_1.default.join(DATA_DIR, 'agorion-registry.json');
+        if (fs_1.default.existsSync(agorionFile)) {
+            const raw = fs_1.default.readFileSync(agorionFile, 'utf-8');
+            const parsed = JSON.parse(raw);
+            const providers = Array.isArray(parsed) ? parsed : (parsed.providers || []);
+            const bySource = {};
+            let healthy = 0;
+            for (const p of providers) {
+                const src = p.source || 'unknown';
+                bySource[src] = (bySource[src] || 0) + 1;
+                if ((p.health?.status || p.status) === 'healthy')
+                    healthy++;
+            }
+            agorionStats = { totalProviders: providers.length, healthyProviders: healthy, bySource };
+        }
+    }
+    catch { /* non-fatal */ }
+    res.json({
+        timestamp: new Date().toISOString(),
+        singleSource: 'admin/truth',
+        offering: {
+            sentinelConfigured: !!process.env.BOTINDEX_STRIPE_PRICE_SENTINEL,
+            sentinelPriceId: process.env.BOTINDEX_STRIPE_PRICE_SENTINEL || null,
+            proPriceId: process.env.BOTINDEX_STRIPE_PRICE_STARTER || null,
+            registrationUrl: 'https://api.botindex.dev/api/botindex/keys/register?plan=sentinel',
+        },
+        keys: {
+            total: keyEntries.length,
+            activeKeys,
+            byPlan: keysByPlan,
+        },
+        funnel: {
+            totalEvents: (funnel.events || []).length,
+            byTypePlan,
+            sentinel: sentinelFunnel,
+            lastEventAt: ((funnel.events || [])[((funnel.events || []).length - 1)]?.ts) || null,
+        },
+        stripe: stripeSummary,
+        agorion: agorionStats,
+        monetizationPrompts: (0, funnel_tracker_1.getFunnelSummary)(),
+        truthEvents: {
+            grepHint: 'grep -E "SENTINEL_(REGISTER_HIT|CHECKOUT_CREATED|CHECKOUT_COMPLETED|KEY_ISSUED)"',
+        },
+    });
+});
 router.get('/admin/keys', (req, res) => {
     const adminId = typeof req.query.adminId === 'string' ? req.query.adminId : '';
     if (adminId !== ADMIN_ID) {
@@ -536,8 +756,8 @@ router.post('/admin/upgrade', express_1.default.json(), (req, res) => {
         return;
     }
     const { apiKey, plan } = req.body;
-    if (!apiKey || !plan || !['free', 'basic', 'pro'].includes(plan)) {
-        res.status(400).json({ error: 'bad_request', message: 'Provide apiKey and plan (free|basic|pro)' });
+    if (!apiKey || !plan || !['free', 'pro'].includes(plan)) {
+        res.status(400).json({ error: 'bad_request', message: 'Provide apiKey and plan (free|pro)' });
         return;
     }
     const entry = (0, apiKeyAuth_1.getApiKeyEntry)(apiKey);
