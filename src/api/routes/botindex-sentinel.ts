@@ -333,6 +333,27 @@ td{padding:8px;border-bottom:1px solid #1e293b;font-size:.9rem}
       return;
     }
 
+    // Gate detailed signals behind Sentinel auth
+    const isSentinel = isSentinelAuthorized(_req);
+    if (!isSentinel) {
+      // Public: stats only, no signal details
+      res.json({
+        totalPredictions: record.totalPredictions,
+        resolved: record.resolved,
+        correct: record.correct,
+        incorrect: record.incorrect,
+        pending: record.pending,
+        accuracy: record.accuracy,
+        byAsset: record.byAsset,
+        byType: record.byType,
+        recentPredictions: [],
+        recentResolutions: [],
+        message: 'Live signals and resolution details available with Sentinel tier.',
+        upgrade: { url: 'https://api.botindex.dev/api/botindex/keys/register?plan=sentinel', price: '$49.99/mo', trial: '7-day free trial' },
+      });
+      return;
+    }
+
     res.json(record);
   } catch (err) {
     logger.error({ err }, 'Track record endpoint failed');
