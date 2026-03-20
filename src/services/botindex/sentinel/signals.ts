@@ -21,6 +21,7 @@ import { getHyperliquidWhaleAlerts } from '../hyperliquid/whale-alerts';
 import { getFundingArbOpportunities } from '../hyperliquid/funding-arb';
 import { getTrending, getPrices } from '../coingecko-cache';
 import { queueSignalForRelay } from './public-channel-relay';
+import { collectEcosystemIntel, EcosystemData } from './ecosystem-intel';
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const SENTINEL_LOG = path.join(DATA_DIR, 'sentinel-signals.jsonl');
@@ -100,6 +101,7 @@ interface CollectedData {
   tvlMovers: Array<{ name: string; symbol: string; change1d: number; tvl: number }>;
   npmTrends: string | null;
   redditSentiment: string | null;
+  ecosystem: EcosystemData | null;
   sourcesOk: number;
 }
 
@@ -127,6 +129,12 @@ async function collectAllData(): Promise<CollectedData> {
   } catch { /* non-fatal */ }
 
   // Parallel fetch all external sources
+  // Ecosystem intelligence (GitHub + npm) — runs in parallel with other fetches
+  let ecosystem: EcosystemData | null = null;
+  const ecosystemPromise = collectEcosystemIntel().then(d => { ecosystem = d; sourcesOk += d.sourcesOk > 0 ? 1 : 0; }).catch(err => {
+    logger.warn({ err: err instanceof Error ? err.message : String(err) }, 'Ecosystem intel failed');
+  });
+
   const [whaleResult, fundingResult, fngResult, trendingResult, protocolsResult, npmResult, redditResult] = await Promise.all([
     getHyperliquidWhaleAlerts().then(d => { sourcesOk++; return d; }).catch(() => null),
     getFundingArbOpportunities().then(d => { sourcesOk++; return d; }).catch(() => null),
@@ -175,6 +183,9 @@ async function collectAllData(): Promise<CollectedData> {
   const redditSentiment = redditResult?.results ? redditResult.results.slice(0, 3).map(r => r.title).join(' | ') : null;
   if (npmTrends || redditSentiment) sourcesOk++;
 
+  // Wait for ecosystem intel to finish
+  await ecosystemPromise;
+
   return {
     querySurges,
     whales: whaleResult ? { topPositions: whaleResult.topPositions.map(p => ({ coin: p.coin, side: p.side, positionValue: p.positionValue })), summary: whaleResult.summary } : null,
@@ -184,6 +195,7 @@ async function collectAllData(): Promise<CollectedData> {
     tvlMovers,
     npmTrends,
     redditSentiment,
+    ecosystem,
     sourcesOk,
   };
 }
@@ -224,6 +236,21 @@ ${data.npmTrends || 'none detected'}
 8. SOCIAL SENTIMENT (bullish signals):
 ${data.redditSentiment || 'none detected'}
 
+9. ECOSYSTEM INTELLIGENCE (GitHub dev activity + npm download velocity — LEADING INDICATOR):
+${data.ecosystem ? (() => {
+  const hotRepos = data.ecosystem.repos
+    .filter((r: any) => r.commitsRecent > 0)
+    .sort((a: any, b: any) => b.commitsRecent - a.commitsRecent)
+    .slice(0, 8)
+    .map((r: any) => `${r.repo}(${r.asset}): ${r.stars.toLocaleString()}★, ${r.commitsRecent} commits/7d`);
+  const hotNpm = data.ecosystem.npm
+    .filter((n: any) => n.weeklyDownloads > 0)
+    .sort((a: any, b: any) => b.growthPct - a.growthPct)
+    .slice(0, 8)
+    .map((n: any) => `${n.pkg}(${n.asset}): ${n.weeklyDownloads.toLocaleString()}/wk ${n.growthPct > 0 ? '+' : ''}${n.growthPct.toFixed(1)}%`);
+  return `GitHub: ${hotRepos.join(', ') || 'none'}\nnpm: ${hotNpm.join(', ') || 'none'}`;
+})() : 'unavailable'}
+
 OUTPUT FORMAT (strict JSON, no markdown):
 {
   "market_regime": "risk_on|risk_off|neutral|transitioning",
@@ -232,7 +259,7 @@ OUTPUT FORMAT (strict JSON, no markdown):
   "synthesis": "<2-3 sentence market narrative>",
   "signals": [
     {
-      "type": "momentum_surge|momentum_decay|risk_cascade|sentiment_shift|whale_divergence|dump_warning|pump_signal",
+      "type": "momentum_surge|momentum_decay|risk_cascade|sentiment_shift|whale_divergence|dump_warning|ecosystem_momentum",
       "asset": "<token/chain name>",
       "strength": <0-100>,
       "direction": "bullish|bearish|neutral",
@@ -253,7 +280,8 @@ RULES:
 - IMPORTANT: whale_divergence direction = whale's bet direction, NOT current price direction
 - Network momentum surges indicate pre-move developer interest
 - Be specific about assets. "BTC" not "the market"
-- ASSET DIVERSITY: Do NOT only generate BTC and ETH signals. Look at trending tokens, TVL movers, and funding rate data for altcoins (SOL, AVAX, LINK, DOGE, etc). At least 1-2 signals per batch MUST be for non-BTC/ETH assets when the data supports it.
+- ASSET DIVERSITY: Do NOT only generate BTC and ETH signals. Look at trending tokens, TVL movers, funding rate data, and ECOSYSTEM INTELLIGENCE for altcoins (SOL, AVAX, LINK, APT, SUI, etc). At least 1-2 signals per batch MUST be for non-BTC/ETH assets when the data supports it.
+- ecosystem_momentum: Use this signal type when GitHub commit velocity, npm download growth, or developer activity for an asset is accelerating or decelerating significantly. Rising dev activity (commits up, downloads surging) = bullish leading indicator. Declining dev activity (commits dropping, downloads falling) = bearish. This is a LEADING indicator — developer activity often leads price by days or weeks.
 - Be direct. No hedging language. State the signal clearly.
 - If data is insufficient, lower confidence, don't hallucinate signals`;
 
