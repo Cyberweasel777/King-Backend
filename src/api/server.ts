@@ -299,9 +299,9 @@ async function start() {
   const { startTelegramBot } = await import('../services/botindex/sentinel/telegram-subscribers');
   startTelegramBot();
 
-  // Start delayed public Telegram relay for Sentinel signals
-  const { startPublicRelay } = await import('../services/botindex/sentinel/public-channel-relay');
-  startPublicRelay();
+  // Public Telegram relay DISABLED — ecosystem-only pivot, reducing channel noise
+  // const { startPublicRelay } = await import('../services/botindex/sentinel/public-channel-relay');
+  // startPublicRelay();
   
   app.listen(PORT, () => {
     logger.info(
@@ -326,11 +326,12 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-if (process.env.ZORA_ALPHA_BOT_TOKEN) {
-  import('../services/botindex/zora/alpha-bot').catch((error) => {
-    logger.error({ err: error }, 'Failed to start Zora Alpha bot polling service');
-  });
-}
+// Zora Alpha bot DISABLED — reducing overhead
+// if (process.env.ZORA_ALPHA_BOT_TOKEN) {
+//   import('../services/botindex/zora/alpha-bot').catch((error) => {
+//     logger.error({ err: error }, 'Failed to start Zora Alpha bot polling service');
+//   });
+// }
 
 export default app;
 // This won't work appended at end, need to insert before 404 handler
