@@ -269,7 +269,7 @@ OUTPUT FORMAT (strict JSON, no markdown):
   "synthesis": "<2-3 sentence market narrative>",
   "signals": [
     {
-      "type": "momentum_surge|momentum_decay|risk_cascade|sentiment_shift|whale_divergence|dump_warning|ecosystem_momentum",
+      "type": "ecosystem_momentum",
       "asset": "<token/chain name>",
       "strength": <0-100>,
       "direction": "bullish|bearish|neutral",
@@ -283,20 +283,19 @@ OUTPUT FORMAT (strict JSON, no markdown):
 }
 
 RULES:
-- Generate 3-7 signals, ranked by strength
-- Flag dump_warning signals when: extreme greed + whale concentration + high funding rates converge (BEARISH)
-- DO NOT generate pump_signal type signals. This signal type is disabled until further notice. Skip it entirely.
-- whale_divergence: when whale positions DIVERGE from price action. If whales are long while price drops, direction is BULLISH (smart money accumulating). If whales are short while price rises, direction is BEARISH. The direction should match WHERE THE WHALE IS POSITIONED, not the current price trend.
-- IMPORTANT: whale_divergence direction = whale's bet direction, NOT current price direction
-- Network momentum surges indicate pre-move developer interest
+- Generate 3-7 ecosystem_momentum signals ONLY. No other signal types.
+- DO NOT generate: pump_signal, sentiment_shift, momentum_decay, risk_cascade, dump_warning, whale_divergence, momentum_surge. These are ALL disabled.
+- ONLY generate ecosystem_momentum signals based on the ecosystem intelligence data provided above.
+- Interpret the ecosystem data (commits, downloads, crate activity) with market context to determine direction and strength.
+- Rising dev activity (commits up, downloads surging across npm AND PyPI AND Rust crates) = bullish leading indicator.
+- Declining dev activity (commits dropping, downloads falling) = bearish leading indicator.
+- Cross-reference npm + PyPI + Rust crates trends for convergence — if multiple ecosystems show the same direction, confidence should be HIGH.
+- Rust crate activity is especially significant for L1 chains (SOL, DOT, NEAR, STRK) built in Rust.
+- ASSET DIVERSITY (MANDATORY): You MUST generate signals for at least 3 DIFFERENT assets per batch. Maximum 2 signals for BTC, maximum 2 for ETH. The rest MUST be altcoins from the ecosystem data.
+- EXCLUDED ASSETS: Do NOT generate signals for KAS (Kaspa). Skip it entirely.
 - Be specific about assets. "BTC" not "the market"
-- ASSET DIVERSITY (MANDATORY): You MUST generate signals for at least 3 DIFFERENT assets per batch. Maximum 2 signals for BTC, maximum 2 for ETH. The rest MUST be altcoins from the data: SOL, AVAX, LINK, APT, SUI, UNI, AAVE, NEAR, GRT, COMP, RENDER — use trending tokens, TVL movers, funding rates, and ecosystem intelligence to find them. If you only output BTC/ETH/SOL, you are failing this requirement.
-- EXCLUDED ASSETS: Do NOT generate signals for KAS (Kaspa). This asset has insufficient data quality. Skip it entirely.
-- ecosystem_momentum: Use this signal type when GitHub commit velocity, npm/PyPI/crates.io download growth, or developer activity for an asset is accelerating or decelerating significantly. Rising dev activity (commits up, downloads surging across npm AND PyPI AND Rust crates) = bullish leading indicator. Declining dev activity (commits dropping, downloads falling) = bearish. This is a LEADING indicator — developer activity often leads price by days or weeks. Cross-reference npm + PyPI + Rust crates trends for convergence — if multiple ecosystems show the same direction, confidence should be HIGH. Rust crate activity is especially significant for L1 chains (SOL, DOT, NEAR, STRK) built in Rust.
-- sentiment_shift: In the current bear/fear market regime, ONLY generate bearish sentiment_shift signals. Do NOT call bullish sentiment shifts — they have 27% accuracy and fail consistently. Wait for confirmed regime change before generating bullish sentiment signals.
-- momentum_decay: This signal MUST have clear evidence of trend reversal, not just "slowing momentum." Require at least 2 concrete data points showing directional change (e.g., funding rate flip + volume spike + whale repositioning). Do not default to always-bearish — if momentum is decaying upward, say bullish.
 - Be direct. No hedging language. State the signal clearly.
-- If data is insufficient, lower confidence, don't hallucinate signals`;
+- If data is insufficient for an asset, lower confidence, don't hallucinate signals`;
 
   try {
     const res = await fetchWithTimeout(DEEPSEEK_URL, {

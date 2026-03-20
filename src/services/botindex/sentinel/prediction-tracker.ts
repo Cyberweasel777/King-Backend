@@ -288,7 +288,7 @@ export function getTrackRecord(): {
   for (const p of predictions) predMap.set(p.id, p);
 
   // Filter out excluded signal types and assets from resolution counts
-  const EXCLUDED_TYPES_SET = new Set(['pump_signal']);
+  const EXCLUDED_TYPES_SET = new Set(['pump_signal', 'sentiment_shift', 'momentum_decay', 'risk_cascade', 'dump_warning', 'whale_divergence', 'momentum_surge']);
   const EXCLUDED_ASSETS = new Set(['KAS', 'KATANA (KAT)']);
   const scorableResolutions = resolutions.filter(r => {
     const pred = predMap.get(r.prediction_id);
@@ -304,8 +304,8 @@ export function getTrackRecord(): {
   const byAsset: Record<string, { total: number; correct: number; accuracy: number }> = {};
   const byType: Record<string, { total: number; correct: number; accuracy: number }> = {};
 
-  // Signal types excluded from public track record (broken/disabled)
-  const EXCLUDED_TYPES = new Set(['pump_signal']);
+  // Signal types excluded from public track record (disabled — ecosystem_momentum only now)
+  const EXCLUDED_TYPES = new Set(['pump_signal', 'sentiment_shift', 'momentum_decay', 'risk_cascade', 'dump_warning', 'whale_divergence', 'momentum_surge']);
 
   for (const r of resolutions) {
     // Only aggregate scored outcomes (exclude null/unscorable resolutions)

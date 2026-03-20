@@ -480,7 +480,7 @@ td{padding:8px;border-bottom:1px solid #1e293b;font-size:.9rem}
 <table><thead><tr><th>Signal</th><th>Resolved</th><th>Correct</th><th>Accuracy</th></tr></thead><tbody>${typeRows || '<tr><td colspan="4" style="color:#64748b">Accumulating data...</td></tr>'}</tbody></table>
 <h2>By Asset</h2>
 <table><thead><tr><th>Asset</th><th>Resolved</th><th>Correct</th><th>Accuracy</th></tr></thead><tbody>${assetRows || '<tr><td colspan="4" style="color:#64748b">Accumulating data...</td></tr>'}</tbody></table>
-<h2>📡 Ecosystem Intelligence — Live Developer Activity</h2>
+<h2>📡 Ecosystem Intelligence</h2>
 ${ecosystemSnapshot ? (() => {
   const npmRows = ecosystemSnapshot.npm
     .sort((a, b) => b.growthPct - a.growthPct)
@@ -498,11 +498,11 @@ ${ecosystemSnapshot ? (() => {
     .map((p: any) => `<tr><td>${p.pkg}</td><td>${p.asset}</td><td>${p.weeklyDownloads.toLocaleString()}</td><td style="color:${p.growthPct > 0 ? '#10b981' : p.growthPct < 0 ? '#ef4444' : '#64748b'}">${p.growthPct > 0 ? '+' : ''}${p.growthPct.toFixed(1)}%</td></tr>`)
     .join('');
   return `
-<h2>Developer Ecosystem Intelligence</h2>
+<h2>Ecosystem Intelligence</h2>
 <div style="background:#1e293b;padding:16px;border-radius:8px;margin-bottom:16px">
   <div style="font-size:36px;font-weight:800;color:#a78bfa;text-align:center">${ecosystemSnapshot.sourcesOk} Sources Tracked</div>
   <div style="text-align:center;color:#64748b;font-size:14px">${ecosystemSnapshot.repos.length} GitHub repos · ${ecosystemSnapshot.npm.length} npm packages · ${(ecosystemSnapshot.pypi||[]).length} PyPI packages · ${(ecosystemSnapshot.crates||[]).length} Rust crates</div>
-  <div style="text-align:center;color:#64748b;font-size:12px;margin-top:8px">Real-time developer activity signals across 4 package ecosystems</div>
+  <div style="text-align:center;color:#64748b;font-size:12px;margin-top:8px">Real-time ecosystem signals across multiple data sources</div>
 </div>
 <div style="background:#0f172a;border:1px solid #a78bfa;border-radius:8px;padding:16px;text-align:center;margin-bottom:16px">
   <div style="color:#a78bfa;font-weight:600">🔒 Individual package signals are Sentinel-exclusive</div>
