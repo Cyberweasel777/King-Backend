@@ -497,21 +497,19 @@ ${ecosystemSnapshot ? (() => {
     .slice(0, 10)
     .map((p: any) => `<tr><td>${p.pkg}</td><td>${p.asset}</td><td>${p.weeklyDownloads.toLocaleString()}</td><td style="color:${p.growthPct > 0 ? '#10b981' : p.growthPct < 0 ? '#ef4444' : '#64748b'}">${p.growthPct > 0 ? '+' : ''}${p.growthPct.toFixed(1)}%</td></tr>`)
     .join('');
-  const crateRows = (ecosystemSnapshot.crates || [])
-    .sort((a: any, b: any) => b.recentDownloads - a.recentDownloads)
-    .slice(0, 10)
-    .map((c: any) => `<tr><td>${c.crate}</td><td>${c.asset}</td><td>${c.recentDownloads.toLocaleString()}</td><td>${c.totalDownloads.toLocaleString()}</td></tr>`)
-    .join('');
   return `
-<h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">npm Package Downloads (weekly)</h3>
-<table><thead><tr><th>Package</th><th>Asset</th><th>Downloads/wk</th><th>Growth</th></tr></thead><tbody>${npmRows || '<tr><td colspan="4" style="color:#64748b">No npm data yet...</td></tr>'}</tbody></table>
-<h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">PyPI Package Downloads (weekly)</h3>
-<table><thead><tr><th>Package</th><th>Asset</th><th>Downloads/wk</th><th>Growth</th></tr></thead><tbody>${pypiRows || '<tr><td colspan="4" style="color:#64748b">No PyPI data yet...</td></tr>'}</tbody></table>
-<h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">Rust Crate Downloads (90-day)</h3>
-<table><thead><tr><th>Crate</th><th>Asset</th><th>Downloads/90d</th><th>Total</th></tr></thead><tbody>${crateRows || '<tr><td colspan="4" style="color:#64748b">No crates.io data yet...</td></tr>'}</tbody></table>
-<h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">GitHub Development Velocity (7-day)</h3>
-<table><thead><tr><th>Repository</th><th>Asset</th><th>Stars</th><th>Commits/7d</th></tr></thead><tbody>${repoRows || '<tr><td colspan="4" style="color:#64748b">No GitHub data yet...</td></tr>'}</tbody></table>
-<div class="note">Updated: ${new Date().toLocaleString()} · ${ecosystemSnapshot.sourcesOk} sources active</div>`;
+<h2>Developer Ecosystem Intelligence</h2>
+<div style="background:#1e293b;padding:16px;border-radius:8px;margin-bottom:16px">
+  <div style="font-size:36px;font-weight:800;color:#a78bfa;text-align:center">${ecosystemSnapshot.sourcesOk} Sources Tracked</div>
+  <div style="text-align:center;color:#64748b;font-size:14px">${ecosystemSnapshot.repos.length} GitHub repos · ${ecosystemSnapshot.npm.length} npm packages · ${(ecosystemSnapshot.pypi||[]).length} PyPI packages · ${(ecosystemSnapshot.crates||[]).length} Rust crates</div>
+  <div style="text-align:center;color:#64748b;font-size:12px;margin-top:8px">Real-time developer activity signals across 4 package ecosystems</div>
+</div>
+<div style="background:#0f172a;border:1px solid #a78bfa;border-radius:8px;padding:16px;text-align:center;margin-bottom:16px">
+  <div style="color:#a78bfa;font-weight:600">🔒 Individual package signals are Sentinel-exclusive</div>
+  <div style="color:#64748b;font-size:13px;margin-top:4px">Upgrade to see which packages are surging, which are declining, and cross-ecosystem convergence data</div>
+  <a href="${REGISTER_URL}" style="display:inline-block;margin-top:12px;background:#a78bfa;color:#fff;padding:8px 24px;border-radius:6px;text-decoration:none;font-weight:600">Start 7-Day Free Trial →</a>
+</div>
+<div class="note">Updated: ${new Date().toLocaleString()}</div>`;
 })() : '<div class="note">Ecosystem data temporarily unavailable</div>'}
 <h2>Recent Signals</h2>
 <table><thead><tr><th>Time</th><th>Asset</th><th>Signal</th><th>Direction</th><th>Strength</th><th>Entry Price</th></tr></thead><tbody>${recentRows || '<tr><td colspan="6" style="color:#64748b">No predictions yet...</td></tr>'}</tbody></table>
