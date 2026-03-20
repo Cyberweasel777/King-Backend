@@ -72,9 +72,27 @@ const TRACKED_NPM: Array<{ pkg: string; asset: string; category: string }> = [
   { pkg: '@eth-optimism/sdk', asset: 'OP', category: 'L2' },
   { pkg: 'starknet', asset: 'STRK', category: 'L2' },
   { pkg: '@near-js/client', asset: 'NEAR', category: 'L1' },
-  { pkg: '@modelcontextprotocol/sdk', asset: 'META', category: 'MCP' },
   { pkg: '@aptos-labs/ts-sdk', asset: 'APT', category: 'L1' },
   { pkg: '@mysten/sui', asset: 'SUI', category: 'L1' },
+  // MCP / Agent ecosystem — individual signal per package
+  { pkg: '@modelcontextprotocol/sdk', asset: 'MCP', category: 'MCP-core' },
+  { pkg: '@modelcontextprotocol/server-filesystem', asset: 'MCP', category: 'MCP-server' },
+  { pkg: '@modelcontextprotocol/server-everything', asset: 'MCP', category: 'MCP-server' },
+  { pkg: '@modelcontextprotocol/server-sequential-thinking', asset: 'MCP', category: 'MCP-server' },
+  { pkg: '@modelcontextprotocol/inspector', asset: 'MCP', category: 'MCP-tools' },
+  { pkg: '@modelcontextprotocol/ext-apps', asset: 'MCP', category: 'MCP-core' },
+  { pkg: '@notionhq/notion-mcp-server', asset: 'MCP', category: 'MCP-integration' },
+  { pkg: '@supabase/mcp-server-supabase', asset: 'MCP', category: 'MCP-integration' },
+  { pkg: '@sentry/mcp-server', asset: 'MCP', category: 'MCP-integration' },
+  { pkg: '@heroku/mcp-server', asset: 'MCP', category: 'MCP-integration' },
+  { pkg: '@railway/mcp-server', asset: 'MCP', category: 'MCP-integration' },
+  { pkg: '@mapbox/mcp-server', asset: 'MCP', category: 'MCP-integration' },
+  { pkg: '@eslint/mcp', asset: 'MCP', category: 'MCP-tools' },
+  { pkg: 'puppeteer-mcp-server', asset: 'MCP', category: 'MCP-tools' },
+  { pkg: 'mcp-server-kubernetes', asset: 'MCP', category: 'MCP-infra' },
+  { pkg: '@upstash/context7-mcp', asset: 'MCP', category: 'MCP-integration' },
+  { pkg: 'fastmcp', asset: 'MCP', category: 'MCP-framework' },
+  { pkg: 'mcp-framework', asset: 'MCP', category: 'MCP-framework' },
 ];
 
 // PyPI packages — Python ecosystem signals
@@ -87,6 +105,10 @@ const TRACKED_PYPI: Array<{ pkg: string; asset: string; category: string }> = [
   { pkg: 'sui-python-sdk', asset: 'SUI', category: 'L1' },
   { pkg: 'starknet-py', asset: 'STRK', category: 'L2' },
   { pkg: 'bittensor', asset: 'TAO', category: 'AI' },
+  // MCP Python ecosystem
+  { pkg: 'mcp', asset: 'MCP', category: 'MCP-core' },
+  { pkg: 'fastmcp', asset: 'MCP', category: 'MCP-framework' },
+  { pkg: 'langchain-mcp-adapters', asset: 'MCP', category: 'MCP-framework' },
 ];
 
 interface RepoStats {

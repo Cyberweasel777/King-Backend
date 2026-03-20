@@ -13,6 +13,7 @@ import logger from '../../config/logger';
 import { getCachedSentinelReport, type SentinelReport } from '../../services/botindex/sentinel/signals';
 import { getCachedNetworkIntelligence, type NetworkIntelligenceReport } from '../../services/botindex/sentinel/network-intelligence';
 import { collectEcosystemIntel } from '../../services/botindex/sentinel/ecosystem-intel';
+import { generateEcosystemSignals, EcosystemSignalReport } from '../../services/botindex/sentinel/ecosystem-signals';
 
 const router = Router();
 
@@ -330,6 +331,74 @@ router.get('/sentinel/ecosystem', async (_req: Request, res: Response) => {
   } catch (err) {
     logger.error({ err }, 'Ecosystem endpoint failed');
     res.status(500).json({ error: 'ecosystem_error' });
+  }
+});
+
+// ── Ecosystem Signals — Individual + Aggregates ──────────────────────
+
+let ecoSignalsCache: { data: EcosystemSignalReport; fetchedAt: number } | null = null;
+const ECO_SIGNALS_CACHE_TTL = 5 * 60 * 1000; // 5 min
+
+router.get('/sentinel/ecosystem-signals', async (_req: Request, res: Response) => {
+  try {
+    const now = Date.now();
+    if (ecoSignalsCache && (now - ecoSignalsCache.fetchedAt) < ECO_SIGNALS_CACHE_TTL) {
+      // Public gets aggregates only; Sentinel gets individual signals too
+      const isSentinel = !!extractApiKey(_req);
+      if (isSentinel) {
+        res.json(ecoSignalsCache.data);
+      } else {
+        res.json({
+          aggregates: ecoSignalsCache.data.aggregates.map(a => ({
+            asset: a.asset,
+            direction: a.direction,
+            strength: a.strength,
+            confidence: a.confidence,
+            signalCount: a.signalCount,
+            bullishCount: a.bullishCount,
+            bearishCount: a.bearishCount,
+            neutralCount: a.neutralCount,
+            narrative: a.narrative,
+          })),
+          grandAggregate: ecoSignalsCache.data.grandAggregate,
+          timestamp: ecoSignalsCache.data.timestamp,
+          sourcesOk: ecoSignalsCache.data.sourcesOk,
+          _note: 'Individual signal breakdown available with Sentinel plan',
+          _upgrade: REGISTER_URL,
+        });
+      }
+      return;
+    }
+
+    const report = await generateEcosystemSignals();
+    ecoSignalsCache = { data: report, fetchedAt: now };
+
+    const isSentinel = !!extractApiKey(_req);
+    if (isSentinel) {
+      res.json(report);
+    } else {
+      res.json({
+        aggregates: report.aggregates.map(a => ({
+          asset: a.asset,
+          direction: a.direction,
+          strength: a.strength,
+          confidence: a.confidence,
+          signalCount: a.signalCount,
+          bullishCount: a.bullishCount,
+          bearishCount: a.bearishCount,
+          neutralCount: a.neutralCount,
+          narrative: a.narrative,
+        })),
+        grandAggregate: report.grandAggregate,
+        timestamp: report.timestamp,
+        sourcesOk: report.sourcesOk,
+        _note: 'Individual signal breakdown available with Sentinel plan',
+        _upgrade: REGISTER_URL,
+      });
+    }
+  } catch (err) {
+    logger.error({ err }, 'Ecosystem signals endpoint failed');
+    res.status(500).json({ error: 'ecosystem_signals_error' });
   }
 });
 
