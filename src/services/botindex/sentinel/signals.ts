@@ -280,8 +280,11 @@ RULES:
 - IMPORTANT: whale_divergence direction = whale's bet direction, NOT current price direction
 - Network momentum surges indicate pre-move developer interest
 - Be specific about assets. "BTC" not "the market"
-- ASSET DIVERSITY: Do NOT only generate BTC and ETH signals. Look at trending tokens, TVL movers, funding rate data, and ECOSYSTEM INTELLIGENCE for altcoins (SOL, AVAX, LINK, APT, SUI, etc). At least 1-2 signals per batch MUST be for non-BTC/ETH assets when the data supports it.
+- ASSET DIVERSITY (MANDATORY): You MUST generate signals for at least 3 DIFFERENT assets per batch. Maximum 2 signals for BTC, maximum 2 for ETH. The rest MUST be altcoins from the data: SOL, AVAX, LINK, APT, SUI, UNI, AAVE, NEAR, GRT, COMP, RENDER — use trending tokens, TVL movers, funding rates, and ecosystem intelligence to find them. If you only output BTC/ETH/SOL, you are failing this requirement.
+- EXCLUDED ASSETS: Do NOT generate signals for KAS (Kaspa). This asset has insufficient data quality. Skip it entirely.
 - ecosystem_momentum: Use this signal type when GitHub commit velocity, npm download growth, or developer activity for an asset is accelerating or decelerating significantly. Rising dev activity (commits up, downloads surging) = bullish leading indicator. Declining dev activity (commits dropping, downloads falling) = bearish. This is a LEADING indicator — developer activity often leads price by days or weeks.
+- sentiment_shift: In the current bear/fear market regime, ONLY generate bearish sentiment_shift signals. Do NOT call bullish sentiment shifts — they have 27% accuracy and fail consistently. Wait for confirmed regime change before generating bullish sentiment signals.
+- momentum_decay: This signal MUST have clear evidence of trend reversal, not just "slowing momentum." Require at least 2 concrete data points showing directional change (e.g., funding rate flip + volume spike + whale repositioning). Do not default to always-bearish — if momentum is decaying upward, say bullish.
 - Be direct. No hedging language. State the signal clearly.
 - If data is insufficient, lower confidence, don't hallucinate signals`;
 

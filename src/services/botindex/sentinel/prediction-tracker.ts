@@ -287,12 +287,14 @@ export function getTrackRecord(): {
   const predMap = new Map<string, Prediction>();
   for (const p of predictions) predMap.set(p.id, p);
 
-  // Filter out excluded signal types from resolution counts
+  // Filter out excluded signal types and assets from resolution counts
   const EXCLUDED_TYPES_SET = new Set(['pump_signal']);
+  const EXCLUDED_ASSETS = new Set(['KAS', 'KATANA (KAT)']);
   const scorableResolutions = resolutions.filter(r => {
     const pred = predMap.get(r.prediction_id);
     const type = pred?.signal_type || 'unknown';
-    return !EXCLUDED_TYPES_SET.has(type);
+    const asset = normalizeAsset(r.asset);
+    return !EXCLUDED_TYPES_SET.has(type) && !EXCLUDED_ASSETS.has(asset);
   });
 
   const correct = scorableResolutions.filter(r => r.correct_24h === true).length;
@@ -312,10 +314,10 @@ export function getTrackRecord(): {
     const pred = predMap.get(r.prediction_id);
     const type = pred?.signal_type || 'unknown';
 
-    // Skip excluded signal types entirely
+    // Skip excluded signal types and assets entirely
     if (EXCLUDED_TYPES.has(type)) continue;
-
     const asset = normalizeAsset(r.asset);
+    if (EXCLUDED_ASSETS.has(asset)) continue;
 
     if (!byAsset[asset]) byAsset[asset] = { total: 0, correct: 0, accuracy: 0 };
     byAsset[asset].total++;
