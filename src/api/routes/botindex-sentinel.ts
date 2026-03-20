@@ -12,6 +12,7 @@ import { extractApiKey, getApiKeyEntry } from '../middleware/apiKeyAuth';
 import logger from '../../config/logger';
 import { getCachedSentinelReport, type SentinelReport } from '../../services/botindex/sentinel/signals';
 import { getCachedNetworkIntelligence, type NetworkIntelligenceReport } from '../../services/botindex/sentinel/network-intelligence';
+import { collectEcosystemIntel } from '../../services/botindex/sentinel/ecosystem-intel';
 
 const router = Router();
 
@@ -279,6 +280,51 @@ Sources: ${report.metadata.sources_ok}/${report.metadata.sources_queried} | Late
 </div></div></body></html>`;
 }
 
+// ── Ecosystem Intelligence (PUBLIC — differentiator) ─────────────────
+
+// Cache ecosystem data for 5 min (expensive to fetch)
+let ecosystemCache: { data: any; fetchedAt: number } | null = null;
+const ECOSYSTEM_CACHE_TTL = 5 * 60 * 1000;
+
+router.get('/sentinel/ecosystem', async (_req: Request, res: Response) => {
+  try {
+    const now = Date.now();
+    if (ecosystemCache && (now - ecosystemCache.fetchedAt) < ECOSYSTEM_CACHE_TTL) {
+      res.json(ecosystemCache.data);
+      return;
+    }
+
+    const data = await collectEcosystemIntel();
+
+    const response = {
+      repos: data.repos.map(r => ({
+        repo: r.repo,
+        asset: r.asset,
+        category: r.category,
+        stars: r.stars,
+        commitsWeekly: r.commitsRecent,
+        pushedAt: r.pushedAt,
+      })).sort((a, b) => b.commitsWeekly - a.commitsWeekly),
+      npm: data.npm.map(n => ({
+        package: n.pkg,
+        asset: n.asset,
+        category: n.category,
+        weeklyDownloads: n.weeklyDownloads,
+        prevWeekDownloads: n.prevWeekDownloads,
+        growthPct: Math.round(n.growthPct * 10) / 10,
+      })).sort((a, b) => b.growthPct - a.growthPct),
+      sourcesOk: data.sourcesOk,
+      fetchedAt: new Date().toISOString(),
+    };
+
+    ecosystemCache = { data: response, fetchedAt: now };
+    res.json(response);
+  } catch (err) {
+    logger.error({ err }, 'Ecosystem endpoint failed');
+    res.status(500).json({ error: 'ecosystem_error' });
+  }
+});
+
 // ── Track Record (PUBLIC — this is the proof) ────────────────────────
 
 router.get('/sentinel/track-record', async (_req: Request, res: Response) => {
@@ -346,6 +392,32 @@ td{padding:8px;border-bottom:1px solid #1e293b;font-size:.9rem}
 <table><thead><tr><th>Signal</th><th>Resolved</th><th>Correct</th><th>Accuracy</th></tr></thead><tbody>${typeRows || '<tr><td colspan="4" style="color:#64748b">Accumulating data...</td></tr>'}</tbody></table>
 <h2>By Asset</h2>
 <table><thead><tr><th>Asset</th><th>Resolved</th><th>Correct</th><th>Accuracy</th></tr></thead><tbody>${assetRows || '<tr><td colspan="4" style="color:#64748b">Accumulating data...</td></tr>'}</tbody></table>
+<h2>📡 Ecosystem Intelligence — Live Developer Activity</h2>
+<div id="ecosystem-data" style="color:#64748b;font-size:.9rem">Loading ecosystem data...</div>
+<script>
+fetch('/api/botindex/sentinel/ecosystem').then(r=>r.json()).then(d=>{
+  let html='';
+  if(d.npm&&d.npm.length){
+    html+='<h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">npm Package Downloads (weekly)</h3>';
+    html+='<table><thead><tr><th>Package</th><th>Asset</th><th>Downloads/wk</th><th>Growth</th></tr></thead><tbody>';
+    d.npm.forEach(n=>{
+      const color=n.growthPct>0?'#10b981':n.growthPct<0?'#ef4444':'#64748b';
+      html+='<tr><td>'+n.package+'</td><td>'+n.asset+'</td><td>'+n.weeklyDownloads.toLocaleString()+'</td><td style="color:'+color+'">'+(n.growthPct>0?'+':'')+n.growthPct+'%</td></tr>';
+    });
+    html+='</tbody></table>';
+  }
+  if(d.repos&&d.repos.length){
+    html+='<h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">GitHub Development Velocity (7-day)</h3>';
+    html+='<table><thead><tr><th>Repository</th><th>Asset</th><th>Stars</th><th>Commits/7d</th></tr></thead><tbody>';
+    d.repos.forEach(r=>{
+      html+='<tr><td>'+r.repo+'</td><td>'+r.asset+'</td><td>'+r.stars.toLocaleString()+'</td><td>'+r.commitsWeekly+'</td></tr>';
+    });
+    html+='</tbody></table>';
+  }
+  html+='<div class="note">Updated: '+new Date(d.fetchedAt).toLocaleString()+' · '+d.sourcesOk+' sources active</div>';
+  document.getElementById('ecosystem-data').innerHTML=html;
+}).catch(()=>{document.getElementById('ecosystem-data').textContent='Ecosystem data temporarily unavailable';});
+</script>
 <h2>Recent Signals</h2>
 <table><thead><tr><th>Time</th><th>Asset</th><th>Signal</th><th>Direction</th><th>Strength</th><th>Entry Price</th></tr></thead><tbody>${recentRows || '<tr><td colspan="6" style="color:#64748b">No predictions yet...</td></tr>'}</tbody></table>
 ${ctaHtml}
