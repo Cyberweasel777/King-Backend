@@ -313,6 +313,14 @@ router.get('/sentinel/ecosystem', async (_req: Request, res: Response) => {
         prevWeekDownloads: n.prevWeekDownloads,
         growthPct: Math.round(n.growthPct * 10) / 10,
       })).sort((a, b) => b.growthPct - a.growthPct),
+      pypi: (data.pypi || []).map(p => ({
+        package: p.pkg,
+        asset: p.asset,
+        category: p.category,
+        weeklyDownloads: p.weeklyDownloads,
+        prevWeekDownloads: p.prevWeekDownloads,
+        growthPct: Math.round(p.growthPct * 10) / 10,
+      })).sort((a, b) => b.growthPct - a.growthPct),
       sourcesOk: data.sourcesOk,
       fetchedAt: new Date().toISOString(),
     };
@@ -408,9 +416,16 @@ ${ecosystemSnapshot ? (() => {
     .slice(0, 10)
     .map(r => `<tr><td>${r.repo}</td><td>${r.asset}</td><td>${r.stars.toLocaleString()}</td><td>${r.commitsRecent}</td></tr>`)
     .join('');
+  const pypiRows = (ecosystemSnapshot.pypi || [])
+    .sort((a: any, b: any) => b.growthPct - a.growthPct)
+    .slice(0, 10)
+    .map((p: any) => `<tr><td>${p.pkg}</td><td>${p.asset}</td><td>${p.weeklyDownloads.toLocaleString()}</td><td style="color:${p.growthPct > 0 ? '#10b981' : p.growthPct < 0 ? '#ef4444' : '#64748b'}">${p.growthPct > 0 ? '+' : ''}${p.growthPct.toFixed(1)}%</td></tr>`)
+    .join('');
   return `
 <h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">npm Package Downloads (weekly)</h3>
 <table><thead><tr><th>Package</th><th>Asset</th><th>Downloads/wk</th><th>Growth</th></tr></thead><tbody>${npmRows || '<tr><td colspan="4" style="color:#64748b">No npm data yet...</td></tr>'}</tbody></table>
+<h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">PyPI Package Downloads (weekly)</h3>
+<table><thead><tr><th>Package</th><th>Asset</th><th>Downloads/wk</th><th>Growth</th></tr></thead><tbody>${pypiRows || '<tr><td colspan="4" style="color:#64748b">No PyPI data yet...</td></tr>'}</tbody></table>
 <h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">GitHub Development Velocity (7-day)</h3>
 <table><thead><tr><th>Repository</th><th>Asset</th><th>Stars</th><th>Commits/7d</th></tr></thead><tbody>${repoRows || '<tr><td colspan="4" style="color:#64748b">No GitHub data yet...</td></tr>'}</tbody></table>
 <div class="note">Updated: ${new Date().toLocaleString()} · ${ecosystemSnapshot.sourcesOk} sources active</div>`;
