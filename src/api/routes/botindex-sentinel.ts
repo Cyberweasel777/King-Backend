@@ -537,7 +537,7 @@ ${ctaHtml}
         asset: r.asset,
         direction_predicted: r.direction_predicted,
         correct_24h: r.correct_24h,
-        pct_change_24h: r.pct_change_24h ? `${r.pct_change_24h > 0 ? '+' : ''}${r.pct_change_24h.toFixed(1)}%` : null,
+        pct_change_24h: r.pct_change_24h ?? null,
         entry_price: null,
         price_at_24h: null,
         timestamp: r.timestamp,
