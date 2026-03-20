@@ -322,6 +322,13 @@ router.get('/sentinel/ecosystem', async (_req: Request, res: Response) => {
         prevWeekDownloads: p.prevWeekDownloads,
         growthPct: Math.round(p.growthPct * 10) / 10,
       })).sort((a, b) => b.growthPct - a.growthPct),
+      crates: (data.crates || []).map(c => ({
+        crate: c.crate,
+        asset: c.asset,
+        category: c.category,
+        recentDownloads: c.recentDownloads,
+        totalDownloads: c.totalDownloads,
+      })).sort((a, b) => b.recentDownloads - a.recentDownloads),
       sourcesOk: data.sourcesOk,
       fetchedAt: new Date().toISOString(),
     };
@@ -490,11 +497,18 @@ ${ecosystemSnapshot ? (() => {
     .slice(0, 10)
     .map((p: any) => `<tr><td>${p.pkg}</td><td>${p.asset}</td><td>${p.weeklyDownloads.toLocaleString()}</td><td style="color:${p.growthPct > 0 ? '#10b981' : p.growthPct < 0 ? '#ef4444' : '#64748b'}">${p.growthPct > 0 ? '+' : ''}${p.growthPct.toFixed(1)}%</td></tr>`)
     .join('');
+  const crateRows = (ecosystemSnapshot.crates || [])
+    .sort((a: any, b: any) => b.recentDownloads - a.recentDownloads)
+    .slice(0, 10)
+    .map((c: any) => `<tr><td>${c.crate}</td><td>${c.asset}</td><td>${c.recentDownloads.toLocaleString()}</td><td>${c.totalDownloads.toLocaleString()}</td></tr>`)
+    .join('');
   return `
 <h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">npm Package Downloads (weekly)</h3>
 <table><thead><tr><th>Package</th><th>Asset</th><th>Downloads/wk</th><th>Growth</th></tr></thead><tbody>${npmRows || '<tr><td colspan="4" style="color:#64748b">No npm data yet...</td></tr>'}</tbody></table>
 <h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">PyPI Package Downloads (weekly)</h3>
 <table><thead><tr><th>Package</th><th>Asset</th><th>Downloads/wk</th><th>Growth</th></tr></thead><tbody>${pypiRows || '<tr><td colspan="4" style="color:#64748b">No PyPI data yet...</td></tr>'}</tbody></table>
+<h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">Rust Crate Downloads (90-day)</h3>
+<table><thead><tr><th>Crate</th><th>Asset</th><th>Downloads/90d</th><th>Total</th></tr></thead><tbody>${crateRows || '<tr><td colspan="4" style="color:#64748b">No crates.io data yet...</td></tr>'}</tbody></table>
 <h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">GitHub Development Velocity (7-day)</h3>
 <table><thead><tr><th>Repository</th><th>Asset</th><th>Stars</th><th>Commits/7d</th></tr></thead><tbody>${repoRows || '<tr><td colspan="4" style="color:#64748b">No GitHub data yet...</td></tr>'}</tbody></table>
 <div class="note">Updated: ${new Date().toLocaleString()} · ${ecosystemSnapshot.sourcesOk} sources active</div>`;

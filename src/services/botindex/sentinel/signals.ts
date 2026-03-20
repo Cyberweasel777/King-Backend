@@ -253,7 +253,12 @@ ${data.ecosystem ? (() => {
     .sort((a: any, b: any) => b.growthPct - a.growthPct)
     .slice(0, 8)
     .map((p: any) => `${p.pkg}(${p.asset}): ${p.weeklyDownloads.toLocaleString()}/wk ${p.growthPct > 0 ? '+' : ''}${p.growthPct.toFixed(1)}%`);
-  return `GitHub: ${hotRepos.join(', ') || 'none'}\nnpm: ${hotNpm.join(', ') || 'none'}\nPyPI: ${hotPyPI.join(', ') || 'none'}`;
+  const hotCrates = (data.ecosystem.crates || [])
+    .filter((c: any) => c.recentDownloads > 0)
+    .sort((a: any, b: any) => b.recentDownloads - a.recentDownloads)
+    .slice(0, 8)
+    .map((c: any) => `${c.crate}(${c.asset}): ${c.recentDownloads.toLocaleString()} downloads/90d`);
+  return `GitHub: ${hotRepos.join(', ') || 'none'}\nnpm: ${hotNpm.join(', ') || 'none'}\nPyPI: ${hotPyPI.join(', ') || 'none'}\nRust crates: ${hotCrates.join(', ') || 'none'}`;
 })() : 'unavailable'}
 
 OUTPUT FORMAT (strict JSON, no markdown):
@@ -287,7 +292,7 @@ RULES:
 - Be specific about assets. "BTC" not "the market"
 - ASSET DIVERSITY (MANDATORY): You MUST generate signals for at least 3 DIFFERENT assets per batch. Maximum 2 signals for BTC, maximum 2 for ETH. The rest MUST be altcoins from the data: SOL, AVAX, LINK, APT, SUI, UNI, AAVE, NEAR, GRT, COMP, RENDER — use trending tokens, TVL movers, funding rates, and ecosystem intelligence to find them. If you only output BTC/ETH/SOL, you are failing this requirement.
 - EXCLUDED ASSETS: Do NOT generate signals for KAS (Kaspa). This asset has insufficient data quality. Skip it entirely.
-- ecosystem_momentum: Use this signal type when GitHub commit velocity, npm/PyPI download growth, or developer activity for an asset is accelerating or decelerating significantly. Rising dev activity (commits up, downloads surging across npm AND PyPI) = bullish leading indicator. Declining dev activity (commits dropping, downloads falling) = bearish. This is a LEADING indicator — developer activity often leads price by days or weeks. Cross-reference npm + PyPI trends for convergence — if both ecosystems show the same direction, confidence should be HIGH.
+- ecosystem_momentum: Use this signal type when GitHub commit velocity, npm/PyPI/crates.io download growth, or developer activity for an asset is accelerating or decelerating significantly. Rising dev activity (commits up, downloads surging across npm AND PyPI AND Rust crates) = bullish leading indicator. Declining dev activity (commits dropping, downloads falling) = bearish. This is a LEADING indicator — developer activity often leads price by days or weeks. Cross-reference npm + PyPI + Rust crates trends for convergence — if multiple ecosystems show the same direction, confidence should be HIGH. Rust crate activity is especially significant for L1 chains (SOL, DOT, NEAR, STRK) built in Rust.
 - sentiment_shift: In the current bear/fear market regime, ONLY generate bearish sentiment_shift signals. Do NOT call bullish sentiment shifts — they have 27% accuracy and fail consistently. Wait for confirmed regime change before generating bullish sentiment signals.
 - momentum_decay: This signal MUST have clear evidence of trend reversal, not just "slowing momentum." Require at least 2 concrete data points showing directional change (e.g., funding rate flip + volume spike + whale repositioning). Do not default to always-bearish — if momentum is decaying upward, say bullish.
 - Be direct. No hedging language. State the signal clearly.

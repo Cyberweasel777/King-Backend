@@ -13,7 +13,7 @@ import { collectEcosystemIntel, EcosystemData } from './ecosystem-intel';
 
 export interface EcosystemSignal {
   id: string;
-  source: 'npm' | 'pypi' | 'github';
+  source: 'npm' | 'pypi' | 'github' | 'crates';
   name: string;           // package name or repo
   asset: string;
   category: string;
@@ -165,6 +165,43 @@ function generateIndividualSignals(data: EcosystemData): EcosystemSignal[] {
       prevValue: p.prevWeekDownloads,
       changePct: Math.round(p.growthPct * 10) / 10,
       narrative: `${p.pkg} PyPI downloads ${p.growthPct > 0 ? 'up' : p.growthPct < 0 ? 'down' : 'flat'} ${Math.abs(p.growthPct).toFixed(1)}% WoW (${p.weeklyDownloads.toLocaleString()}/wk)`,
+      timestamp: now,
+    });
+  }
+
+  // Crates.io signals
+  for (const c of (data.crates || [])) {
+    if (c.recentDownloads === 0) continue;
+
+    // Score based on absolute download volume (no WoW comparison available from crates.io API)
+    let direction: 'bullish' | 'bearish' | 'neutral' = 'neutral';
+    let strength = 15;
+    if (c.recentDownloads > 100000) {
+      direction = 'bullish'; strength = 70;
+    } else if (c.recentDownloads > 10000) {
+      direction = 'bullish'; strength = 50;
+    } else if (c.recentDownloads > 1000) {
+      direction = 'neutral'; strength = 25;
+    } else {
+      direction = 'bearish'; strength = 35;
+    }
+
+    const confidence = determineConfidence(strength, false);
+
+    signals.push({
+      id: `crate-${c.crate.replace(/[^a-zA-Z0-9]/g, '-')}-${Date.now()}`,
+      source: 'crates' as any,
+      name: c.crate,
+      asset: c.asset,
+      category: c.category,
+      direction,
+      strength,
+      confidence,
+      metric: 'recent_downloads_90d',
+      value: c.recentDownloads,
+      prevValue: 0,
+      changePct: 0,
+      narrative: `${c.crate} Rust crate: ${c.recentDownloads.toLocaleString()} downloads in 90d (${c.totalDownloads.toLocaleString()} total)`,
       timestamp: now,
     });
   }

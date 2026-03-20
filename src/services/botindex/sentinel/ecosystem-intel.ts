@@ -111,6 +111,28 @@ const TRACKED_PYPI: Array<{ pkg: string; asset: string; category: string }> = [
   { pkg: 'langchain-mcp-adapters', asset: 'MCP', category: 'MCP-framework' },
 ];
 
+// Rust crates — critical for L1/infra chains built in Rust
+const TRACKED_CRATES: Array<{ crate: string; asset: string; category: string }> = [
+  { crate: 'solana-sdk', asset: 'SOL', category: 'L1' },
+  { crate: 'solana-program', asset: 'SOL', category: 'L1' },
+  { crate: 'anchor-lang', asset: 'SOL', category: 'L1' },
+  { crate: 'ethers', asset: 'ETH', category: 'L1' },
+  { crate: 'alloy', asset: 'ETH', category: 'L1' },
+  { crate: 'revm', asset: 'ETH', category: 'L1' },
+  { crate: 'cosmrs', asset: 'ATOM', category: 'L1' },
+  { crate: 'cosmwasm-std', asset: 'ATOM', category: 'L1' },
+  { crate: 'sui-sdk', asset: 'SUI', category: 'L1' },
+  { crate: 'aptos-sdk', asset: 'APT', category: 'L1' },
+  { crate: 'near-sdk', asset: 'NEAR', category: 'L1' },
+  { crate: 'substrate', asset: 'DOT', category: 'L1' },
+  { crate: 'sp-runtime', asset: 'DOT', category: 'L1' },
+  { crate: 'starknet', asset: 'STRK', category: 'L2' },
+  { crate: 'cairo-lang-compiler', asset: 'STRK', category: 'L2' },
+  { crate: 'chainlink', asset: 'LINK', category: 'Oracle' },
+  { crate: 'mcp-core', asset: 'MCP', category: 'MCP-core' },
+  { crate: 'rmcp', asset: 'MCP', category: 'MCP-core' },
+];
+
 interface RepoStats {
   repo: string;
   asset: string;
@@ -141,10 +163,19 @@ interface PyPIStats {
   growthPct: number;
 }
 
+interface CrateStats {
+  crate: string;
+  asset: string;
+  category: string;
+  recentDownloads: number; // last 90 days
+  totalDownloads: number;
+}
+
 export interface EcosystemData {
   repos: RepoStats[];
   npm: NpmStats[];
   pypi: PyPIStats[];
+  crates: CrateStats[];
   summary: string;
   sourcesOk: number;
 }
@@ -267,6 +298,29 @@ async function fetchNpmStats(pkg: string, asset: string, category: string): Prom
   }
 }
 
+async function fetchCrateStats(crateName: string, asset: string, category: string): Promise<CrateStats | null> {
+  try {
+    const res = await fetchWithTimeout(`https://crates.io/api/v1/crates/${encodeURIComponent(crateName)}`, {
+      headers: { 'User-Agent': 'BotIndex-Sentinel (https://botindex.dev)' },
+    });
+    if (!res.ok) {
+      logger.warn({ crate: crateName, status: res.status }, 'crates.io fetch failed');
+      return null;
+    }
+    const data = await res.json() as any;
+    return {
+      crate: crateName,
+      asset,
+      category,
+      recentDownloads: data?.crate?.recent_downloads || 0,
+      totalDownloads: data?.crate?.downloads || 0,
+    };
+  } catch (err) {
+    logger.warn({ crate: crateName, err: err instanceof Error ? err.message : String(err) }, 'crates.io stats failed');
+    return null;
+  }
+}
+
 async function fetchPyPIStats(pkg: string, asset: string, category: string): Promise<PyPIStats | null> {
   try {
     // PyPI stats via pypistats.org API (BigQuery-backed, free)
@@ -343,6 +397,21 @@ export async function collectEcosystemIntel(): Promise<EcosystemData> {
     }
   }
 
+  // Fetch crates.io stats (batches of 4, respect rate limit)
+  const crates: CrateStats[] = [];
+  for (let i = 0; i < TRACKED_CRATES.length; i += 4) {
+    const batch = TRACKED_CRATES.slice(i, i + 4);
+    const results = await Promise.all(
+      batch.map(c => fetchCrateStats(c.crate, c.asset, c.category))
+    );
+    for (const c of results) {
+      if (c) { crates.push(c); sourcesOk++; }
+    }
+    if (i + 4 < TRACKED_CRATES.length) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+  }
+
   // Build summary
   const hotRepos = repos
     .filter(r => r.commitsRecent > 10)
@@ -367,10 +436,17 @@ export async function collectEcosystemIntel(): Promise<EcosystemData> {
   if (hotPyPI.length) {
     summaryParts.push('PyPI trends: ' + hotPyPI.map(p => `${p.pkg}(${p.asset}): ${p.weeklyDownloads.toLocaleString()}/wk ${p.growthPct > 0 ? '+' : ''}${p.growthPct.toFixed(1)}%`).join(', '));
   }
+  const hotCrates = crates
+    .filter(c => c.recentDownloads > 1000)
+    .sort((a, b) => b.recentDownloads - a.recentDownloads)
+    .slice(0, 5);
+  if (hotCrates.length) {
+    summaryParts.push('Rust crates (90d): ' + hotCrates.map(c => `${c.crate}(${c.asset}): ${c.recentDownloads.toLocaleString()}`).join(', '));
+  }
 
   const summary = summaryParts.join(' | ') || 'Insufficient ecosystem data';
 
-  logger.info({ reposOk: repos.length, npmOk: npm.length, pypiOk: pypi.length, sourcesOk }, 'Ecosystem intelligence collected');
+  logger.info({ reposOk: repos.length, npmOk: npm.length, pypiOk: pypi.length, cratesOk: crates.length, sourcesOk }, 'Ecosystem intelligence collected');
 
-  return { repos, npm, pypi, summary, sourcesOk };
+  return { repos, npm, pypi, crates, summary, sourcesOk };
 }
