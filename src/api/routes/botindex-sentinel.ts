@@ -332,6 +332,10 @@ router.get('/sentinel/track-record', async (_req: Request, res: Response) => {
     const { getTrackRecord } = await import('../../services/botindex/sentinel/prediction-tracker');
     const record = getTrackRecord();
 
+    // Optional ecosystem snapshot for HTML rendering
+    let ecosystemSnapshot: Awaited<ReturnType<typeof collectEcosystemIntel>> | null = null;
+    try { ecosystemSnapshot = await collectEcosystemIntel(); } catch { /* non-fatal */ }
+
     const wantsHtml = _req.headers.accept?.includes('text/html');
     if (wantsHtml) {
       const isSentinelHtml = isSentinelAuthorized(_req);
@@ -393,31 +397,24 @@ td{padding:8px;border-bottom:1px solid #1e293b;font-size:.9rem}
 <h2>By Asset</h2>
 <table><thead><tr><th>Asset</th><th>Resolved</th><th>Correct</th><th>Accuracy</th></tr></thead><tbody>${assetRows || '<tr><td colspan="4" style="color:#64748b">Accumulating data...</td></tr>'}</tbody></table>
 <h2>📡 Ecosystem Intelligence — Live Developer Activity</h2>
-<div id="ecosystem-data" style="color:#64748b;font-size:.9rem">Loading ecosystem data...</div>
-<script>
-fetch('/api/botindex/sentinel/ecosystem').then(r=>r.json()).then(d=>{
-  let html='';
-  if(d.npm&&d.npm.length){
-    html+='<h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">npm Package Downloads (weekly)</h3>';
-    html+='<table><thead><tr><th>Package</th><th>Asset</th><th>Downloads/wk</th><th>Growth</th></tr></thead><tbody>';
-    d.npm.forEach(n=>{
-      const color=n.growthPct>0?'#10b981':n.growthPct<0?'#ef4444':'#64748b';
-      html+='<tr><td>'+n.package+'</td><td>'+n.asset+'</td><td>'+n.weeklyDownloads.toLocaleString()+'</td><td style="color:'+color+'">'+(n.growthPct>0?'+':'')+n.growthPct+'%</td></tr>';
-    });
-    html+='</tbody></table>';
-  }
-  if(d.repos&&d.repos.length){
-    html+='<h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">GitHub Development Velocity (7-day)</h3>';
-    html+='<table><thead><tr><th>Repository</th><th>Asset</th><th>Stars</th><th>Commits/7d</th></tr></thead><tbody>';
-    d.repos.forEach(r=>{
-      html+='<tr><td>'+r.repo+'</td><td>'+r.asset+'</td><td>'+r.stars.toLocaleString()+'</td><td>'+r.commitsWeekly+'</td></tr>';
-    });
-    html+='</tbody></table>';
-  }
-  html+='<div class="note">Updated: '+new Date(d.fetchedAt).toLocaleString()+' · '+d.sourcesOk+' sources active</div>';
-  document.getElementById('ecosystem-data').innerHTML=html;
-}).catch(()=>{document.getElementById('ecosystem-data').textContent='Ecosystem data temporarily unavailable';});
-</script>
+${ecosystemSnapshot ? (() => {
+  const npmRows = ecosystemSnapshot.npm
+    .sort((a, b) => b.growthPct - a.growthPct)
+    .slice(0, 10)
+    .map(n => `<tr><td>${n.pkg}</td><td>${n.asset}</td><td>${n.weeklyDownloads.toLocaleString()}</td><td style="color:${n.growthPct > 0 ? '#10b981' : n.growthPct < 0 ? '#ef4444' : '#64748b'}">${n.growthPct > 0 ? '+' : ''}${n.growthPct.toFixed(1)}%</td></tr>`)
+    .join('');
+  const repoRows = ecosystemSnapshot.repos
+    .sort((a, b) => b.commitsRecent - a.commitsRecent)
+    .slice(0, 10)
+    .map(r => `<tr><td>${r.repo}</td><td>${r.asset}</td><td>${r.stars.toLocaleString()}</td><td>${r.commitsRecent}</td></tr>`)
+    .join('');
+  return `
+<h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">npm Package Downloads (weekly)</h3>
+<table><thead><tr><th>Package</th><th>Asset</th><th>Downloads/wk</th><th>Growth</th></tr></thead><tbody>${npmRows || '<tr><td colspan="4" style="color:#64748b">No npm data yet...</td></tr>'}</tbody></table>
+<h3 style="color:#a78bfa;margin-top:16px;font-size:1rem">GitHub Development Velocity (7-day)</h3>
+<table><thead><tr><th>Repository</th><th>Asset</th><th>Stars</th><th>Commits/7d</th></tr></thead><tbody>${repoRows || '<tr><td colspan="4" style="color:#64748b">No GitHub data yet...</td></tr>'}</tbody></table>
+<div class="note">Updated: ${new Date().toLocaleString()} · ${ecosystemSnapshot.sourcesOk} sources active</div>`;
+})() : '<div class="note">Ecosystem data temporarily unavailable</div>'}
 <h2>Recent Signals</h2>
 <table><thead><tr><th>Time</th><th>Asset</th><th>Signal</th><th>Direction</th><th>Strength</th><th>Entry Price</th></tr></thead><tbody>${recentRows || '<tr><td colspan="6" style="color:#64748b">No predictions yet...</td></tr>'}</tbody></table>
 ${ctaHtml}
