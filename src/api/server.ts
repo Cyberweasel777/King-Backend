@@ -27,6 +27,7 @@ import botindexMemeRouter from './routes/botindex-meme';
 import botindexStablecoinRouter from './routes/botindex-stablecoin';
 import botindexSynthesisRouter from './routes/botindex-synthesis';
 import botindexSentinelRouter from './routes/botindex-sentinel';
+import botindexAuthRouter from './routes/botindex-auth';
 import { initDb } from '../shared/payments/database';
 import logger from '../config/logger';
 import { initSentry, Sentry } from '../config/sentry';
@@ -193,6 +194,9 @@ app.use('/api/botindex', botindexSynthesisRouter);
 
 // Sentinel Intelligence (premium predictive signals — $49.99/mo)
 app.use('/api/botindex', botindexSentinelRouter);
+
+// Magic link auth (no rate limit — it's email-gated)
+app.use('/api/botindex', botindexAuthRouter);
 
 // Receipt and trust-layer endpoints
 app.use('/api/botindex/receipts', receiptsRouter);
