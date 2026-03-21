@@ -275,19 +275,18 @@ async function start() {
   await initDb();
   await initReceiptSigning();
   
-  // Start market surge monitor (broad crypto spike detection)
-  const { startMarketSurgeMonitor } = await import('../services/botindex/market-surge-monitor');
-  startMarketSurgeMonitor();
+  // Market surge monitor DISABLED — killing all Telegram bot alerts
+  // const { startMarketSurgeMonitor } = await import('../services/botindex/market-surge-monitor');
+  // startMarketSurgeMonitor();
 
-  // Start Sentinel personal alert feed (Andrew's private intelligence brief every 15 min)
-  const { sendPersonalSentinelAlert } = await import('../services/botindex/sentinel/signals');
-  setInterval(() => { void sendPersonalSentinelAlert(); }, 15 * 60 * 1000);
-  // First personal alert after 60 seconds
-  setTimeout(() => { void sendPersonalSentinelAlert(); }, 60_000);
+  // Sentinel personal alert feed DISABLED — killing all Telegram bot alerts
+  // const { sendPersonalSentinelAlert } = await import('../services/botindex/sentinel/signals');
+  // setInterval(() => { void sendPersonalSentinelAlert(); }, 15 * 60 * 1000);
+  // setTimeout(() => { void sendPersonalSentinelAlert(); }, 60_000);
 
-  // Start Divergence Scanner (whales holding + devs building + fear growing)
-  const { startDivergenceScanner } = await import('../services/botindex/sentinel/divergence-scanner');
-  startDivergenceScanner();
+  // Divergence Scanner DISABLED — killing all Telegram bot alerts
+  // const { startDivergenceScanner } = await import('../services/botindex/sentinel/divergence-scanner');
+  // startDivergenceScanner();
 
   // Resolve predictions every hour (check which predictions were right/wrong)
   const { resolvePredictions } = await import('../services/botindex/sentinel/prediction-tracker');
