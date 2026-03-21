@@ -54,20 +54,24 @@ router.get('/', (req, res) => {
     async function load(){
       document.getElementById('c').innerHTML='<div class="loading">Loading...</div>';
       try{
-        const [truthRes,hitsRes]=await Promise.all([
+        const [truthRes,hitsRes,eventsRes,keyHealthRes]=await Promise.all([
           fetch('/api/botindex/keys/admin/truth?adminId='+A),
-          fetch('/api/botindex/admin/hits?adminId='+A)
+          fetch('/api/botindex/admin/hits?adminId='+A),
+          fetch('/api/botindex/admin/events/summary').catch(()=>({ok:false})),
+          fetch('/api/botindex/admin/key-health').catch(()=>({ok:false}))
         ]);
         if(!truthRes.ok||!hitsRes.ok) throw new Error('fetch failed');
         const truth=await truthRes.json();
         const hits=await hitsRes.json();
-        render(truth,hits);
+        const events=eventsRes.ok?await eventsRes.json():null;
+        const keyHealth=keyHealthRes.ok?await keyHealthRes.json():null;
+        render(truth,hits,events,keyHealth);
       }catch(e){
         document.getElementById('c').innerHTML='<div class="error">'+e.message+'</div>';
       }
     }
     function pct(a,b){return b>0?((a/b)*100).toFixed(1):'0.0'}
-    function render(t,h){
+    function render(t,h,ev,kh){
       document.getElementById('ts').textContent=t.timestamp;
       const k=t.keys||{};
       const f=t.funnel||{};
@@ -162,6 +166,9 @@ router.get('/', (req, res) => {
             ['Paywall Hits','paywall_hit'],
             ['Upgrade CTA Shown','upgrade_cta_shown'],
             ['Checkout Redirects','checkout_redirect'],
+            ['First Auth Call','first_auth_call'],
+            ['Second Auth Call','second_auth_call'],
+            ['Key Daily Active','key_daily_active'],
           ];
           return '<div class="card"><table><thead><tr><th>Event</th><th>Total</th><th>Last 24h</th><th>Last Hour</th></tr></thead><tbody>'+
             rows.map(([label,key])=>{
@@ -170,6 +177,39 @@ router.get('/', (req, res) => {
             }).join('')+
             '</tbody></table></div>';
         })()}
+        
+        <h2>📡 Event Logger (JSONL)</h2>
+        \${ev?
+          '<div class="grid">'+
+            '<div class="card"><h3>Total Events</h3><div class="v">'+(ev.total_events||0).toLocaleString()+'</div></div>'+
+            '<div class="card"><h3>Last 24h</h3><div class="v">'+(ev.events_last_24h||0).toLocaleString()+'</div></div>'+
+            '<div class="card"><h3>Unique IPs</h3><div class="v cyan">'+(ev.unique_ips||0).toLocaleString()+'</div></div>'+
+            '<div class="card"><h3>Authenticated</h3><div class="v green">'+(ev.authenticated||0)+'</div></div>'+
+            '<div class="card"><h3>Anonymous</h3><div class="v yellow">'+(ev.anonymous||0).toLocaleString()+'</div></div>'+
+            '<div class="card"><h3>Auth %</h3><div class="v">'+(ev.auth_pct||'0%')+'</div></div>'+
+          '</div>'+
+          '<div class="card" style="margin-bottom:12px"><h3 style="margin-bottom:8px">Top Paths</h3><table><thead><tr><th>Path</th><th>Hits</th><th>%</th></tr></thead><tbody>'+
+            (ev.top_paths||[]).slice(0,10).map(p=>'<tr><td>'+p.path+'</td><td>'+p.count+'</td><td>'+p.pct+'</td></tr>').join('')+
+          '</tbody></table></div>'+
+          '<div class="card" style="margin-bottom:20px"><h3 style="margin-bottom:8px">Top User Agents</h3><table><thead><tr><th>UA</th><th>Hits</th><th>%</th></tr></thead><tbody>'+
+            (ev.top_user_agents||[]).slice(0,10).map(u=>'<tr><td>'+u.user_agent+'</td><td>'+u.count+'</td><td>'+u.pct+'</td></tr>').join('')+
+          '</tbody></table></div>'
+          :'<div class="card" style="color:#888">Event logger not available</div>'
+        }
+        
+        <h2>🔑 Key Health & Retention</h2>
+        \${kh?
+          '<div class="grid">'+
+            '<div class="card"><h3>Total Keys</h3><div class="v">'+(kh.total_keys||0)+'</div></div>'+
+            '<div class="card"><h3>1+ Calls</h3><div class="v cyan">'+(kh.activated_1_call||0)+'</div></div>'+
+            '<div class="card"><h3>2+ Calls</h3><div class="v purple">'+(kh.activated_2_calls||0)+'</div></div>'+
+            '<div class="card"><h3>Active Today</h3><div class="v green">'+(kh.active_today||0)+'</div></div>'+
+            '<div class="card"><h3>Active 7d</h3><div class="v green">'+(kh.active_7d||0)+'</div></div>'+
+            '<div class="card"><h3>7d Retention</h3><div class="v '+(parseFloat(kh.retention_7d_pct)>20?'green':'red')+'">'+(kh.retention_7d_pct||'N/A')+'</div></div>'+
+            '<div class="card"><h3>Median hrs to 2nd call</h3><div class="v">'+(kh.median_hours_to_second_call!==null?kh.median_hours_to_second_call:'—')+'</div></div>'+
+          '</div>'
+          :'<div class="card" style="color:#888">Key health not available</div>'
+        }
         
         <h2>🤖 Agorion Registry</h2>
         \${t.agorion?

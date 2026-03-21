@@ -1,1 +1,1 @@
-{"version":3,"file":"admin-dashboard.d.ts","sourceRoot":"","sources":["../../../src/api/routes/admin-dashboard.ts"],"names":[],"mappings":"AAEA,QAAA,MAAM,MAAM,4CAAW,CAAC;AAyMxB,eAAe,MAAM,CAAC"}
+{"version":3,"file":"admin-dashboard.d.ts","sourceRoot":"","sources":["../../../src/api/routes/admin-dashboard.ts"],"names":[],"mappings":"AAEA,QAAA,MAAM,MAAM,4CAAW,CAAC;AAiPxB,eAAe,MAAM,CAAC"}
