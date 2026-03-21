@@ -19,6 +19,8 @@ const KNOWN_STEPS = [
   'key_issued',
   'key_issued_paid',
   'first_auth_call',
+  'second_auth_call',
+  'key_daily_active',
   'paywall_hit',
   'rate_limit_hit',
   'upgrade_cta_shown',

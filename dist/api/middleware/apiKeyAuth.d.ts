@@ -12,6 +12,9 @@ export interface ApiKeyLedgerEntry {
     dailyCount?: number;
     dailyCountDate?: string;
     status: 'active';
+    last_active_date?: string;
+    days_active?: number;
+    second_call_hours?: number;
 }
 declare global {
     namespace Express {

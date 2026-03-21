@@ -15,6 +15,8 @@ type FunnelEvent = {
   // legacy compatibility for old snapshots
   timestamp?: string;
   plan?: 'free' | 'basic' | 'pro' | 'starter' | 'sentinel' | 'enterprise';
+  source?: string;   // endpoint that drove this event (from ?source= param)
+  referer?: string;  // Referer header value
 };
 
 type FunnelStore = {
@@ -64,8 +66,16 @@ function scheduleFlush(): void {
   }, 500);
 }
 
-export function trackFunnelEvent(type: FunnelEventType, plan?: 'free' | 'basic' | 'pro' | 'starter' | 'sentinel' | 'enterprise'): void {
-  store.events.push({ type, plan, ts: new Date().toISOString() });
+export function trackFunnelEvent(
+  type: FunnelEventType,
+  plan?: 'free' | 'basic' | 'pro' | 'starter' | 'sentinel' | 'enterprise',
+  source?: string,
+  referer?: string,
+): void {
+  const event: FunnelEvent = { type, plan, ts: new Date().toISOString() };
+  if (source) event.source = source;
+  if (referer) event.referer = referer;
+  store.events.push(event);
   if (store.events.length > MAX_EVENTS) {
     store.events = store.events.slice(-MAX_EVENTS);
   }

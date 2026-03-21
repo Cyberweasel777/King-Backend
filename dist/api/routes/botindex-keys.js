@@ -118,6 +118,9 @@ function readJson(file, fallback) {
 // GET /register — browser-friendly: redirects straight to Stripe Checkout
 router.get('/register', async (req, res) => {
     try {
+        // Source attribution: which endpoint drove this registration
+        const regSource = typeof req.query.source === 'string' ? req.query.source.slice(0, 200) : undefined;
+        const regReferer = typeof req.headers.referer === 'string' ? req.headers.referer.slice(0, 200) : undefined;
         const planParam = req.query.plan;
         const plan = (planParam === 'free')
             ? 'free'
@@ -127,7 +130,7 @@ router.get('/register', async (req, res) => {
                     ? 'pro'
                     : 'free';
         if (plan === 'free') {
-            (0, conversion_funnel_1.trackFunnelEvent)('register_page_hit', 'free');
+            (0, conversion_funnel_1.trackFunnelEvent)('register_page_hit', 'free', regSource, regReferer);
             const emailParam = typeof req.query.email === 'string' ? req.query.email.trim().toLowerCase() : '';
             const acceptsHtml = (req.headers.accept || '').includes('text/html');
             // If no email provided, show email capture form (browser) or return error (API)
@@ -333,9 +336,60 @@ router.get('/register', async (req, res) => {
         }
         const stripe = getStripeClient();
         const priceId = getPlanPriceId(plan);
-        (0, conversion_funnel_1.trackFunnelEvent)('register_page_hit', plan);
+        (0, conversion_funnel_1.trackFunnelEvent)('register_page_hit', plan, regSource, regReferer);
         if (plan === 'sentinel') {
             logger_1.default.info({ truth: 'SENTINEL_REGISTER_HIT', plan, channel: 'web_get' }, 'Single source of truth event');
+        }
+        // Sentinel interstitial: show value prop before Stripe checkout
+        const acceptsHtml = (req.headers.accept || '').includes('text/html');
+        if (plan === 'sentinel' && acceptsHtml && !req.query.confirm) {
+            (0, conversion_funnel_1.trackFunnelEvent)('sentinel_interstitial_shown', plan);
+            res.setHeader('Content-Type', 'text/html');
+            res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BotIndex Sentinel — Premium Intelligence</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0a;color:#e5e5e5;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:24px}
+    .card{max-width:520px;width:100%;border:1px solid #27272a;border-radius:16px;background:#18181b;padding:36px}
+    h1{font-size:28px;color:#fff;margin-bottom:4px}
+    .price{font-size:14px;color:#f59e0b;margin-bottom:20px;font-weight:600}
+    .trial{display:inline-block;background:#22c55e20;color:#22c55e;border-radius:999px;padding:4px 14px;font-size:13px;font-weight:600;margin-bottom:20px}
+    .features{list-style:none;margin-bottom:28px}
+    .features li{padding:8px 0;font-size:14px;color:#d4d4d8;border-bottom:1px solid #27272a}
+    .features li:last-child{border-bottom:none}
+    .features li::before{content:'✓ ';color:#22c55e;font-weight:700}
+    .btn{display:block;width:100%;padding:14px;background:#f59e0b;color:#0a0a0a;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;text-align:center;text-decoration:none}
+    .btn:hover{background:#fbbf24}
+    .cancel{display:block;text-align:center;margin-top:12px;color:#71717a;font-size:13px;text-decoration:none}
+    .cancel:hover{color:#a1a1aa}
+    .guarantee{text-align:center;margin-top:16px;font-size:12px;color:#52525b}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Sentinel Intelligence</h1>
+    <div class="price">$49.99/mo after trial</div>
+    <span class="trial">🎁 7-DAY FREE TRIAL — Cancel anytime</span>
+    <ul class="features">
+      <li>Real-time predictive signals every 15 minutes</li>
+      <li>Whale divergence detection (Hyperliquid + on-chain)</li>
+      <li>AI-synthesized intelligence briefs</li>
+      <li>Verifiable prediction track record with accuracy scores</li>
+      <li>Private Telegram alerts delivered to your phone</li>
+      <li>500 API requests/day (10x Pro tier)</li>
+      <li>Priority support</li>
+    </ul>
+    <a href="/api/botindex/keys/register?plan=sentinel&confirm=1" class="btn">Start Free Trial →</a>
+    <a href="https://botindex.dev" class="cancel">← Back to BotIndex</a>
+    <p class="guarantee">No charge for 7 days. Cancel with one click. No questions asked.</p>
+  </div>
+</body>
+</html>`);
+            return;
         }
         const session = await stripe.checkout.sessions.create({
             mode: 'subscription',
@@ -344,6 +398,7 @@ router.get('/register', async (req, res) => {
             success_url: SUCCESS_URL,
             cancel_url: CANCEL_URL,
             metadata: { plan },
+            ...(plan === 'sentinel' ? { subscription_data: { trial_period_days: 7 } } : {}),
         });
         if (!session.url) {
             res.status(500).json({ error: 'checkout_session_failed', message: 'Stripe did not return a checkout URL' });
@@ -378,12 +433,15 @@ router.post('/register', async (req, res) => {
         const requestedPlan = parsed.data.plan;
         const plan = requestedPlan === 'sentinel' ? 'sentinel' : 'pro';
         const priceId = getPlanPriceId(plan);
-        (0, conversion_funnel_1.trackFunnelEvent)('register_page_hit', plan);
+        const postSource = typeof req.body.source === 'string' ? req.body.source.slice(0, 200) : undefined;
+        const postReferer = typeof req.headers.referer === 'string' ? req.headers.referer.slice(0, 200) : undefined;
+        (0, conversion_funnel_1.trackFunnelEvent)('register_page_hit', plan, postSource, postReferer);
         const session = await stripe.checkout.sessions.create({
             mode: 'subscription',
             customer_email: parsed.data.email,
             payment_method_types: ['card'],
             line_items: [{ price: priceId, quantity: 1 }],
+            ...(plan === 'sentinel' ? { subscription_data: { trial_period_days: 7 } } : {}),
             success_url: SUCCESS_URL,
             cancel_url: CANCEL_URL,
             metadata: {

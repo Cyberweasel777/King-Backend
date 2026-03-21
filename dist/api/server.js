@@ -53,6 +53,7 @@ const errorHandler_1 = require("./middleware/errorHandler");
 const hitCounter_1 = require("./middleware/hitCounter");
 const apiKeyAuth_1 = require("./middleware/apiKeyAuth");
 const anonRateLimit_1 = require("./middleware/anonRateLimit");
+const eventLogger_1 = require("./middleware/eventLogger");
 const x402Gate_1 = require("./middleware/x402Gate");
 const receiptMiddleware_1 = require("./middleware/receiptMiddleware");
 const mcp_1 = __importDefault(require("./routes/mcp"));
@@ -151,6 +152,11 @@ app.use('/api/botindex', (0, ctaInjector_1.ctaInjector)());
 app.use('/api', admin_hits_1.default);
 // BotIndex API key auth (runs before free-trial/x402 route middleware)
 app.use('/api/botindex', apiKeyAuth_1.optionalApiKey);
+// Event logger — after optionalApiKey so req.apiKeyAuth is populated
+app.use(eventLogger_1.eventLogger);
+// Admin instrumentation endpoints
+app.get('/api/botindex/admin/events/summary', eventLogger_1.eventsSummaryHandler);
+app.get('/api/botindex/admin/key-health', eventLogger_1.keyHealthHandler);
 // Anonymous rate limiting on high-value endpoints (3 req/day without API key, 100/day with free key)
 // Rate limit all BotIndex endpoints (10 req/day anonymous)
 // Soft-gated endpoints now included — bots get truncated data for 10 calls, then 429
@@ -274,17 +280,16 @@ async function start() {
     // Initialize database
     await (0, database_1.initDb)();
     await (0, receiptMiddleware_1.initReceiptSigning)();
-    // Start market surge monitor (broad crypto spike detection)
-    const { startMarketSurgeMonitor } = await Promise.resolve().then(() => __importStar(require('../services/botindex/market-surge-monitor')));
-    startMarketSurgeMonitor();
-    // Start Sentinel personal alert feed (Andrew's private intelligence brief every 15 min)
-    const { sendPersonalSentinelAlert } = await Promise.resolve().then(() => __importStar(require('../services/botindex/sentinel/signals')));
-    setInterval(() => { void sendPersonalSentinelAlert(); }, 15 * 60 * 1000);
-    // First personal alert after 60 seconds
-    setTimeout(() => { void sendPersonalSentinelAlert(); }, 60_000);
-    // Start Divergence Scanner (whales holding + devs building + fear growing)
-    const { startDivergenceScanner } = await Promise.resolve().then(() => __importStar(require('../services/botindex/sentinel/divergence-scanner')));
-    startDivergenceScanner();
+    // Market surge monitor DISABLED — killing all Telegram bot alerts
+    // const { startMarketSurgeMonitor } = await import('../services/botindex/market-surge-monitor');
+    // startMarketSurgeMonitor();
+    // Sentinel personal alert feed DISABLED — killing all Telegram bot alerts
+    // const { sendPersonalSentinelAlert } = await import('../services/botindex/sentinel/signals');
+    // setInterval(() => { void sendPersonalSentinelAlert(); }, 15 * 60 * 1000);
+    // setTimeout(() => { void sendPersonalSentinelAlert(); }, 60_000);
+    // Divergence Scanner DISABLED — killing all Telegram bot alerts
+    // const { startDivergenceScanner } = await import('../services/botindex/sentinel/divergence-scanner');
+    // startDivergenceScanner();
     // Resolve predictions every hour (check which predictions were right/wrong)
     const { resolvePredictions } = await Promise.resolve().then(() => __importStar(require('../services/botindex/sentinel/prediction-tracker')));
     setInterval(() => { void resolvePredictions(); }, 60 * 60 * 1000);
@@ -293,9 +298,9 @@ async function start() {
     // Start Telegram subscriber bot (polls for /subscribe commands)
     const { startTelegramBot } = await Promise.resolve().then(() => __importStar(require('../services/botindex/sentinel/telegram-subscribers')));
     startTelegramBot();
-    // Start delayed public Telegram relay for Sentinel signals
-    const { startPublicRelay } = await Promise.resolve().then(() => __importStar(require('../services/botindex/sentinel/public-channel-relay')));
-    startPublicRelay();
+    // Public Telegram relay DISABLED — ecosystem-only pivot, reducing channel noise
+    // const { startPublicRelay } = await import('../services/botindex/sentinel/public-channel-relay');
+    // startPublicRelay();
     app.listen(PORT, () => {
         logger_1.default.info({
             port: PORT,
@@ -313,11 +318,12 @@ process.on('SIGTERM', async () => {
     await (0, posthog_1.shutdownPostHog)();
     process.exit(0);
 });
-if (process.env.ZORA_ALPHA_BOT_TOKEN) {
-    Promise.resolve().then(() => __importStar(require('../services/botindex/zora/alpha-bot'))).catch((error) => {
-        logger_1.default.error({ err: error }, 'Failed to start Zora Alpha bot polling service');
-    });
-}
+// Zora Alpha bot DISABLED — reducing overhead
+// if (process.env.ZORA_ALPHA_BOT_TOKEN) {
+//   import('../services/botindex/zora/alpha-bot').catch((error) => {
+//     logger.error({ err: error }, 'Failed to start Zora Alpha bot polling service');
+//   });
+// }
 exports.default = app;
 // This won't work appended at end, need to insert before 404 handler
 //# sourceMappingURL=server.js.map

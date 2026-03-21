@@ -113,6 +113,10 @@ type PersistedFunnelEvent = {
 // GET /register — browser-friendly: redirects straight to Stripe Checkout
 router.get('/register', async (req: Request, res: Response) => {
   try {
+    // Source attribution: which endpoint drove this registration
+    const regSource = typeof req.query.source === 'string' ? req.query.source.slice(0, 200) : undefined;
+    const regReferer = typeof req.headers.referer === 'string' ? req.headers.referer.slice(0, 200) : undefined;
+
     const planParam = req.query.plan;
     const plan: BotIndexApiPlan = (planParam === 'free')
       ? 'free'
@@ -123,7 +127,7 @@ router.get('/register', async (req: Request, res: Response) => {
           : 'free';
 
     if (plan === 'free') {
-      trackFunnelEvent('register_page_hit', 'free');
+      trackFunnelEvent('register_page_hit', 'free', regSource, regReferer);
 
       const emailParam = typeof req.query.email === 'string' ? req.query.email.trim().toLowerCase() : '';
       const acceptsHtml = (req.headers.accept || '').includes('text/html');
@@ -336,7 +340,7 @@ router.get('/register', async (req: Request, res: Response) => {
     const stripe = getStripeClient();
     const priceId = getPlanPriceId(plan);
 
-    trackFunnelEvent('register_page_hit', plan);
+    trackFunnelEvent('register_page_hit', plan, regSource, regReferer);
     if (plan === 'sentinel') {
       logger.info({ truth: 'SENTINEL_REGISTER_HIT', plan, channel: 'web_get' }, 'Single source of truth event');
     }
@@ -439,7 +443,9 @@ router.post('/register', async (req: Request, res: Response) => {
     const plan: BotIndexApiPlan = requestedPlan === 'sentinel' ? 'sentinel' : 'pro';
     const priceId = getPlanPriceId(plan);
 
-    trackFunnelEvent('register_page_hit', plan);
+    const postSource = typeof req.body.source === 'string' ? req.body.source.slice(0, 200) : undefined;
+    const postReferer = typeof req.headers.referer === 'string' ? req.headers.referer.slice(0, 200) : undefined;
+    trackFunnelEvent('register_page_hit', plan, postSource, postReferer);
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',

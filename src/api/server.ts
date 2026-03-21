@@ -16,6 +16,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { hitCounter } from './middleware/hitCounter';
 import { optionalApiKey } from './middleware/apiKeyAuth';
 import { anonRateLimit } from './middleware/anonRateLimit';
+import { eventLogger, eventsSummaryHandler, keyHealthHandler } from './middleware/eventLogger';
 import { getX402RuntimeConfig } from './middleware/x402Gate';
 import { initReceiptSigning, receiptMiddleware } from './middleware/receiptMiddleware';
 import mcpRouter from './routes/mcp';
@@ -136,6 +137,13 @@ app.use('/api', adminHitsRouter);
 
 // BotIndex API key auth (runs before free-trial/x402 route middleware)
 app.use('/api/botindex', optionalApiKey);
+
+// Event logger — after optionalApiKey so req.apiKeyAuth is populated
+app.use(eventLogger);
+
+// Admin instrumentation endpoints
+app.get('/api/botindex/admin/events/summary', eventsSummaryHandler);
+app.get('/api/botindex/admin/key-health', keyHealthHandler);
 
 // Anonymous rate limiting on high-value endpoints (3 req/day without API key, 100/day with free key)
 // Rate limit all BotIndex endpoints (10 req/day anonymous)

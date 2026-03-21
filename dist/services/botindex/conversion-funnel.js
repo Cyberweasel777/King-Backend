@@ -50,8 +50,13 @@ function scheduleFlush() {
         void flush();
     }, 500);
 }
-function trackFunnelEvent(type, plan) {
-    store.events.push({ type, plan, ts: new Date().toISOString() });
+function trackFunnelEvent(type, plan, source, referer) {
+    const event = { type, plan, ts: new Date().toISOString() };
+    if (source)
+        event.source = source;
+    if (referer)
+        event.referer = referer;
+    store.events.push(event);
     if (store.events.length > MAX_EVENTS) {
         store.events = store.events.slice(-MAX_EVENTS);
     }

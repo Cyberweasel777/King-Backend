@@ -139,7 +139,8 @@ function pickTarget(body: JsonRecord): CollectionTarget | null {
   return null;
 }
 
-function buildGatedBlock(params: { total: number; showing: number; truncated: boolean; message: string }) {
+function buildGatedBlock(params: { total: number; showing: number; truncated: boolean; message: string; sourcePath?: string }) {
+  const sourceParam = params.sourcePath ? `&source=${encodeURIComponent(params.sourcePath)}` : '';
   return {
     truncated: params.truncated,
     showing: params.showing,
@@ -147,12 +148,12 @@ function buildGatedBlock(params: { total: number; showing: number; truncated: bo
     message: params.message,
     intelligence: {
       pro: {
-        url: UPGRADE_URL,
+        url: UPGRADE_URL + sourceParam,
         price: '$9.99/mo',
         includes: ['Smart Money Flow', 'Risk Radar', 'Convergence Scoring', 'Network Intelligence'],
       },
       sentinel: {
-        url: 'https://api.botindex.dev/api/botindex/keys/register?plan=sentinel',
+        url: 'https://api.botindex.dev/api/botindex/keys/register?plan=sentinel' + sourceParam,
         price: '$49.99/mo',
         includes: ['Predictive signals', 'Query surge intelligence', 'Personal alert feed', 'Verifiable track record'],
         track_record: 'https://api.botindex.dev/api/botindex/sentinel/track-record',
@@ -185,7 +186,7 @@ function truncateMatrix(matrix: JsonRecord, limit: number): JsonRecord {
   return next;
 }
 
-function applyGate(body: unknown, gate: GateConfig): unknown {
+function applyGate(body: unknown, gate: GateConfig, sourcePath?: string): unknown {
   if (Array.isArray(body)) {
     const total = body.length;
     const showing = Math.min(gate.limit, total);
@@ -196,6 +197,7 @@ function applyGate(body: unknown, gate: GateConfig): unknown {
         showing,
         total,
         message: gate.message,
+        sourcePath,
       }),
     };
   }
@@ -209,6 +211,7 @@ function applyGate(body: unknown, gate: GateConfig): unknown {
       showing: 0,
       total: 0,
       message: gate.message,
+      sourcePath,
     });
     return body;
   }
@@ -222,6 +225,7 @@ function applyGate(body: unknown, gate: GateConfig): unknown {
       showing,
       total,
       message: gate.message,
+      sourcePath,
     });
     return body;
   }
@@ -234,6 +238,7 @@ function applyGate(body: unknown, gate: GateConfig): unknown {
     showing,
     total,
     message: gate.message,
+    sourcePath,
   });
   return body;
 }
@@ -274,7 +279,7 @@ export function softGate(): RequestHandler {
       }
 
       trackFunnelEvent('soft_gate_truncated', { path: req.path, gateTier: gate === ANON_GATE ? 'anon' : 'free' });
-      return originalJson(applyGate(body, gate));
+      return originalJson(applyGate(body, gate, req.path));
     };
 
     next();

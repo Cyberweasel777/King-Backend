@@ -19,6 +19,10 @@ export interface ApiKeyLedgerEntry {
   dailyCount?: number;
   dailyCountDate?: string; // YYYY-MM-DD UTC
   status: 'active';
+  // Retention tracking (added 2026-03-21)
+  last_active_date?: string;  // YYYY-MM-DD UTC — last day this key made a call
+  days_active?: number;       // count of unique UTC days with ≥1 call
+  second_call_hours?: number; // hours between creation and second call (set once)
 }
 
 const API_KEY_DATA_DIR = process.env.API_KEY_DATA_DIR || '/data';
@@ -113,6 +117,36 @@ function touchValidKey(apiKey: string, entry: ApiKeyLedgerEntry): void {
     } else {
       entry.dailyCount = (entry.dailyCount || 0) + 1;
     }
+  }
+
+  // --- Retention instrumentation (2026-03-21) ---
+
+  // Emit second_auth_call exactly once when requestCount transitions 1→2
+  if (entry.requestCount === 2) {
+    const hoursAlive = (Date.now() - new Date(entry.createdAt).getTime()) / 3_600_000;
+    const roundedHours = Math.round(hoursAlive * 10) / 10;
+    entry.second_call_hours = roundedHours;
+    trackFunnelEvent('second_auth_call', {
+      keyPrefix: apiKey.slice(0, 8),
+      plan: entry.plan,
+      hours_since_creation: roundedHours,
+    });
+  }
+
+  // Track daily activity: emit key_daily_active on first call per UTC day
+  const today = todayUTC();
+  if (entry.last_active_date !== today) {
+    entry.days_active = (entry.days_active || 0) + 1;
+    entry.last_active_date = today;
+    const daysAlive = Math.floor(
+      (Date.now() - new Date(entry.createdAt).getTime()) / 86_400_000,
+    );
+    trackFunnelEvent('key_daily_active', {
+      keyPrefix: apiKey.slice(0, 8),
+      plan: entry.plan,
+      days_active: entry.days_active,
+      day_number_since_creation: daysAlive,
+    });
   }
 
   apiKeyLedger.set(apiKey, entry);

@@ -154,6 +154,7 @@ export function anonRateLimit(paths: string[], exclude: string[] = []): RequestH
 
     trackFunnelEvent('anon_rate_limit_429', { ip, path: req.path, used: entry.count });
 
+    const sourceParam = `&source=${encodeURIComponent(req.path)}`;
     res.status(429).json({
       error: 'daily_limit_exceeded',
       used: entry.count,
@@ -162,7 +163,7 @@ export function anonRateLimit(paths: string[], exclude: string[] = []): RequestH
       resets_at: resetInfo.resetAtIso,
       message: 'Raw data has limits. Intelligence doesn\'t.',
       upgrade: {
-        url: UPGRADE_URL,
+        url: UPGRADE_URL + sourceParam,
         plan: 'pro',
         price: '$9.99/mo',
         description: 'BotIndex Pro — Predictive signals, convergence scoring, whale divergence detection. Not just data — intelligence.',
@@ -175,7 +176,7 @@ export function anonRateLimit(paths: string[], exclude: string[] = []): RequestH
         ...(x402Upgrade?.body || {}),
       },
       sentinel: {
-        url: 'https://api.botindex.dev/api/botindex/keys/register?plan=sentinel',
+        url: 'https://api.botindex.dev/api/botindex/keys/register?plan=sentinel' + sourceParam,
         price: '$49.99/mo',
         description: 'Sentinel Intelligence — Predictive signals with verifiable track record. Query surge intelligence. Personal alert feed.',
         track_record: 'https://api.botindex.dev/api/botindex/sentinel/track-record',
