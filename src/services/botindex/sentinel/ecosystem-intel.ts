@@ -16,6 +16,12 @@ const GITHUB_TOKEN = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
 
 // Crypto ecosystem repos to track — maps to tradeable assets
 const TRACKED_REPOS: Array<{ repo: string; asset: string; category: string }> = [
+  // Bitcoin
+  { repo: 'bitcoin/bitcoin', asset: 'BTC', category: 'L1' },
+  { repo: 'lightningnetwork/lnd', asset: 'BTC', category: 'L1' },
+  { repo: 'ElementsProject/lightning', asset: 'BTC', category: 'L1' },
+  { repo: 'bcoin-org/bcoin', asset: 'BTC', category: 'L1' },
+  { repo: 'ABI-Software/ord', asset: 'BTC', category: 'L1' },
   // Layer 1s
   { repo: 'solana-labs/solana', asset: 'SOL', category: 'L1' },
   { repo: 'solana-labs/solana-program-library', asset: 'SOL', category: 'L1' },
@@ -57,6 +63,9 @@ const TRACKED_REPOS: Array<{ repo: string; asset: string; category: string }> = 
 
 // npm packages that signal ecosystem health
 const TRACKED_NPM: Array<{ pkg: string; asset: string; category: string }> = [
+  { pkg: 'bitcoinjs-lib', asset: 'BTC', category: 'L1' },
+  { pkg: '@scure/btc-signer', asset: 'BTC', category: 'L1' },
+  { pkg: 'bolt11', asset: 'BTC', category: 'L1' },
   { pkg: '@solana/web3.js', asset: 'SOL', category: 'L1' },
   { pkg: '@solana/spl-token', asset: 'SOL', category: 'L1' },
   { pkg: 'ethers', asset: 'ETH', category: 'L1' },
@@ -97,6 +106,8 @@ const TRACKED_NPM: Array<{ pkg: string; asset: string; category: string }> = [
 
 // PyPI packages — Python ecosystem signals
 const TRACKED_PYPI: Array<{ pkg: string; asset: string; category: string }> = [
+  { pkg: 'python-bitcoinlib', asset: 'BTC', category: 'L1' },
+  { pkg: 'bitcoinlib', asset: 'BTC', category: 'L1' },
   { pkg: 'solana', asset: 'SOL', category: 'L1' },
   { pkg: 'web3', asset: 'ETH', category: 'L1' },
   { pkg: 'brownie', asset: 'ETH', category: 'L1' },
@@ -113,6 +124,9 @@ const TRACKED_PYPI: Array<{ pkg: string; asset: string; category: string }> = [
 
 // Rust crates — critical for L1/infra chains built in Rust
 const TRACKED_CRATES: Array<{ crate: string; asset: string; category: string }> = [
+  { crate: 'bitcoin', asset: 'BTC', category: 'L1' },
+  { crate: 'lightning', asset: 'BTC', category: 'L1' },
+  { crate: 'bdk', asset: 'BTC', category: 'L1' },
   { crate: 'solana-sdk', asset: 'SOL', category: 'L1' },
   { crate: 'solana-program', asset: 'SOL', category: 'L1' },
   { crate: 'anchor-lang', asset: 'SOL', category: 'L1' },
