@@ -25,7 +25,7 @@ const JWT_SECRET = process.env.BOTINDEX_JWT_SECRET
 
 const MAGIC_LINK_EXPIRY = '15m';   // Link expires in 15 minutes
 const SESSION_EXPIRY = '24h';       // Session lasts 24 hours
-const DASHBOARD_URL = 'https://botindex.dev/sentinel/dashboard';
+const DASHBOARD_URL = process.env.BOTINDEX_DASHBOARD_URL || 'https://www.botindex.dev/sentinel/dashboard';
 const RESEND_API_BASE = 'https://api.resend.com/emails';
 const FROM_EMAIL = process.env.BOTINDEX_EMAIL_FROM || 'BotIndex <onboarding@resend.dev>';
 
