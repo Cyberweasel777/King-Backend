@@ -8,7 +8,9 @@
 import fs from 'fs';
 import path from 'path';
 import { Request, Response, Router } from 'express';
-import { extractApiKey, getApiKeyEntry } from '../middleware/apiKeyAuth';
+import { extractApiKey, getApiKeyEntry, getAllApiKeys } from '../middleware/apiKeyAuth';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import logger from '../../config/logger';
 import { getCachedSentinelReport, type SentinelReport } from '../../services/botindex/sentinel/signals';
 import { getCachedNetworkIntelligence, type NetworkIntelligenceReport } from '../../services/botindex/sentinel/network-intelligence';
@@ -19,12 +21,51 @@ const router = Router();
 
 const REGISTER_URL = 'https://api.botindex.dev/api/botindex/keys/register?plan=sentinel';
 
-function isSentinelAuthorized(req: Request): boolean {
+// JWT secret — same derivation as botindex-auth.ts
+const JWT_SECRET = process.env.BOTINDEX_JWT_SECRET
+  || (process.env.BOTINDEX_STRIPE_SECRET_KEY
+    ? crypto.createHash('sha256').update(`botindex-auth-${process.env.BOTINDEX_STRIPE_SECRET_KEY}`).digest('hex')
+    : 'botindex-dev-secret-change-me');
+
+/**
+ * Resolve user plan from either X-API-Key header OR Bearer session token.
+ * Returns the plan string if authenticated, null if not.
+ */
+function resolveAuthPlan(req: Request): string | null {
+  // Try API key first
   const key = extractApiKey(req);
-  if (!key) return false;
-  const entry = getApiKeyEntry(key);
-  if (!entry || entry.status !== 'active') return false;
-  return entry.plan === 'sentinel' || entry.plan === 'enterprise';
+  if (key) {
+    const entry = getApiKeyEntry(key);
+    if (entry && entry.status === 'active') return entry.plan;
+  }
+
+  // Try Bearer session token (from dashboard magic link auth)
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.slice(7);
+      const decoded = jwt.verify(token, JWT_SECRET) as { email: string; plan: string; type: string };
+      if (decoded.type === 'session') {
+        // Verify the user still has an active key
+        const allKeys = getAllApiKeys();
+        const match = allKeys.find(k => k.entry.email?.toLowerCase() === decoded.email.toLowerCase() && k.entry.status === 'active');
+        if (match) return match.entry.plan;
+      }
+    } catch {
+      // Invalid/expired token — fall through
+    }
+  }
+
+  return null;
+}
+
+function isSentinelAuthorized(req: Request): boolean {
+  const plan = resolveAuthPlan(req);
+  return plan === 'sentinel' || plan === 'enterprise';
+}
+
+function isAuthenticated(req: Request): boolean {
+  return resolveAuthPlan(req) !== null;
 }
 
 function buildUpgradeResponse() {
@@ -349,43 +390,13 @@ const ECO_SIGNALS_CACHE_TTL = 5 * 60 * 1000; // 5 min
 router.get('/sentinel/ecosystem-signals', async (_req: Request, res: Response) => {
   try {
     const now = Date.now();
-    if (ecoSignalsCache && (now - ecoSignalsCache.fetchedAt) < ECO_SIGNALS_CACHE_TTL) {
-      // Public gets aggregates only; Sentinel gets individual signals too
-      const isSentinel = !!extractApiKey(_req);
-      if (isSentinel) {
-        res.json(ecoSignalsCache.data);
-      } else {
-        res.json({
-          aggregates: ecoSignalsCache.data.aggregates.map(a => ({
-            asset: a.asset,
-            direction: a.direction,
-            strength: a.strength,
-            confidence: a.confidence,
-            signalCount: a.signalCount,
-            bullishCount: a.bullishCount,
-            bearishCount: a.bearishCount,
-            neutralCount: a.neutralCount,
-            narrative: a.narrative,
-          })),
-          grandAggregate: ecoSignalsCache.data.grandAggregate,
-          timestamp: ecoSignalsCache.data.timestamp,
-          sourcesOk: ecoSignalsCache.data.sourcesOk,
-          _note: 'Individual signal breakdown available with Sentinel plan',
-          _upgrade: REGISTER_URL,
-        });
-      }
-      return;
-    }
+    const plan = resolveAuthPlan(_req);
+    const hasSentinel = plan === 'sentinel' || plan === 'enterprise';
+    const hasAnyAuth = plan !== null;
 
-    const report = await generateEcosystemSignals();
-    ecoSignalsCache = { data: report, fetchedAt: now };
-
-    const isSentinel = !!extractApiKey(_req);
-    if (isSentinel) {
-      res.json(report);
-    } else {
-      res.json({
-        aggregates: report.aggregates.map(a => ({
+    function buildPublicResponse(data: EcosystemSignalReport) {
+      return {
+        aggregates: data.aggregates.map(a => ({
           asset: a.asset,
           direction: a.direction,
           strength: a.strength,
@@ -396,12 +407,31 @@ router.get('/sentinel/ecosystem-signals', async (_req: Request, res: Response) =
           neutralCount: a.neutralCount,
           narrative: a.narrative,
         })),
-        grandAggregate: report.grandAggregate,
-        timestamp: report.timestamp,
-        sourcesOk: report.sourcesOk,
-        _note: 'Individual signal breakdown available with Sentinel plan',
-        _upgrade: REGISTER_URL,
-      });
+        grandAggregate: data.grandAggregate,
+        timestamp: data.timestamp,
+        sourcesOk: data.sourcesOk,
+        _plan: plan || 'anonymous',
+        _note: hasSentinel ? undefined : 'Individual signal breakdown available with Sentinel plan',
+        _upgrade: hasSentinel ? undefined : REGISTER_URL,
+      };
+    }
+
+    if (ecoSignalsCache && (now - ecoSignalsCache.fetchedAt) < ECO_SIGNALS_CACHE_TTL) {
+      if (hasSentinel) {
+        res.json({ ...ecoSignalsCache.data, _plan: plan });
+      } else {
+        res.json(buildPublicResponse(ecoSignalsCache.data));
+      }
+      return;
+    }
+
+    const report = await generateEcosystemSignals();
+    ecoSignalsCache = { data: report, fetchedAt: now };
+
+    if (hasSentinel) {
+      res.json({ ...report, _plan: plan });
+    } else {
+      res.json(buildPublicResponse(report));
     }
   } catch (err) {
     logger.error({ err }, 'Ecosystem signals endpoint failed');
