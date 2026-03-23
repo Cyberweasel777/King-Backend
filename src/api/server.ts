@@ -104,6 +104,10 @@ app.use('/api/botindex', mcpCatalogRouter);
 // Agorion auto-discovery crawler and registry API
 app.use('/api/agorion', agorionRouter);
 
+// BaseRadar public API (no auth, no rate limiting)
+import baseradarRouter from './routes/baseradar';
+app.use('/api/baseradar', baseradarRouter);
+
 // BotIndex beacon
 app.get('/api/botindex/beacon', (req, res) => {
   res.set({
