@@ -28,6 +28,7 @@ import botindexTrustRouter from './botindex-trust';
 import botindexPumpfunRouter from './botindex-pumpfun';
 import botindexIntelRouter from './botindex-intel';
 import botindexComplianceRouter from './botindex-compliance';
+import analycysRouter from './analycys';
 import x402TestRouter from './x402-test';
 import x402PremiumRouter from './x402-premium';
 import memeradarRouter from './memeradar';
@@ -124,6 +125,9 @@ router.use('/', shellRouter);
 
 // Admin dashboard (traffic, conversions, funnel)
 router.use('/admin/dashboard', adminDashboardRouter);
+
+// Analycys routes
+router.use('/analycys', analycysRouter);
 
 // Admin analytics (Convex-powered persistent analytics)
 router.use('/admin', adminAnalyticsRouter);
